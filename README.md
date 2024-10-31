@@ -33,18 +33,23 @@ An essential feature of "The Tutor" is its Conversation History module, which st
 The Tutor might be applied on different scenarios.
 
 - Personalized Learning Experience
+
 "The Tutor" aims to enhance student learning by offering individualized feedback, allowing each student to learn at their own pace with personalized interactions.
 
 - Automated Student Evaluations
+
 The platform provides automated assessment tools for essays and questions, freeing up valuable time for educators while maintaining high standards for feedback quality.
 
 - Scalability and Adaptability
+
 Designed with scalability in mind, "The Tutor" can handle increasing volumes of student interactions without compromising the quality of service, thanks to its use of Azure services and AI-driven models.
 
 - Teacher Support and Insights
+
 Through the Professor Dashboard, educators are provided with real-time insights into student progress, enabling them to tailor lesson plans and interventions based on objective data.
 
 - Continuous Learning and Memory
+
 By using conversation history and memory, "The Tutor" ensures continuity in the learning process, helping students build upon previous sessions and facilitating long-term retention of knowledge.
 
 ## Getting Started
