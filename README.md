@@ -12,7 +12,7 @@ This project framework provides the following components:
 
 Students can engage with the platform through two main interfaces: the Avatar Interaction and the Textual (Async) Interaction. The Avatar Interaction offers a more immersive learning experience, providing real-time conversational feedback through an AI avatar that uses a Speech Avatar Engine to synthesize speech. In parallel, the Textual Interaction allows for more asynchronous interaction, where students can receive detailed responses in text form. Both interaction methods are processed by their respective engines, the Avatar Engine and Textual Engine, which ensure a smooth and context-aware experience by leveraging Azure OpenAI and cognitive services.
 
-### Avatar and Textual Interaction Layers
+### AI Engine and Vector Database
 
 The heart of "The Tutor" is its AI Engine (powered by Azure OpenAI), which processes interactions and provides intelligent responses based on student input. The platform stores interaction data and semantic representations in a Vector Database (Azure AI Search), allowing the AI engine to reference past conversations and retrieve relevant information for current interactions, enhancing the overall learning experience through personalization and memory retention.
 
