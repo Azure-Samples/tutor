@@ -1,0 +1,63 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python Debugger: Evaluation FastAPI",
+      "type": "debugpy",
+      "cwd": "${workspaceFolder}\\src\\evaluation_engine",
+      "request": "launch",
+      "module": "uvicorn",
+      "env": {
+        "Path": "${env:Path};${workspaceFolder}\\src"
+      },
+      "args": ["app.main:app", "--reload", "--port", "8084"],
+      "jinja": true,
+      "justMyCode": false
+    },
+    {
+      "name": "Python Debugger: Transcription FastAPI",
+      "type": "debugpy",
+      "cwd": "${workspaceFolder}\\src\\transcription_engine",
+      "request": "launch",
+      "module": "uvicorn",
+      "env": {
+        "Path": "${env:Path};${workspaceFolder}\\src"
+      },
+      "args": ["app.main:app", "--reload", "--port", "8083"],
+      "jinja": true,
+      "justMyCode": false
+    },
+    {
+      "name": "Python Debugger: Web Adapter FastAPI",
+      "type": "debugpy",
+      "cwd": "${workspaceFolder}\\src\\web_adapter",
+      "request": "launch",
+      "module": "uvicorn",
+      "env": {
+        "Path": "${env:Path};${workspaceFolder}\\src"
+      },
+      "args": ["app.main:app", "--reload", "--port", "8082"],
+      "jinja": true,
+      "justMyCode": false
+    },
+    {
+      "name": "Python Debugger: Web API FastAPI",
+      "type": "debugpy",
+      "cwd": "${workspaceFolder}\\src\\web_api",
+      "request": "launch",
+      "module": "uvicorn",
+      "env": {
+        "Path": "${env:Path};${workspaceFolder}\\src"
+      },
+      "args": ["app.main:app", "--reload", "--port", "8081"],
+      "jinja": true,
+      "justMyCode": false
+    },
+    {
+      "name": "Python Debugger: Python File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}"
+    }
+  ]
+}
