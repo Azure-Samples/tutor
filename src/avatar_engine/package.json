@@ -1,0 +1,10 @@
+{
+  "name": "avatar_engine",
+  "version": "0.1.0",
+  "main": "typescript/index.ts",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "microsoft-cognitiveservices-speech-sdk": "^1.41.0"
+  }
+}

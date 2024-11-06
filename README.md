@@ -95,5 +95,5 @@ To run the demo, follow these steps:
 (Any additional resources or related projects)
 
 - Link to supporting information
-- Link to similar sample
+- Link to similar sample\
 - ...
