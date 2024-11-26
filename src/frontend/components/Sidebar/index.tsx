@@ -15,7 +15,7 @@ interface SidebarProps {
 
 const menuGroups = [
   {
-    name: "TAYRA - CALLCENTER ANALYTICS",
+    name: "The Tutor - Student Assistant",
     menuItems: [
       {
         icon: (
@@ -60,7 +60,26 @@ const menuGroups = [
             />
           </svg>
         ),
-        label: "Job Management",
+        label: "Essays",
+        route: "/jobs",
+      },
+      {
+        icon: (
+          <svg
+            className="fill-current"
+            width="25"
+            height="25"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM13 11V16H11V11H8L12 7L16 11H13Z"
+              fill=""
+            />
+          </svg>
+        ),
+        label: "Questions",
         route: "/jobs",
       },
       {
@@ -83,8 +102,8 @@ const menuGroups = [
             />
           </svg>
         ),
-        label: "Transcription Analysis",
-        route: "/transcriptions",
+        label: "Avatar",
+        route: "/avatar",
       },
       {
         icon: (
@@ -102,7 +121,7 @@ const menuGroups = [
             />
           </svg>
         ),
-        label: "Chat with your Data",
+        label: "Chat",
         route: "/chat",
       }
     ]
@@ -125,7 +144,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             <Image
               width={150}
               height={50}
-              src={"/images/logo/logo.png"}
+              src={"/images/logo/logo.webp"}
               alt="Logo"
               priority
             />
