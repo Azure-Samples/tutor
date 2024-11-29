@@ -7,7 +7,7 @@ const api = axios.create({
 });
 
 export const webApp = axios.create({
-  baseURL: process.env.WEB_APP_BASE_URL || "http://localhost:8081"
+  baseURL: process.env.WEB_APP_BASE_URL || "http://localhost:8000"
 });
 
 export const webApi = axios.create({

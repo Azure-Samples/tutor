@@ -8,8 +8,14 @@ packages = [{include = "./python"}]
 
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.12, <3.13"
 aiohttp = "^3.10.3"
+fastapi = "^0.115.5"
+azure-storage-blob = "^12.24.0"
+promptflow = "^1.16.2"
+azure-identity = "^1.19.0"
+azure-cosmos = "^4.9.0"
+uvicorn = "^0.32.1"
 
 
 [tool.poetry.group.dev.dependencies]
