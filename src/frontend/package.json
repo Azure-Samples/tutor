@@ -15,7 +15,7 @@
     "axios": "^1.7.4",
     "flatpickr": "^4.6.13",
     "jsvectormap": "^1.6.0",
-    "next": "14.2.10",
+    "next": "14.2.15",
     "microsoft-cognitiveservices-speech-sdk": "^1.41.0",
     "powerbi-client-react": "^1.4.0",
     "react": "^18",
