@@ -13,7 +13,7 @@ const Breadcrumb = ({ pageName }: BreadcrumbProps) => {
         <ol className="flex items-center gap-2">
           <li>
             <Link className="font-medium text-kelly-green" href="/">
-              Tayra /
+              Tutor /
             </Link>
           </li>
           <li className="font-medium text-non-photo-blue">{pageName}</li>

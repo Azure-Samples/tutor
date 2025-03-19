@@ -1,19 +1,20 @@
-# PowerShell script
-
-# Function to execute a command and print its output
 function ExecuteCommand($command) {
     Write-Host "Executing: $command"
     Invoke-Expression $command
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error executing command: $LASTEXITCODE"
+        Write-Host "Error output: $($error[0])"
         exit $LASTEXITCODE
     }
 }
 
 # Go to the financial_analyst_py folder
 $rootFolder = (Get-Item -Path "$PSScriptRoot\..").FullName
-$command = "cd $rootFolder\src\backend"
-ExecuteCommand $command
+try {
+    Set-Location -Path "$rootFolder\src"
+} catch {
+    Write-Host "Error changing directory: $_"
+}
 
 # Configure the package to use local .venv
 $command = "poetry config virtualenvs.in-project true"

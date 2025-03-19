@@ -2,9 +2,9 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Python Debugger: Evaluation FastAPI",
+      "name": "Avatar",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\evaluation_engine",
+      "cwd": "${workspaceFolder}\\src\\avatar",
       "request": "launch",
       "module": "uvicorn",
       "env": {
@@ -15,9 +15,9 @@
       "justMyCode": false
     },
     {
-      "name": "Python Debugger: Transcription FastAPI",
+      "name": "Essay",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\transcription_engine",
+      "cwd": "${workspaceFolder}\\src\\essays",
       "request": "launch",
       "module": "uvicorn",
       "env": {
@@ -28,9 +28,9 @@
       "justMyCode": false
     },
     {
-      "name": "Python Debugger: Web Adapter FastAPI",
+      "name": "Questions",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\web_adapter",
+      "cwd": "${workspaceFolder}\\src\\questions",
       "request": "launch",
       "module": "uvicorn",
       "env": {
@@ -41,9 +41,9 @@
       "justMyCode": false
     },
     {
-      "name": "Python Debugger: Web API FastAPI",
+      "name": "Configuration",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\web_api",
+      "cwd": "${workspaceFolder}\\src\\configuration",
       "request": "launch",
       "module": "uvicorn",
       "env": {

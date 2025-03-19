@@ -2,8 +2,12 @@ import axios from 'axios';
 
 export const BACK_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost'
 
+const api = axios.create({
+  baseURL: process.env.WEB_APP_BASE_URL || "http://localhost:8084"
+});
+
 export const webApp = axios.create({
-  baseURL: process.env.WEB_APP_BASE_URL || "http://localhost:8081"
+  baseURL: process.env.WEB_APP_BASE_URL || "http://localhost:8084"
 });
 
 export const webApi = axios.create({
@@ -17,3 +21,5 @@ export const transcriptionApi = axios.create({
 export const evaluateApi = axios.create({
   baseURL: process.env.EVALUATE_API_BASE_URL || "http://localhost:8084"
 });
+
+export default api;
