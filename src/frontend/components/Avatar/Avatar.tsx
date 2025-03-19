@@ -8,11 +8,13 @@ import { Case } from "@/types/cases";
 const speechKey = process.env.NEXT_PUBLIC_SPEECH_KEY || "";
 const speechRegion = process.env.NEXT_PUBLIC_SPEECH_REGION || "";
 
+
 type AvatarConfig = {
   character: string;
   style: string;
   videoFormat: SpeechSDK.AvatarVideoFormat;
 };
+
 
 class AvatarHandler {
   public speechConfig: SpeechSDK.SpeechConfig;
@@ -235,7 +237,7 @@ const AvatarChat: React.FC = () => {
         const response = await webApp.get("/profile");
         if (response.status === 200) {
           setChatId(response?.data?.result);
-  
+
           const gender = response?.data?.result?.profile?.gender || "male";
           const language = "pt-BR";
           const voice = gender === "feminino" ? "pt-BR-FranciscaNeural" : "pt-BR-AntonioNeural";
@@ -245,7 +247,7 @@ const AvatarChat: React.FC = () => {
             style: gender === "feminino" ? "casual-sitting" : "casual",
             videoFormat: new SpeechSDK.AvatarVideoFormat("H264", 2000000, 1920, 1080),
           });
-  
+
           avatarHandlerRef.current.speechConfig.speechSynthesisLanguage = language;
           avatarHandlerRef.current.speechConfig.speechSynthesisVoiceName = voice;
   
@@ -285,7 +287,7 @@ const AvatarChat: React.FC = () => {
           setChatHistory(updatedChatHistory);
         }
 
-        const response = await avatarHandlerRef.current.getAvatarResponse(spokenText, isChatHistory ? isChatHistory.toString() : "", isChatId);
+        const response = await avatarHandlerRef.current.getAvatarResponse(spokenText, isChatHistory ? JSON.stringify(isChatHistory) : "", isChatId);
 
         if (response) {
           setChatHistory((prev) => [...(prev || []), { assistant: response }]);
@@ -359,7 +361,7 @@ const AvatarChat: React.FC = () => {
               <div key={index} className="mb-2">
                 {Object.entries(message).map(([key, value]) => (
                   <p key={key} className="text-gray-700">
-                    <strong>{key === "assistant" ? "paciente": "você"}:</strong> {value}
+                    <strong>{key === "assistant" ? "entrevistador": "você"}:</strong> {value}
                   </p>
                 ))}
               </div>

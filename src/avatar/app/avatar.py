@@ -15,6 +15,7 @@ from app.schemas import ChatResponse
 
 load_dotenv(find_dotenv())
 
+
 DEFAULT_CREDENTIAL = DefaultAzureCredential()
 GPT4_KEY = os.getenv("GPT4O_KEY", "")
 GPT4_URL = os.getenv("GPT4O_URL", "")
@@ -26,7 +27,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_CONFIG = AzureOpenAIModelConfiguration(
     azure_deployment="gpt-4o-mini",
     azure_endpoint=MODEL_URL,
-    api_version="2024-08-01-preview",
+    api_version="2025-01-01-preview",
     api_key=MODEL_KEY
 )
 
@@ -71,7 +72,7 @@ class AvatarChat:
     def evaluate(self, avatar_data: dict, prompt_data: ChatResponse):
         start = time.time()
         prompty = Prompty.load(
-            source=f"{BASE_DIR}/prompts/avatar.prompty",
+            source=f"{BASE_DIR}/prompts/interview.prompty",
             model={"configuration": self.model_config},
         )
         output = prompty(
@@ -80,7 +81,8 @@ class AvatarChat:
             profile=avatar_data["profile"],
             case=avatar_data["role"],
             steps=avatar_data["steps"],
-            user_prompt=prompt_data.prompt
+            user_prompt=prompt_data.prompt,
+            previous_chat=prompt_data.chat_history,
         )
         logger.info("Evaluation took: %s seconds", time.time() - start)
         return output
