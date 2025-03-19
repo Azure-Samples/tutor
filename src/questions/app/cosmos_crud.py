@@ -36,20 +36,24 @@ class CosmosCRUD:
             parameters = []
         async for container in self._get_container():
             items = [item async for item in container.query_items(query=query, parameters=parameters)]
-            return items
+        return items
 
     async def create_item(self, item: dict):
         async for container in self._get_container():
-            return await container.upsert_item(item)
+            response = await container.upsert_item(item)
+        return response
 
     async def read_item(self, item_id: str):
         async for container in self._get_container():
-            return await container.read_item(item=item_id, partition_key=item_id)
+            response = await container.read_item(item=item_id, partition_key=item_id)
+        return response
 
     async def update_item(self, item_id: str, item: dict):
         async for container in self._get_container():
-            return await container.replace_item(item=item_id, body=item)
+            response = await container.replace_item(item=item_id, body=item)
+        return response
 
     async def delete_item(self, item_id: str):
         async for container in self._get_container():
-            return await container.delete_item(item=item_id, partition_key=item_id)
+            response = await container.delete_item(item=item_id, partition_key=item_id)
+        return response

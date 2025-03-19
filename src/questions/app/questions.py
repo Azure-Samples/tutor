@@ -29,10 +29,10 @@ import jinja2
 import semantic_kernel as sk
 
 from semantic_kernel.agents import ChatCompletionAgent
+from semantic_kernel.contents import ChatHistory, ChatMessageContent, AuthorRole
 from semantic_kernel.connectors.ai import FunctionChoiceBehavior
-from semantic_kernel.contents.chat_history import ChatHistory
-from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
+from semantic_kernel.functions.kernel_arguments import KernelArguments
 
 from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
@@ -43,19 +43,15 @@ import asyncio
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-print(f"Base dir: {BASE_DIR}")
 ENV_FILE = os.path.join(BASE_DIR, ".env")
-print(f"Env file: {ENV_FILE}")
 load_dotenv(ENV_FILE)
 
 
 COSMOS_DB_NAME = os.getenv("COSMOS_QNA_NAME", "mydb")
 COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "https://myendpoint.documents.azure.com:443/")
-
+COSMOS_ASSEMBLY_TABLE = os.getenv("COSMOS_ASSEMBLY_TABLE", "assembly")
 AZURE_MODEL_KEY = os.getenv("AZURE_MODEL_KEY", "")
 AZURE_MODEL_URL = os.getenv("AZURE_MODEL_URL", "")
-
-COSMOS_ASSEMBLY_TABLE = os.getenv("COSMOS_ASSEMBLY_TABLE", "assembly")
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "prompts")
 JINJA_ENV = jinja2.Environment(loader=jinja2.FileSystemLoader(TEMPLATES_DIR))
 
@@ -127,7 +123,6 @@ class AnswerGrader(GraderBase):
         settings = self.kernel.get_prompt_execution_settings_from_service_id(service_id=self.grader.model_id)
         settings.function_choice_behavior = FunctionChoiceBehavior.Auto()
         self.agent = ChatCompletionAgent(
-            service_id=str(self.grader.model_id),
             kernel=self.kernel,
             name=self.grader.name,
             instructions=rendered_settings,
@@ -150,11 +145,11 @@ class AnswerGrader(GraderBase):
             answer=answer
         )
 
-        chat.add_user_message(rendered_prompt)
+        chat.add_message(ChatMessageContent(role=AuthorRole.USER, content=rendered_prompt))
         response = ""
         async for message in self.agent.invoke(chat):
             response += message.content
-            chat.add_assistant_message(message)
+            chat.add_message(ChatMessageContent(role=AuthorRole.ASSISTANT, content=message.content))
 
         if self.mediator:
             self.mediator.notify(
@@ -199,18 +194,18 @@ class AnswerOrchestrator:
     def __init__(self) -> None:
         self.graders: List[AnswerGrader] = []
 
-    async def __parallel_processing(self, question: Question, answer: Answer):  # pylint: disable=unused-private-member
+    async def _parallel_processing(self, question: Question, answer: Answer):  # pylint: disable=unused-private-member
         """
         Execute the 'interact' method of all graders in parallel.
         """
+        answers = []
+        chat = ChatHistory()
+        async def interact_with_grader(grader: AnswerGrader, chat: ChatHistory):
+            return await grader.interact(question, answer, chat)
 
-        async def interact_with_grader(grader):
-            chat = ChatHistory()
-            await grader.interact(question, answer, chat)
+        return await asyncio.gather(*(interact_with_grader(grader, chat) for grader in self.graders))
 
-        return await asyncio.gather(*(interact_with_grader(grader) for grader in self.graders))
-
-    async def __sequential_processing(self, question: Question, answer: Answer):  # pylint: disable=unused-private-member
+    async def _sequential_processing(self, question: Question, answer: Answer):  # pylint: disable=unused-private-member
         """
         Execute the 'interact' method of all graders sequentially.
         """
@@ -238,7 +233,7 @@ class AnswerOrchestrator:
         factory = GraderFactory()
         assembly = await self.fetch_assembly(assembly_id)
         self.graders = factory.create_graders(assembly)
-        answers = getattr(self, f"__{strategy}_processing")(question, answer)
+        answers = await getattr(self, f"_{strategy}_processing")(question, answer)
         return answers
 
     async def fetch_assembly(self, assembly_id: str) -> Assembly:

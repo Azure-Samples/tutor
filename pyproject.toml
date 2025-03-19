@@ -9,7 +9,7 @@ packages = [{include = "./python"}]
 
 [tool.poetry.dependencies]
 python = "^3.12, <3.13"
-aiohttp = "^3.10.3"
+aiohttp = "*"
 fastapi = "^0.115.5"
 azure-storage-blob = "^12.24.0"
 promptflow = "^1.16.2"
