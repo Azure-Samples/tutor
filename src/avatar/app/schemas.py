@@ -3,7 +3,7 @@ A package that manages the response bodies.
 """
 
 from pydantic import BaseModel
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union, Any
 
 from starlette.status import (
     HTTP_200_OK,
@@ -16,7 +16,7 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_418_IM_A_TEAPOT,
-    HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_422_UNPROCESSABLE_ENTITY
 )
 
 
@@ -28,7 +28,7 @@ class BodyMessage(BaseModel):
     success: bool
     type: Optional[str]
     title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    detail: Optional[Union[dict[str, Union[str, list]], list[dict[str, Union[str, list]]]]]
 
 class ChatResponse(BaseModel):
     """
@@ -36,17 +36,16 @@ class ChatResponse(BaseModel):
     """
     case_id: str
     prompt: str
-    chat_history: str
+    chat_history: Optional[list[dict[str, Any]]] = None
 
 
 class Case(BaseModel):
     name: str
     role: str
     id: Optional[str] = None
-    steps: Optional[List] = None
-    profile: Optional[Dict] = None
-    history: Optional[List] = None
-
+    steps: Optional[list] = None
+    profile: Optional[dict] = None
+    history: Optional[list] = None
 
 
 RESPONSES = {

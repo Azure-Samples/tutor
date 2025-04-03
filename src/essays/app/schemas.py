@@ -1,9 +1,11 @@
 """
 A package that manages the response bodies.
 """
+import json
+from dataclasses import dataclass
 
-from pydantic import BaseModel
 from typing import Dict, List, Optional, Union
+from pydantic import BaseModel, field_validator, Field
 
 from starlette.status import (
     HTTP_200_OK,
@@ -30,23 +32,100 @@ class BodyMessage(BaseModel):
     title: Optional[str]
     detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
 
+
+@dataclass
+class SuccessMessage:
+    """
+    The base message body for HTTP responses
+    """
+
+    title: Optional[str]
+    message: Optional[str]
+    content: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+
+
+@dataclass
+class ErrorMessage:
+    """
+    The base message body for HTTP responses
+    """
+
+    success: bool
+    type: Optional[str]
+    title: Optional[str]
+    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+
+
+class Essay(BaseModel):
+    id: str = Field(..., description="Question ID")
+    topic: str
+    content: str
+    explanation: Optional[str] = Field(..., description="Question Explanation")
+
+
+class Resource(BaseModel):
+    id: str = Field(..., description="Question ID")
+    url: str = Field(..., description="Respondent Name")
+    content: str = Field(..., description="Answer Text")
+    essay_id: str = Field(..., description="Question ID")
+
+
 class ChatResponse(BaseModel):
     """
     The response from the chatbot
     """
     case_id: str
-    prompt: str
-    chat_history: str
+    essay: Essay
+    resources: list[Resource]
 
 
-class Case(BaseModel):
-    name: str
-    role: str
-    id: Optional[str] = None
-    steps: Optional[List] = None
-    profile: Optional[Dict] = None
-    history: Optional[List] = None
+class Grader(BaseModel):
+    """
+    Represents a Grader with an id, model, url, and metaprompt.
 
+    Attributes:
+        id (str): The unique identifier for the judge.
+        model (HttpUrl): The model name of the judge.
+        metaprompt (str): The metaprompt for the judge.
+    """
+
+    id: str = Field(..., description="Judge ID")
+    name: str = Field(..., description="Judge Name", max_length=16)
+    model_id: str = Field(..., description="Model ID")
+    metaprompt: str = Field(..., description="Grader System Prompt Parameters")
+
+    @classmethod
+    @field_validator("model")
+    def model_must_be_azure_url(cls, v):
+        if not v.startswith("https://"):
+            raise ValueError("model must be a URL from Azure Open AI")
+        return v
+
+    @classmethod
+    @field_validator("metaprompt")
+    def metaprompt_must_be_json_serializable(cls, v):
+        try:
+            json.loads(v)
+        except json.JSONDecodeError as jexc:
+            raise ValueError("metaprompt must be JSON serializable") from jexc
+        if not ("text" in v and "json" in v):
+            raise ValueError("metaprompt must contain the format (text, json)")
+        return v
+
+
+class Assembly(BaseModel):
+    """
+    Represents an Assemble with an id, list of judges, and roles.
+
+    Attributes:
+        id (int): The unique identifier for the assemble.
+        judges (List[Judge]): A list of Judge objects.
+        roles (List[str]): A list of roles.
+    """
+
+    id: str = Field(..., description="Assembly ID")
+    agents: List[Grader] = Field(..., description="Judges Assemblies")
+    topic_name: str = Field(..., description="Topic to Answer")
 
 
 RESPONSES = {

@@ -19,6 +19,8 @@ uvicorn = "^0.32.1"
 jinja2 = "^3.1.5"
 semantic-kernel = "^1.20.0"
 autogen = "^0.8.2"
+azure-ai-projects = "^1.0.0b8"
+azure-ai-inference = "^1.0.0b9"
 
 
 [tool.poetry.group.dev.dependencies]

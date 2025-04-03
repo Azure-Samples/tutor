@@ -6,8 +6,7 @@ model:
   parameters:
     max_tokens: 3000
     temperature: 0.8
-    response_format:
-        type: text
+    response_format: text
 inputs:
   role:
     type: string
