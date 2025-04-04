@@ -157,7 +157,7 @@ async def grader_interaction(payload: ChatResponse) -> JSONResponse:
     Returns the evaluated answer from the agents involved.
     """
     aggregated_response = await answer_orchestrator.run_interaction(payload.case_id, payload.question, payload.answer)
-    return JSONResponse({"text": aggregated_response})
+    return JSONResponse({"text": jsonable_encoder(aggregated_response)})
 
 
 @app.get("/questions", tags=["CRUD - Perguntas"])

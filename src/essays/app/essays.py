@@ -53,7 +53,7 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from app.schemas import Assembly, Grader, Question, Answer
+from app.schemas import Assembly, Grader, Essay, Resource
 
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -164,7 +164,7 @@ class AnswerGrader(GraderBase):
         )
 
     @override
-    async def interact(self, question: Question, answer: Answer, chat: ChatHistory) -> str:  # pylint: disable=arguments-differ
+    async def interact(self, essay: Essay, resources: list[Resource], chat: ChatHistory) -> str:  # pylint: disable=arguments-differ
         """
         Interact with a provided question and answer using the ChatCompletionAgent.
 
@@ -178,8 +178,8 @@ class AnswerGrader(GraderBase):
         """
         prompt_template = JINJA_ENV.get_template("correct.jinja")
         rendered_prompt = prompt_template.render(
-            question=question,
-            answer=answer
+            essay=essay,
+            resources=resources
         )
         chat.add_message(ChatMessageContent(role=AuthorRole.USER, content=rendered_prompt))
         response = ""
@@ -231,7 +231,7 @@ class GraderFactory:
         return [AnswerGrader(grader=ad, kernel=self.__build_kernel()) for ad in assembly.agents]
 
 
-class AnswerOrchestrator:
+class EssayOrchestrator:
     """
     High-level orchestrator that merges grader management and interaction execution.
 
@@ -241,7 +241,7 @@ class AnswerOrchestrator:
     def __init__(self) -> None:
         self.graders: List[AnswerGrader] = []
 
-    async def _parallel_processing(self, question: Question, answer: Answer) -> List:
+    async def _parallel_processing(self, essay: Essay, resources: list[Resource]) -> List:
         """
         Execute the 'interact' method of all graders concurrently.
 
@@ -250,12 +250,12 @@ class AnswerOrchestrator:
         :return: A list of responses from all graders executed in parallel.
         """
         async def interact_with_grader(grader: AnswerGrader, chat: ChatHistory) -> str:
-            return await grader.interact(question, answer, chat)
+            return await grader.interact(essay, resources, chat)
 
         chat = ChatHistory()
         return await asyncio.gather(*(interact_with_grader(grader, chat) for grader in self.graders))
 
-    async def _sequential_processing(self, question: Question, answer: Answer) -> List:
+    async def _sequential_processing(self, essay: Essay, resources: list[Resource]) -> List:
         """
         Execute the 'interact' method of all graders sequentially.
 
@@ -266,15 +266,15 @@ class AnswerOrchestrator:
         answers = []
         for index, grader in enumerate(self.graders):
             chat = ChatHistory()
-            result = await grader.interact(question, answer, chat)
+            result = await grader.interact(essay, resources, chat)
             answers.append({f"agent_{index}": result})
         return answers
 
     async def run_interaction(
             self,
             assembly_id: str,
-            question: Question,
-            answer: Answer,
+            essay: Essay,
+            resources: list[Resource],
             strategy: Literal["parallel", "sequential"] = "parallel") -> str:
         """
         Orchestrate the grader interactions for a given assembly.
@@ -295,7 +295,7 @@ class AnswerOrchestrator:
         factory = GraderFactory()
         assembly = await self.fetch_assembly(assembly_id)
         self.graders = factory.create_graders(assembly)
-        answers = await getattr(self, f"_{strategy}_processing")(question, answer)
+        answers = await getattr(self, f"_{strategy}_processing")(essay, resources)
         return answers
 
     async def fetch_assembly(self, assembly_id: str) -> Assembly:
