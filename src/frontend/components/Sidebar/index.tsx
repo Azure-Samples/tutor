@@ -25,7 +25,7 @@ const menuGroups = [
               viewBox="0 0 100 100"
               xmlns="http://www.w3.org/2000/svg"
           >
-              <circle cx="50" cy="50" r="45" stroke="black" stroke-width="2" fill="none" />
+              <circle cx="50" cy="50" r="45" stroke="black" strokeWidth="2" fill="none" />
               <g fill="black">
                   <rect x="47" y="5" width="6" height="10" />
                   <rect x="47" y="85" width="6" height="10" />
@@ -37,7 +37,7 @@ const menuGroups = [
                   <rect x="20" y="75" width="6" height="10" transform="rotate(-45 20 75)" />
                   <rect x="75" y="75" width="6" height="10" transform="rotate(45 75 75)" />
               </g>
-              <circle cx="50" cy="50" r="20" fill="none" stroke="black" stroke-width="2" />
+              <circle cx="50" cy="50" r="20" fill="none" stroke="black" strokeWidth="2" />
               <circle cx="50" cy="50" r="6" fill="black" />
           </svg>
         ),

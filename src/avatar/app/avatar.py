@@ -36,6 +36,7 @@ AI_PROJECT = AIProjectClient.from_connection_string(
 )
 
 class AvatarChat:
+
     def __init__(
         self,
         model_deployment: str = MODEL_DEPLOYMENT,
