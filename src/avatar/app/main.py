@@ -41,10 +41,14 @@ tags_metadata: list[dict] = [
         "name": "Avatar",
         "description": """Endpoints de gerenciamento de dados do Avatar.""",
     },
+    {
+        "name": "Configuration",
+        "description": """Endpoints de gerenciamento de dados do Avatar.""",
+    },
 ]
 
 description: str = """
-    Uma API Web para gerenciar o avatar.
+    .
 """
 
 
@@ -121,7 +125,7 @@ async def avatar_profile() -> JSONResponse:
     return JSONResponse({"result": random.choice(cases)})
 
 
-@app.post("/create-case", tags=["Avatar"])
+@app.post("/create-case", tags=["Configuration"])
 async def create_case(case: Case) -> JSONResponse:
     """
     Endpoint para reprocessar lotes de arquivos.

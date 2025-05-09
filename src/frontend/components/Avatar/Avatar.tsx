@@ -35,7 +35,6 @@ class AvatarHandler {
   }
 
   public updateLanguage(language: string, voice: string) {
-    // Update language and voice for TTS
     this.speechConfig.speechSynthesisLanguage = language;
     this.speechConfig.speechSynthesisVoiceName = voice;
 
@@ -54,10 +53,14 @@ class AvatarHandler {
     );
 
     if (!response.ok) {
+      console.error("Failed to fetch ICE server information:", response);
       throw new Error("Failed to fetch ICE server information");
     }
 
+    console.log("ICE server information fetched successfully. \nResponse: ", response);
+
     const data = await response.json();
+
     return data.Urls.map((url: string) => ({
       urls: url,
       username: data.Username,
@@ -98,6 +101,7 @@ class AvatarHandler {
     };
   
     peerConnection.ontrack = (event) => {
+      console.log("Track event received:", event);
       if (event.track.kind === "audio") {
         console.log("Audio track received from the avatar.");
         const audioElement = document.createElement("audio");
@@ -105,9 +109,9 @@ class AvatarHandler {
         audioElement.srcObject = event.streams[0];
         audioElement.autoplay = true;
         audioElement.className = "hidden";
-  
+
         audioElement.controls = true;
-  
+
         document.body.appendChild(audioElement);
       }
       if (event.track.kind === "video" && videoRef.current) {
@@ -116,12 +120,12 @@ class AvatarHandler {
         videoElement.srcObject = event.streams[0];
         videoElement.autoplay = true;
         videoElement.playsInline = true;
-  
+
         videoRef.current.innerHTML = "";
         videoRef.current.appendChild(videoElement);
       }
     };
-  
+
     await this.avatarSynthesizer.startAvatarAsync(peerConnection);
     console.log("Avatar session started.");
   }
@@ -255,6 +259,14 @@ const AvatarChat: React.FC = () => {
         }
       } catch (error) {
         console.error("Error fetching profile data:", error);
+        avatarHandlerRef.current = new AvatarHandler({
+          character: "lisa",
+          style: "feminino",
+          videoFormat: new SpeechSDK.AvatarVideoFormat("H264", 2000000, 1920, 1080),
+        });
+
+        avatarHandlerRef.current.speechConfig.speechSynthesisLanguage = "pt-BR";
+        avatarHandlerRef.current.speechConfig.speechSynthesisVoiceName = "pt-BR-FranciscaNeural";
       }
     };
   
@@ -262,7 +274,6 @@ const AvatarChat: React.FC = () => {
   }, []);
 
   const handleStartAvatar = async () => {
-    console.log(isChatId?.profile?.gender);
     if (avatarHandlerRef.current && videoRef.current) {
       setIsLoading(true);
       try {

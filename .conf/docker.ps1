@@ -14,7 +14,7 @@ if (-not $imageVersion) {
 Set-Location -Path $gitRepositoryAddress
 
 # Read the .env file. You might want to add this.
-$envFile = Get-Content "src\backend\.env"
+$envFile = Get-Content "src\.env"
 
 # # Extract the username and password from the .env file
 $usernameLine = $envFile | Where-Object { $_ -match "^ACR_USER = " }
