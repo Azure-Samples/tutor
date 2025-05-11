@@ -1,5 +1,5 @@
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import CardLayout from "@/components/Cards/Cards";
+import QuestionsList from "@/components/Lists/Questions";
 
 import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
@@ -14,9 +14,7 @@ const TablesPage = () => {
   return (
     <DefaultLayout>
       <Breadcrumb pageName="Transcription Evaluation" />
-      <div className="flex flex-col gap-10">
-        <CardLayout />
-      </div>
+      <QuestionsList />
     </DefaultLayout>
   );
 };

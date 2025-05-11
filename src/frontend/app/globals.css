@@ -26,8 +26,49 @@ body {
     rgb(var(--background-start-rgb));
 }
 
+body, input, textarea, button, select {
+  font-family: 'Satoshi', 'Quicksand', 'Nunito', 'Inter', 'Segoe UI Rounded', 'Segoe UI', Arial, sans-serif;
+  font-feature-settings: "ss01" on, "ss02" on;
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-8deg) scale(1); }
+  20% { transform: rotate(8deg) scale(1.08); }
+  40% { transform: rotate(-8deg) scale(1.12); }
+  60% { transform: rotate(8deg) scale(1.16); }
+  80% { transform: rotate(-8deg) scale(1.12); }
+}
+.animate-wiggle {
+  animation: wiggle 1.5s infinite;
+}
+@keyframes spin-slow {
+  100% { transform: rotate(360deg); }
+}
+.animate-spin-slow {
+  animation: spin-slow 4s linear infinite;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+}
+
+/* Dot-style scrollbar for forms */
+.form-dot-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  background: transparent;
+}
+.form-dot-scrollbar::-webkit-scrollbar-thumb {
+  background: #22d3ee;
+  border-radius: 50%;
+  min-height: 24px;
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  margin: 2px 0;
+}
+.form-dot-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #22d3ee transparent;
 }

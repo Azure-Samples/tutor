@@ -15,12 +15,13 @@
     "axios": "^1.8.2",
     "flatpickr": "^4.6.13",
     "jsvectormap": "^1.6.0",
-    "next": "14.2.26",
     "microsoft-cognitiveservices-speech-sdk": "^1.41.0",
+    "next": "14.2.26",
     "powerbi-client-react": "^1.4.0",
     "react": "^18",
     "react-apexcharts": "^1.4.1",
     "react-dom": "^18",
+    "react-icons": "^5.5.0",
     "react-modal": "^3.16.1"
   },
   "devDependencies": {
