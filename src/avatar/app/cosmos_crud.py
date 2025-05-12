@@ -9,7 +9,7 @@ from azure.identity.aio import DefaultAzureCredential
 class CosmosCRUD:
     def __init__(self, container_env_var: str):
         self.cosmos_endpoint = os.getenv("COSMOS_ENDPOINT", "")
-        self.database_name = os.getenv("COSMOS_ESSAYS_NAME", "")
+        self.database_name = os.getenv("COSMOS_AVATAR_NAME", "")
         self.container_name = os.getenv(container_env_var, "")
         print(f"Container name: {self.container_name}")
         print(f"Cosmos endpoint: {self.cosmos_endpoint}")

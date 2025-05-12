@@ -1,15 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import { questionsEngine } from "@/utils/api";
+import { Question } from "@/types/question";
 import FormsModal from "@/components/common/Modals";
-import { FaTrash, FaPen, FaPlus, FaQuestionCircle, FaBook } from "react-icons/fa";
-
-// Minimal Question type for demo
-interface Question {
-  id?: string;
-  text: string;
-  topic: string;
-}
+import { FaTrash, FaPen, FaPlus } from "react-icons/fa";
+import QuestionForm from "@/components/Forms/Questions";
 
 const QuestionsList: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -26,91 +21,48 @@ const QuestionsList: React.FC = () => {
     setShowDeleteModal(false);
   };
 
-  useEffect(() => {
+  const fetchQuestions = async () => {
     setLoading(true);
-    questionsEngine.get("/questions").then((res) => {
-      setQuestions(res.data.content || []);
-      setLoading(false);
-    });
-  }, []);
-
-  const handleEditClick = (question: Question) => {
-    setSelectedQuestion(question);
-    closeAllModals();
-    setShowEditModal(true);
+    try {
+      const res = await questionsEngine.get("/questions");
+      console.log("Questions API response:", res.data);
+      // Try common property names for the questions array
+      setQuestions(
+        res.data.result ||
+        res.data.questions ||
+        res.data.content ||
+        []
+      );
+    } catch {
+      setQuestions([]);
+    }
+    setLoading(false);
   };
 
-  const handleDeleteClick = (question: Question) => {
-    setSelectedQuestion(question);
+  useEffect(() => {
+    fetchQuestions();
+  }, []);
+
+  const handleEditClick = async (q: Question) => {
+    setModalLoading(true);
+    closeAllModals();
+    setShowEditModal(true);
+    setSelectedQuestion(q);
+    setModalLoading(false);
+  };
+
+  const handleDeleteClick = (q: Question) => {
+    setSelectedQuestion(q);
     closeAllModals();
     setShowDeleteModal(true);
   };
 
   const confirmDelete = async () => {
-    if (!selectedQuestion?.id) return;
-    await questionsEngine.delete(`/questions/${selectedQuestion.id}`);
-    setQuestions(questions.filter((q) => q.id !== selectedQuestion.id));
+    if (!selectedQuestion) return;
+    await questionsEngine.delete(`/questions/${selectedQuestion.topic}`);
+    setQuestions(questions.filter((q) => q.topic !== selectedQuestion.topic));
     closeAllModals();
     setSelectedQuestion(null);
-  };
-
-  const QuestionForm = ({ question, onSuccess }: { question?: Question; onSuccess: () => void }) => {
-    const [form, setForm] = useState<Question>(question || { text: "", topic: "" });
-    const [status, setStatus] = useState("");
-    const isEdit = !!question?.id;
-
-    const handleSubmit = async () => {
-      setStatus("Saving...");
-      try {
-        let res;
-        if (isEdit) {
-          res = await questionsEngine.put(`/questions/${question.id}`, form);
-        } else {
-          res = await questionsEngine.post("/questions", form);
-        }
-        if (res.status === 200 || res.status === 201) {
-          setStatus(isEdit ? "Question updated!" : "Question created!");
-          onSuccess();
-        } else {
-          setStatus("Error saving question.");
-        }
-      } catch (e) {
-        setStatus("Error saving question.");
-      }
-    };
-
-    return (
-      <form className="flex flex-col gap-4 w-full max-w-xl">
-        <label className="flex items-center gap-2 text-cyan-700 font-bold">
-          <FaQuestionCircle /> Question Text
-        </label>
-        <input
-          type="text"
-          value={form.text}
-          onChange={e => setForm({ ...form, text: e.target.value })}
-          className="w-full rounded-2xl border-2 border-cyan-200 focus:border-green-400 focus:ring-2 focus:ring-green-200 px-4 py-3 text-lg transition-all duration-200 bg-cyan-50 dark:bg-cyan-900 placeholder:text-cyan-400 focus:bg-white dark:focus:bg-boxdark"
-          placeholder="Type the question"
-        />
-        <label className="flex items-center gap-2 text-green-700 font-bold">
-          <FaBook /> Topic
-        </label>
-        <input
-          type="text"
-          value={form.topic}
-          onChange={e => setForm({ ...form, topic: e.target.value })}
-          className="w-full rounded-2xl border-2 border-green-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-green-50 dark:bg-green-900 placeholder:text-green-400 focus:bg-white dark:focus:bg-boxdark"
-          placeholder="Topic"
-        />
-        <button
-          type="button"
-          onClick={handleSubmit}
-          className="mt-4 px-4 py-3 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold rounded-2xl shadow-lg w-full flex items-center justify-center gap-2 text-lg transition-all duration-200"
-        >
-          {isEdit ? <FaPen /> : <FaPlus />} {isEdit ? "Update Question" : "Add Question"}
-        </button>
-        {status && <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>}
-      </form>
-    );
   };
 
   return (
@@ -136,18 +88,18 @@ const QuestionsList: React.FC = () => {
             <table className="w-full min-w-[600px] text-base">
               <thead>
                 <tr className="text-cyan-700 dark:text-cyan-200 text-lg border-b border-cyan-100 dark:border-cyan-900">
-                  <th className="hidden">ID</th>
-                  <th className="py-4">Text</th>
                   <th className="py-4">Topic</th>
+                  <th className="py-4">Question</th>
+                  <th className="py-4">Answer</th>
                   <th className="py-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {questions.map((q) => (
-                  <tr key={q.id} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
-                    <td className="hidden">{q.id}</td>
-                    <td className="py-4 px-2 text-center font-bold text-blue-700 dark:text-cyan-200">{q.text}</td>
-                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">{q.topic}</td>
+                {questions.map((q, idx) => (
+                  <tr key={q.topic + idx} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
+                    <td className="py-4 px-2 text-center font-bold text-blue-700 dark:text-cyan-200">{q.topic}</td>
+                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">{q.question}</td>
+                    <td className="py-4 px-2 text-center text-gray-700 dark:text-gray-200">{q.answer}</td>
                     <td className="py-4 px-2 text-center">
                       <div className="flex gap-2 justify-center items-center">
                         <button onClick={() => handleDeleteClick(q)} className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Delete"><FaTrash /></button>
@@ -169,10 +121,10 @@ const QuestionsList: React.FC = () => {
         </>
       )}
       <FormsModal open={showCreateModal} onClose={closeAllModals} title="Create a New Question">
-        <QuestionForm onSuccess={closeAllModals} />
+        <QuestionForm onSuccess={() => { closeAllModals(); fetchQuestions(); }} />
       </FormsModal>
       <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Question">
-        <QuestionForm question={selectedQuestion!} onSuccess={closeAllModals} />
+        {selectedQuestion && <QuestionForm questionData={selectedQuestion} onSuccess={() => { closeAllModals(); fetchQuestions(); }} />}
       </FormsModal>
       <FormsModal open={showDeleteModal && !showCreateModal && !showEditModal} onClose={closeAllModals} title="Confirm Delete">
         <div className="p-6">

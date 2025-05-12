@@ -31,7 +31,7 @@ export default function DefaultLayout({
       <div className="flex pt-16">
         {!sidebarOpen && (
           <div className="flex-1">
-            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 bg-white dark:bg-black">
+            <div className="p-4 md:p-6 2xl:p-10 bg-white dark:bg-black">
               {children}
             </div>
           </div>
@@ -39,7 +39,7 @@ export default function DefaultLayout({
         {sidebarOpen && (
           <div className="relative flex flex-1 flex-col lg:ml-72.5">
             <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} exceptionRef={sidebarSwitcherRef} />
-            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 bg-white dark:bg-black">
+            <div className="p-4 md:p-6 2xl:p-10 bg-white dark:bg-black">
               {children}
             </div>
           </div>

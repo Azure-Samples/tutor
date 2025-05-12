@@ -3,7 +3,6 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import SidebarItem from "@/components/Sidebar/SidebarItem";
-import ClickOutside from "@/components/ClickOutside";
 import useLocalStorage from "@/hooks/useLocalStorage";
 import { FaCog, FaFileAlt, FaQuestionCircle, FaUserGraduate, FaComments } from "react-icons/fa";
 
@@ -81,37 +80,35 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, exceptionRef }: SidebarProps) =>
   const [pageName, setPageName] = useLocalStorage("selectedMenu", "dashboard");
 
   return (
-    <ClickOutside onClick={() => setSidebarOpen(false)} exceptionRef={exceptionRef}>
-      <aside
-        className={`fixed left-0 top-10 z-50 flex h-screen w-max flex-col overflow-y-hidden bg-white duration-300 ease-linear dark:bg-boxdark lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none opacity-0"
-        }`}
-      >
-        <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
-          {/* <!-- Sidebar Menu --> */}
-          <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
-            {menuGroups.map((group, groupIndex) => (
-              <div key={groupIndex}>
-                <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">
-                  {group.name}
-                </h3>
-                <ul className="mb-6 flex flex-col gap-1.5">
-                  {group.menuItems.map((menuItem, menuIndex) => (
-                    <SidebarItem
-                      key={menuIndex}
-                      item={menuItem}
-                      pageName={pageName}
-                      setPageName={setPageName}
-                      className="group"
-                    />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </nav>
-        </div>
-      </aside>
-    </ClickOutside>
+    <aside
+      className={`fixed left-0 top-10 z-50 flex h-screen w-max flex-col overflow-y-hidden bg-white duration-300 ease-linear dark:bg-boxdark lg:translate-x-0 ${
+        sidebarOpen ? "translate-x-0" : "-translate-x-full pointer-events-none opacity-0"
+      }`}
+    >
+      <div className="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
+        {/* <!-- Sidebar Menu --> */}
+        <nav className="mt-5 px-4 py-4 lg:mt-9 lg:px-6">
+          {menuGroups.map((group, groupIndex) => (
+            <div key={groupIndex}>
+              <h3 className="mb-4 ml-4 text-sm font-semibold text-bodydark2">
+                {group.name}
+              </h3>
+              <ul className="mb-6 flex flex-col gap-1.5">
+                {group.menuItems.map((menuItem, menuIndex) => (
+                  <SidebarItem
+                    key={menuIndex}
+                    item={menuItem}
+                    pageName={pageName}
+                    setPageName={setPageName}
+                    className="group"
+                  />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </div>
+    </aside>
   );
 };
 

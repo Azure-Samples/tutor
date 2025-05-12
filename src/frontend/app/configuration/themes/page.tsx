@@ -1,25 +1,24 @@
-import React from "react";
-import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import ThemeForm from "@/components/Configuration/Theme";
-
+import EssaysList from "@/components/Lists/Essays";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Tutor | Theme Configuration",
-  description: "Manage Themes for distinct activities.",
+  title: "Essay Evaluation | Tutor",
+  description:
+    "Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights.",
 };
 
-
-const RulesManagementPage = () => {
+const EssaysPage = () => {
   return (
     <DefaultLayout>
-      <Breadcrumb pageName={"Theme Setup"} />
-      <div className="flex flex-col md:flex-row justify-between gap-6 p-6">
-        <ThemeForm />
-      </div>
+      <Breadcrumb 
+        pageName="Essay Evaluation" 
+        subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights." 
+      />
+      <EssaysList />
     </DefaultLayout>
   );
 };
 
-export default RulesManagementPage;
+export default EssaysPage;

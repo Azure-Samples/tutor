@@ -11,11 +11,11 @@ export const avatarEngine = axios.create({
 });
 
 export const essaysEngine = axios.create({
-  baseURL: process.env.ESSAYS_APP_BASE_URL || "http://localhost:8082"
+  baseURL: process.env.ESSAYS_APP_BASE_URL || "http://localhost:8083"
 });
 
 export const questionsEngine = axios.create({
-  baseURL: process.env.QUESTIONS_APP_BASE_URL || "http://localhost:8083"
+  baseURL: process.env.QUESTIONS_APP_BASE_URL || "http://localhost:8082"
 });
 
 export const configurationApi = axios.create({

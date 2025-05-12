@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Essay } from "@/types/essays";
 import { essaysEngine } from "@/utils/api";
 import { FaPen, FaFileAlt, FaListAlt } from "react-icons/fa";
+import { v4 as uuidv4 } from 'uuid';
 
 const EssayForm: React.FC<{ essayData?: Essay; onSuccess?: () => void }> = ({ essayData, onSuccess }) => {
   const [form, setForm] = useState<Essay>(essayData || { topic: "", content: "", explanation: "" });
@@ -13,10 +14,14 @@ const EssayForm: React.FC<{ essayData?: Essay; onSuccess?: () => void }> = ({ es
     setStatus("Saving...");
     try {
       let res;
+      let essayToSend = { ...form };
+      if (!isEdit) {
+        essayToSend.id = uuidv4();
+      }
       if (isEdit) {
-        res = await essaysEngine.put(`/essays/${form.id}`, form);
+        res = await essaysEngine.put(`/essays/${form.id}`, essayToSend);
       } else {
-        res = await essaysEngine.post("/essays", form);
+        res = await essaysEngine.post("/essays", essayToSend);
       }
       if (res.status === 200 || res.status === 201) {
         setStatus(isEdit ? "Essay updated!" : "Essay created!");

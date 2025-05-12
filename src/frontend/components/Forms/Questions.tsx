@@ -23,6 +23,7 @@ const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }
       if (res.status === 200 || res.status === 201) {
         setStatus(isEdit ? "Question updated!" : "Question created!");
         if (onSuccess) onSuccess();
+        if (!isEdit) setForm({ topic: "", question: "", answer: "" });
       } else {
         setStatus("Error saving question.");
       }
@@ -67,6 +68,12 @@ const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }
         placeholder="Type the answer"
         rows={2}
       />
+      <button
+        type="submit"
+        className="mt-4 px-4 py-3 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold rounded-2xl shadow-lg w-full flex items-center justify-center gap-2 text-lg transition-all duration-200"
+      >
+        {isEdit ? <FaPen /> : <FaPlus />} {isEdit ? "Update Question" : "Add Question"}
+      </button>
       {status && <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>}
     </form>
   );

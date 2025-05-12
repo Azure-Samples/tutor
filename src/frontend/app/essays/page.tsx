@@ -1,6 +1,6 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import EssaysList from "@/components/Lists/Essays";
+import EssaySubmission from "@/components/Essays/EssaySubmission";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -16,7 +16,7 @@ const EssaysPage = () => {
         pageName="Essay Evaluation" 
         subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights." 
       />
-      <EssaysList />
+      <EssaySubmission />
     </DefaultLayout>
   );
 };

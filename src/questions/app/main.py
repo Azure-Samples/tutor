@@ -235,11 +235,11 @@ async def list_answers_endpoint() -> JSONResponse:
 @app.post("/answers", tags=["CRUD - Respostas"])
 async def create_answer(answer: Answer) -> JSONResponse:
     crud = CosmosCRUD(COSMOS_ANSWER_TABLE)
-    created = await crud.create_item(answer.model_dump())
+    await crud.create_item(answer.model_dump())
     response_body: SuccessMessage = SuccessMessage(
         title="Answer Created",
         message="Answer created successfully.",
-        content=created,
+        content=answer.model_dump(),
     )
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 

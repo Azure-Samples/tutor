@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { configurationApi } from "@/utils/api";
+import { avatarEngine } from "@/utils/api";
 import { Case } from "@/types/cases";
 import FormsModal from "@/components/common/Modals";
 import { FaTrash, FaPen, FaUser, FaPlus } from "react-icons/fa";
@@ -29,7 +29,7 @@ const CasesList: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    configurationApi.get("/cases").then((res) => {
+    avatarEngine.get("/cases").then((res) => {
       setCases(res.data.result || []);
       setLoading(false);
     });
@@ -46,7 +46,7 @@ const CasesList: React.FC = () => {
     setModalLoading(true);
     closeAllModals();
     setShowEditModal(true);
-    const res = await configurationApi.get(`/cases/${id}`);
+    const res = await avatarEngine.get(`/cases/${id}`);
     setSelectedCase(res.data.result);
     setModalLoading(false);
   };
@@ -56,7 +56,7 @@ const CasesList: React.FC = () => {
     setModalLoading(true);
     closeAllModals();
     setShowProfileModal(true);
-    const res = await configurationApi.get(`/cases/${id}`);
+    const res = await avatarEngine.get(`/cases/${id}`);
     setSelectedCase(res.data.result);
     setModalLoading(false);
   };
@@ -69,7 +69,7 @@ const CasesList: React.FC = () => {
 
   const confirmDelete = async () => {
     if (!selectedCase?.id) return;
-    await configurationApi.delete(`/cases/${selectedCase.id}`);
+    await avatarEngine.delete(`/cases/${selectedCase.id}`);
     setCases(cases.filter((c) => c.id !== selectedCase.id));
     closeAllModals();
     setSelectedCase(null);

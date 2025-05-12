@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
 import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
-import { configurationApi, avatarEngine } from "@/utils/api";
+import { avatarEngine } from "@/utils/api";
 import { FaMicrophone, FaMicrophoneSlash, FaChevronDown } from "react-icons/fa";
 import AvatarUserVideo from "./AvatarUserVideo";
 import type { Case } from "@/types/cases";

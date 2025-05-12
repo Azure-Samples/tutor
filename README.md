@@ -77,7 +77,6 @@ By using conversation history and memory, "The Tutor" ensures continuity in the 
 2. cd [repository name]
 3. ...
 
-
 ## Demo
 
 A demo app is included to show how to use the project.
@@ -89,6 +88,64 @@ To run the demo, follow these steps:
 1.
 2.
 3.
+
+## How to Run Locally and on Azure
+
+### Local Development
+
+1. **Clone the repository:**
+   ```pwsh
+   git clone <repository-url>
+   cd tutor
+   ```
+2. **Install Python dependencies:**
+   ```pwsh
+   pip install poetry
+   poetry install
+   ```
+3. **Install frontend dependencies:**
+   ```pwsh
+   cd src/frontend
+   npm install
+   # or
+   yarn install
+   ```
+4. **Run backend services:**
+   - Each backend app (avatar, essays, questions, configuration) can be started with:
+     ```pwsh
+     poetry run uvicorn app.main:app --reload
+     ```
+   - Run this command in each app's directory (e.g., `src/avatar/app`, `src/essays/app`, etc.).
+5. **Run the frontend:**
+   ```pwsh
+   cd src/frontend
+   npm run dev
+   ```
+   The app will be available at [http://localhost:3000](http://localhost:3000).
+
+### Azure Cloud Deployment
+
+1. **Provision Azure resources:**
+   - Use the provided Bicep files in the `infra/` directory to deploy all required Azure resources (Resource Group, Cosmos DB, Azure OpenAI, Speech, VNet, Container Apps, Static Web App, etc.).
+   - Example (from the root):
+     ```pwsh
+     az deployment sub create --location <location> --template-file infra/main.bicep --parameters rgName=<resource-group> location=<location> environment=prod
+     ```
+2. **Build and push backend containers:**
+   - Build Docker images for each backend app and push to the Azure Container Registry (ACR) provisioned by the infra scripts.
+3. **Configure environment variables and secrets:**
+   - Store all sensitive configuration (API keys, connection strings) in Azure Key Vault as referenced in the Bicep modules.
+4. **Deploy frontend:**
+   - The frontend is deployed as an Azure Static Web App, as defined in the infra scripts. Push your code to the configured repository or deploy manually if needed.
+
+### Infrastructure Requirements
+- Azure Subscription
+- Azure CLI
+- Python 3.10+
+- Node.js 18+
+- Docker (for building backend containers)
+
+For more details, see the README in each app folder and the comments in `infra/main.bicep`.
 
 ## Resources
 

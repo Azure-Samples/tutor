@@ -1,15 +1,15 @@
-# Tutor Questions Backend
+# Tutor Essays Backend
 
-This service provides the question-answering and evaluation engine for The Tutor platform.
+This service provides the essay submission and evaluation engine for The Tutor platform.
 
 ## Objective
 
-- Store, serve, and evaluate objective questions for students
-- Provide multi-agent, real-time feedback on student answers
+- Store, serve, and evaluate student essays
+- Provide detailed, multi-agent feedback on essay submissions
 
 ## Functionalities
 
-- CRUD for questions
+- CRUD for essays
 - Multi-agent evaluation via /grader/interaction
 - Submission history and answer storage
 
