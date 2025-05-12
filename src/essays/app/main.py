@@ -170,12 +170,13 @@ async def list_essays_endpoint() -> JSONResponse:
 
 @app.post("/essays", tags=["CRUD - Perguntas"])
 async def create_essay(question: Essay) -> JSONResponse:
+    print(question)
     crud = CosmosCRUD(COSMOS_ESSAY_TABLE)
-    created = await crud.create_item(question.model_dump())
+    await crud.create_item(question.model_dump())
     response_body: SuccessMessage = SuccessMessage(
         title="Essay Created",
         message="Essay created successfully.",
-        content=created,
+        content=question.model_dump(),
     )
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 

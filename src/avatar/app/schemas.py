@@ -36,7 +36,7 @@ class ChatResponse(BaseModel):
     """
     case_id: str
     prompt: str
-    chat_history: Optional[list[dict[str, Any]]] = None
+    chat_history: Optional[str] = None
 
 
 class Case(BaseModel):

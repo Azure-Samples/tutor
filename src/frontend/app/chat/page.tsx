@@ -12,10 +12,8 @@ export const metadata: Metadata = {
 const TablesPage = () => {
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Converse com seus Dados" />
-      <div className="flex flex-col gap-10">
-        <ChatCard />
-      </div>
+      <Breadcrumb pageName="Converse com seus Dados" subtitle="Chat with your data, ask questions, and get clear, supportive answers. Your curiosity is welcome here!" />
+      <ChatCard />
     </DefaultLayout>
   );
 };

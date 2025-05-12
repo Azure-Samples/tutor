@@ -14,6 +14,8 @@ const config: Config = {
   theme: {
     fontFamily: {
       satoshi: ["Satoshi", "sans-serif"],
+      rounded: ["Quicksand", "ui-rounded", "sans-serif"],
+      DEFAULT: ["Quicksand", "ui-rounded", "sans-serif"],
     },
     screens: {
       "2xsm": "375px",

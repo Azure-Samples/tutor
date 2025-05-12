@@ -2,7 +2,7 @@
 A package that manages the response bodies.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Union
 
 from starlette.status import (
@@ -47,6 +47,37 @@ class Case(BaseModel):
     profile: Optional[Dict] = None
     history: Optional[List] = None
 
+
+class Student(BaseModel):
+    id: str
+    name: str
+    email: str
+    class_id: str
+
+class Professor(BaseModel):
+    id: str
+    name: str
+    email: str
+    courses: List[str] = []
+
+class Course(BaseModel):
+    id: str
+    name: str
+    professor_id: str
+    class_ids: List[str] = []
+
+class Class(BaseModel):
+    id: str
+    name: str
+    course_id: str
+    student_ids: List[str] = []
+
+class Group(BaseModel):
+    id: str
+    name: str
+    class_id: str
+    student_ids: List[str] = []
+    assigned_case_ids: List[str] = []
 
 
 RESPONSES = {

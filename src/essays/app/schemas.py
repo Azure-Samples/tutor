@@ -60,7 +60,7 @@ class Essay(BaseModel):
     id: str = Field(..., description="Question ID")
     topic: str
     content: str
-    explanation: Optional[str] = Field(..., description="Question Explanation")
+    explanation: Optional[str] = Field(None, description="Question Explanation")
 
 
 class Resource(BaseModel):

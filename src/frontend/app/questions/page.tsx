@@ -1,24 +1,20 @@
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import CardLayout from "@/components/Cards/Cards";
-
+import StudentQuestionAnswer from "@/components/Questions/StudentQuestionAnswer";
 import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 
 export const metadata: Metadata = {
-  title: "Avaliação de Trascrições | Gerentes",
-  description:
-    "This is Next.js Tables page for TailAdmin - Next.js Tailwind CSS Admin Dashboard Template",
+  title: "Questions | Tutor App",
+  description: "Manage and review questions for the Tutor application.",
 };
 
-const TablesPage = () => {
+const QuestionsPage = () => {
   return (
-    <DefaultLayout>
-      <Breadcrumb pageName="Transcription Evaluation" />
-      <div className="flex flex-col gap-10">
-        <CardLayout />
-      </div>
+    <DefaultLayout metadata={metadata}>
+      <Breadcrumb pageName="Questions" />
+      <StudentQuestionAnswer />
     </DefaultLayout>
   );
 };
 
-export default TablesPage;
+export default QuestionsPage;

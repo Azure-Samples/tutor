@@ -9,11 +9,11 @@ from azure.identity.aio import DefaultAzureCredential
 class CosmosCRUD:
     def __init__(self, container_env_var: str):
         self.cosmos_endpoint = os.getenv("COSMOS_ENDPOINT", "")
-        self.database_name = os.getenv("COSMOS_QNA_NAME", "")
+        self.database_name = os.getenv("COSMOS_ESSAYS_NAME", "")
         self.container_name = os.getenv(container_env_var, "")
         print(f"Container name: {self.container_name}")
         print(f"Cosmos endpoint: {self.cosmos_endpoint}")
-        if not self.cosmos_endpoint or not self.database_name or not self.container_name:
+        if not all([self.cosmos_endpoint, self.database_name, self.container_name]):
             raise ValueError("Missing required environment variables for CosmosDB configuration.")
 
     async def _get_container(self) -> AsyncIterator:

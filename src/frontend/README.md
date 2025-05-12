@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Tutor Frontend (Next.js)
 
-## Getting Started
+This is the frontend for The Tutor platform, built with [Next.js](https://nextjs.org/). It provides a modern, interactive web interface for students and educators to access all features of the Tutor system.
 
-First, run the development server:
+## Objective
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+The frontend enables:
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Student and teacher login (if enabled)
+- Access to all learning modules: Avatar, Chat, Essays, Questions, and Configuration
+- Real-time and asynchronous AI-powered feedback
+- Submission and review of essays and questions
+- Visualization of evaluation history and progress
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Main Functionalities
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+- **Avatar:** Practice conversations with an AI avatar, including speech synthesis and real-time feedback.
+- **Chat:** Ask questions and discuss topics with the AI.
+- **Essays:** Submit essays for detailed, multi-agent evaluation.
+- **Questions:** Answer objective questions and receive instant, multi-part feedback.
+- **Configuration:** Personalize your learning environment and manage settings.
 
-## Learn More
+## Infrastructure Requirements
 
-To learn more about Next.js, take a look at the following resources:
+- Node.js 18+
+- Access to the Tutor backend APIs (see main README)
+- (For production) Azure Static Web Apps or compatible static hosting
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Running Locally
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+1. Install dependencies:
 
-## Deploy on Vercel
+   ```pwsh
+   npm install
+   # or
+   yarn install
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. Start the development server:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+   ```pwsh
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+   The app will be available at [http://localhost:3000](http://localhost:3000).
+
+3. Configure API endpoints:
+   - Edit `.env.local` or `process.env` to point to your backend API URLs.
+
+## Deploying to Azure
+
+- The frontend is designed to be deployed as an Azure Static Web App.
+- Use the Azure portal or CLI to link your GitHub repository and set build settings.
+- The infrastructure Bicep files in `/infra` will provision the required Azure resources.
+
+For more details, see the main project README and Azure Static Web Apps documentation.

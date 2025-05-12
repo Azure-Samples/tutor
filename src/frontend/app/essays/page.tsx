@@ -1,24 +1,24 @@
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import CardLayout from "@/components/Cards/Cards";
-
-import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import EssaySubmission from "@/components/Essays/EssaySubmission";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Avaliação de Trascrições | Gerentes",
+  title: "Essay Evaluation | Tutor",
   description:
-    "This is Next.js Tables page for TailAdmin - Next.js Tailwind CSS Admin Dashboard Template",
+    "Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights.",
 };
 
-const TablesPage = () => {
+const EssaysPage = () => {
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Transcription Evaluation" />
-      <div className="flex flex-col gap-10">
-        <CardLayout />
-      </div>
+      <Breadcrumb 
+        pageName="Essay Evaluation" 
+        subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights." 
+      />
+      <EssaySubmission />
     </DefaultLayout>
   );
 };
 
-export default TablesPage;
+export default EssaysPage;

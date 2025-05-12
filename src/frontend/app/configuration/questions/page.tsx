@@ -1,25 +1,20 @@
-import React from "react";
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import QuestionsList from "@/components/Lists/Questions";
 import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import RuleForm from "@/components/Configuration/Questions";
-
 
 export const metadata: Metadata = {
-  title: "Tayra | Rules Configuration",
-  description: "Manage Rules to evaluate transcriptions.",
+  title: "Questions | Tutor App",
+  description: "Manage and review questions for the Tutor application.",
 };
 
-
-const RulesManagementPage = () => {
+const QuestionsPage = () => {
   return (
-    <DefaultLayout>
-      <Breadcrumb pageName={"Rule Setup"} />
-      <div className="flex flex-col md:flex-row justify-between gap-6 p-6">
-        <RuleForm />
-      </div>
+    <DefaultLayout metadata={metadata}>
+      <Breadcrumb pageName="Questions" />
+      <QuestionsList />
     </DefaultLayout>
   );
 };
 
-export default RulesManagementPage;
+export default QuestionsPage;

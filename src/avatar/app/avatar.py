@@ -92,14 +92,25 @@ class AvatarChat:
             user_prompt=prompt_data.prompt
         )
 
+        chat_history = None
         if prompt_data.chat_history:
-            for msg in prompt_data.chat_history:
-                if msg.get("role") == "assistant":
-                    messages.append({"role": "assistant", "content": msg.get("content")})
-                elif msg.get("role") == "system":
-                    messages.append({"role": "system", "content": msg.get("content")})
-                elif msg.get("role") == "user":
-                    messages.append({"role": "user", "content": msg.get("content")})
+            # Parse chat history if it's a string
+            if isinstance(prompt_data.chat_history, str):
+                try:
+                    chat_history = json.loads(prompt_data.chat_history) 
+                except json.JSONDecodeError:
+                    pass
+            else:
+                chat_history = prompt_data.chat_history
+                
+        if chat_history:
+            for msg in chat_history:
+                if "assistant" in msg:
+                    messages.append({"role": "assistant", "content": msg["assistant"]})
+                elif "system" in msg:
+                    messages.append({"role": "system", "content": msg["system"]})
+                elif "user" in msg:
+                    messages.append({"role": "user", "content": msg["user"]})
 
         response = self.client.complete(
             model=self.model_deployment,

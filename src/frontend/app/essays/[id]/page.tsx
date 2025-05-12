@@ -1,49 +1,59 @@
 "use client";
-import { useRouter } from 'next/navigation';
-import { useTranscriptionContext } from "@/utils/transcriptionContext";
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import Transcription from '@/components/Transcriptions';
+import type { Essay } from "@/types/essays";
+import { essaysEngine } from "@/utils/api";
 
-const TranscriptionPage: React.FC = () => {
-  const { selectedTranscription } = useTranscriptionContext();
-  const router = useRouter();
+const EssayDetailPage: React.FC = () => {
+  const { id } = useParams();
+  const [essay, setEssay] = useState<Essay | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const handleBack = () => {
-    router.back();
-  };
-
-  if (!selectedTranscription) {
-    return (
-      <DefaultLayout>
-        <Breadcrumb pageName="Evaluate Transcription" />
-        <button
-            onClick={handleBack} // Ação do botão de voltar
-            className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-          Go Back
-        </button>
-        <div className="p-6 bg-white dark:bg-gray-800">
-          <p>Transcription not found.</p>
-        </div>
-      </DefaultLayout>
-    );
-  }
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    essaysEngine.get(`/essays/${id}`)
+      .then(res => {
+        setEssay(res.data.content || null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("Could not load essay.");
+        setLoading(false);
+      });
+  }, [id]);
 
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Evaluate Transcription" />
-      <button
-          onClick={handleBack} // Ação do botão de voltar
-          className="mb-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-        Back
-      </button>
-      <div className="p-6 bg-white dark:bg-gray-800">
-        <Transcription transcription={selectedTranscription} />
-      </div>
+      <Breadcrumb pageName="Essay Details" subtitle="Review the essay theme, content, and explanation." />
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <span className="text-lg text-cyan-500 animate-pulse">Loading essay...</span>
+        </div>
+      ) : error ? (
+        <div className="text-center text-red-600 font-bold py-8">{error}</div>
+      ) : essay ? (
+        <div className="max-w-2xl mx-auto bg-white dark:bg-boxdark rounded-2xl shadow-lg p-8 mt-8">
+          <h2 className="text-3xl font-bold text-cyan-700 mb-4">{essay.topic}</h2>
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-blue-700 mb-2">Content</h3>
+            <p className="text-base text-gray-800 dark:text-gray-200 whitespace-pre-line">{essay.content}</p>
+          </div>
+          {essay.explanation && (
+            <div>
+              <h3 className="text-lg font-semibold text-green-700 mb-2">Explanation</h3>
+              <p className="text-base text-gray-700 dark:text-gray-300 whitespace-pre-line">{essay.explanation}</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center text-gray-600 py-8">No essay found.</div>
+      )}
     </DefaultLayout>
   );
 };
 
-export default TranscriptionPage;
+export default EssayDetailPage;
