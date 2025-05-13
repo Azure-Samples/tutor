@@ -106,6 +106,7 @@ async def avatar_response(params: ChatResponse) -> JSONResponse:
     Uploads an audio file and starts a background task to process it.
     """
     response = chat(params)
+    print("Response: ", response)
     return JSONResponse({'text': response})
 
 

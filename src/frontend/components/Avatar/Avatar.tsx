@@ -27,8 +27,8 @@ class AvatarHandler {
   constructor(config: AvatarConfig) {
     const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
 
-    speechConfig.speechSynthesisLanguage = "pt-BR";
-    speechConfig.speechSynthesisVoiceName = "pt-BR-AntonioNeural";
+    speechConfig.speechSynthesisLanguage = "en-US";
+    speechConfig.speechSynthesisVoiceName = "en-US-AndrewMultilingualNeural";
 
     this.speechConfig = speechConfig;
     this.avatarConfig = new SpeechSDK.AvatarConfig(config.character, config.style, config.videoFormat);
@@ -144,7 +144,7 @@ class AvatarHandler {
       }
     } catch (error) {
       console.error("Error getting avatar response:", error);
-      return "Error processing your request.";
+      return "Couldn't understand what you said due to a server problem. Please try again later.";
     }
   }
 
@@ -270,8 +270,8 @@ const AvatarChat: React.FC = () => {
       setAvatarVideoStream(null); // Reset video stream
       try {
         const gender = selectedCase?.profile?.gender || "male";
-        const language = "pt-BR";
-        const voice = gender === "feminino" ? "pt-BR-FranciscaNeural" : "pt-BR-AntonioNeural";
+        const language = selectedCase?.profile?.language || "en-US";
+        const voice = selectedCase?.profile?.voice || (gender === "feminino" ? "en-US-AvaMultilingualNeural" : "en-US-AndrewMultilingualNeural");
 
         avatarHandlerRef.current.speechConfig.speechSynthesisLanguage = language;
         avatarHandlerRef.current.speechConfig.speechSynthesisVoiceName = voice;
@@ -310,9 +310,10 @@ const AvatarChat: React.FC = () => {
 
       setIsSpeaking(true);
       try {
+        // Send the most recent history including the new user transcription
         const response = await avatarHandlerRef.current?.getAvatarResponse(
           text,
-          JSON.stringify(chatHistory),
+          JSON.stringify(updatedHistory),
           selectedCase
         );
 
@@ -331,7 +332,7 @@ const AvatarChat: React.FC = () => {
     if (isMicrophoneActive) {
       avatarHandlerRef.current.startMicrophone((text) => {
         processTranscript(text);
-      }, "pt-BR");
+      }, "en-US");
     } else {
       avatarHandlerRef.current.stopMicrophone();
     }

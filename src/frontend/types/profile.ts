@@ -1,4 +1,3 @@
-
 export type Profile = {
   name: string;
   gender?: string;
@@ -6,4 +5,6 @@ export type Profile = {
   role: string;
   level?: string;
   details: string;
+  language?: string;
+  voice?: string;
 };

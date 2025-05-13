@@ -54,6 +54,15 @@
       "justMyCode": false
     },
     {
+      "name": "Frontend",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}\\src\\frontend",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["dev"],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Python Debugger: Python File",
       "type": "debugpy",
       "request": "launch",

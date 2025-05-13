@@ -23,7 +23,7 @@ MODEL_KEY: str = os.environ.get("GPT4_KEY", "")
 COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT", "")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-MODEL_DEPLOYMENT = "gpt-4o-essay-eval"
+MODEL_DEPLOYMENT = "gpt-4o"
 API_VERSION = "2025-01-01-preview"
 
 logger = logging.getLogger()
@@ -81,7 +81,7 @@ class AvatarChat:
 
     def evaluate(self, avatar_data: dict, prompt_data: ChatResponse):
         start = time.time()
-        template = PromptTemplate.from_prompty(f"{self.template_dir}\\{avatar_data.get("role", "interviewer")}.prompty")
+        template = PromptTemplate.from_prompty(f"{self.template_dir}\simulation.prompty")
 
         messages = template.create_messages(
             role=avatar_data["profile"]["role"],
@@ -102,7 +102,7 @@ class AvatarChat:
                     pass
             else:
                 chat_history = prompt_data.chat_history
-                
+
         if chat_history:
             for msg in chat_history:
                 if "assistant" in msg:
@@ -117,6 +117,8 @@ class AvatarChat:
             messages=messages,
             **template.parameters
         )
+
+        print("Response: ", response)
 
         logger.info("Evaluation took: %s seconds", time.time() - start)
         return response.choices[0].message.content
