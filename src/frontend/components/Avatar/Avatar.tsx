@@ -27,8 +27,8 @@ class AvatarHandler {
   constructor(config: AvatarConfig) {
     const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
 
-    speechConfig.speechSynthesisLanguage = "en-US";
-    speechConfig.speechSynthesisVoiceName = "en-US-AndrewMultilingualNeural";
+    speechConfig.speechSynthesisLanguage = "pt-BR";
+    speechConfig.speechSynthesisVoiceName = "pt-BR-AntonioNeural";
 
     this.speechConfig = speechConfig;
     this.avatarConfig = new SpeechSDK.AvatarConfig(config.character, config.style, config.videoFormat);
@@ -234,6 +234,16 @@ const AvatarChat: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [avatarVideoStream, setAvatarVideoStream] = useState<MediaStream | null>(null);
 
+  const configRef = React.useRef({
+    gender: selectedCase?.profile?.gender || "male",
+    language: selectedCase?.profile?.language || "pt-BR",
+    voice: selectedCase?.profile?.voice || (
+      (selectedCase?.profile?.gender || "male") === "feminino"
+        ? "pt-BR-FranciscaNeural"
+        : "pt-BR-AntonioNeural"
+    ),
+  });
+
   useEffect(() => {
     const fetchCases = async () => {
       try {
@@ -269,9 +279,17 @@ const AvatarChat: React.FC = () => {
       setError(null);
       setAvatarVideoStream(null); // Reset video stream
       try {
-        const gender = selectedCase?.profile?.gender || "male";
-        const language = selectedCase?.profile?.language || "en-US";
-        const voice = selectedCase?.profile?.voice || (gender === "feminino" ? "en-US-AvaMultilingualNeural" : "en-US-AndrewMultilingualNeural");
+        // Store language, gender, and voice in a ref for global access
+
+        configRef.current.gender = selectedCase?.profile?.gender || "male";
+        configRef.current.language = selectedCase?.profile?.language || "pt-BR";
+        configRef.current.voice = selectedCase?.profile?.voice || (
+          (selectedCase?.profile?.gender || "male") === "feminino"
+            ? "pt-BR-FranciscaNeural"
+            : "pt-BR-AntonioNeural"
+        );
+
+        const { language, voice } = configRef.current;
 
         avatarHandlerRef.current.speechConfig.speechSynthesisLanguage = language;
         avatarHandlerRef.current.speechConfig.speechSynthesisVoiceName = voice;
@@ -329,10 +347,13 @@ const AvatarChat: React.FC = () => {
       }
     };
 
+    // Always use the selected case's language for STT
+    const sttLanguage = configRef.current.language || "pt-BR";
+
     if (isMicrophoneActive) {
       avatarHandlerRef.current.startMicrophone((text) => {
         processTranscript(text);
-      }, "en-US");
+      }, sttLanguage);
     } else {
       avatarHandlerRef.current.stopMicrophone();
     }

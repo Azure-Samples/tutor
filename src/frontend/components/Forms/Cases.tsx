@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { configurationApi } from "@/utils/api";
+import { avatarEngine } from "@/utils/api";
 import { Case } from "@/types/cases";
 import { CaseStep } from "@/types/steps";
 import { Profile } from "@/types/profile";
@@ -30,9 +30,9 @@ const CaseForm: React.FC<{ caseData?: Case; onSuccess?: () => void }> = ({ caseD
       setStatus("Sending request...");
       let response;
       if (isEdit) {
-        response = await configurationApi.put(`/cases/${useCase.id}`, useCase);
+        response = await avatarEngine.put(`/cases/${useCase.id}`, useCase);
       } else {
-        response = await configurationApi.post("/create-case", useCase);
+        response = await avatarEngine.post("/create-case", useCase);
       }
       if (response.status === 200 || response.status === 201) {
         setStatus(isEdit ? "Case updated successfully!" : "Case created successfully!");

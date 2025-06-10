@@ -61,13 +61,23 @@ class Essay(BaseModel):
     topic: str
     content: str
     explanation: Optional[str] = Field(None, description="Question Explanation")
+    content_file_location: Optional[str] = Field(None, description="File Location of the Essay Content, if available")
+    theme: Optional[str] = Field(
+        None,
+        description="Declared theme to ground the evaluation, if provided"
+    )
+    file_url: Optional[str] = Field(
+        None,
+        description="URL of original essay file (image or selectable text), if available"
+    )
 
 
 class Resource(BaseModel):
-    id: str = Field(..., description="Question ID")
-    url: str = Field(..., description="Respondent Name")
-    content: str = Field(..., description="Answer Text")
-    essay_id: str = Field(..., description="Question ID")
+    id: str = Field(..., description="Evaluation criterion ID")
+    url: Optional[str] = Field(None, description="Reference URL for the evaluation criterion (optional)")
+    objective: List[str] = Field(..., description="Correction objectives (spelling, semantics, structure, argumentation, conceptual, etc.)")
+    content: Optional[str] = Field(None, description="Detailed description of the evaluation criterion")
+    essay_id: str = Field(..., description="ID of the essay to which this criterion applies")
 
 
 class ChatResponse(BaseModel):
@@ -79,7 +89,7 @@ class ChatResponse(BaseModel):
     resources: list[Resource]
 
 
-class Grader(BaseModel):
+class Evaluator(BaseModel):
     """
     Represents a Grader with an id, model, url, and metaprompt.
 
@@ -93,6 +103,7 @@ class Grader(BaseModel):
     name: str = Field(..., description="Judge Name", max_length=16)
     model_id: str = Field(..., description="Model ID")
     metaprompt: str = Field(..., description="Grader System Prompt Parameters")
+    description: Optional[str] = Field(None, description="Description of the Grader, if available")
 
     @classmethod
     @field_validator("model")
@@ -113,7 +124,7 @@ class Grader(BaseModel):
         return v
 
 
-class Assembly(BaseModel):
+class Swarm(BaseModel):
     """
     Represents an Assemble with an id, list of judges, and roles.
 
@@ -124,7 +135,7 @@ class Assembly(BaseModel):
     """
 
     id: str = Field(..., description="Assembly ID")
-    agents: List[Grader] = Field(..., description="Judges Assemblies")
+    agents: List[Evaluator] = Field(..., description="Judges Assemblies")
     topic_name: str = Field(..., description="Topic to Answer")
 
 

@@ -1,12 +1,18 @@
-Given this question:
+Dado o seguinte ensaio:
 
-# QUESTION
-topic: {{question.topic}}
-question: {{question.question}}
-explanation: {{question.explanation}}
+# Ensaio
+Tema: {{ essay.theme or 'N/A' }}
+Tópico: {{ essay.topic }}
+URL do arquivo: {{ essay.file_url or 'nenhum' }}
+Conteúdo:
+{{ essay.content }}
 
-Evaluate this answer according with your instructions:
+Agora, avalie de acordo com os seguintes critérios:
+{% for res in resources %}
+- ID do critério: {{ res.id }}
+  Objetivos: {{ res.objective | join(', ') }}
+  URL de referência: {{ res.url or 'nenhum' }}
+  Detalhes: {{ res.content or 'n/a' }}
+{% endfor %}
 
-# ANSWER
-answer: {{answer.text}}
-
+Forneça uma correção detalhada guiada por esses objetivos.

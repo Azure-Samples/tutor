@@ -43,7 +43,15 @@ import jinja2
 import semantic_kernel as sk
 import asyncio
 
-from semantic_kernel.agents import ChatCompletionAgent
+from semantic_kernel.agents import ChatCompletionAgent  # pylint: disable=no-name-in-module
+
+from semantic_kernel.agents.runtime import InProcessRuntime
+
+from semantic_kernel.agents.orchestration.orchestration_base import OrchestrationBase
+from semantic_kernel.agents.orchestration.concurrent import ConcurrentOrchestration
+from semantic_kernel.agents.orchestration.sequential import SequentialOrchestration
+from semantic_kernel.agents.orchestration.group_chat import GroupChatOrchestration, RoundRobinGroupChatManager
+
 from semantic_kernel.contents import ChatHistory, ChatMessageContent, AuthorRole
 from semantic_kernel.connectors.ai import FunctionChoiceBehavior
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
@@ -182,10 +190,10 @@ class AnswerGrader(GraderBase):
             answer=answer
         )
         chat.add_message(ChatMessageContent(role=AuthorRole.USER, content=rendered_prompt))
-        response = ""
-        async for message in self.agent.invoke(chat):
-            response += message.content
-            chat.add_message(ChatMessageContent(role=AuthorRole.ASSISTANT, content=message.content))
+        response: str = str()
+        async for message in self.agent.invoke(list(chat.messages)):
+            response += message.content.content
+            chat.add_message(ChatMessageContent(role=AuthorRole.ASSISTANT, content=message.content.content))
 
         if self.mediator:
             self.mediator.notify(
@@ -240,6 +248,25 @@ class AnswerOrchestrator:
     """
     def __init__(self) -> None:
         self.graders: List[AnswerGrader] = []
+        self.runtime = InProcessRuntime()
+        self.orchestrator: OrchestrationBase
+
+    async def __aenter__(self):
+        """
+        Asynchronous context manager entry point.
+
+        Initializes the orchestrator and prepares it for use.
+        """
+        self.runtime.start()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        """
+        Asynchronous context manager exit point.
+
+        Cleans up resources and stops the runtime.
+        """
+        await self.runtime.stop()
 
     async def _parallel_processing(self, question: Question, answer: Answer) -> List:
         """
@@ -249,13 +276,17 @@ class AnswerOrchestrator:
         :param answer: The associated answer object.
         :return: A list of responses from all graders executed in parallel.
         """
-        async def interact_with_grader(grader: AnswerGrader, chat: ChatHistory) -> str:
-            return await grader.interact(question, answer, chat)
+        prompt_template = JINJA_ENV.get_template("correct.jinja")
+        self.orchestrator = ConcurrentOrchestration[Question, ChatMessageContent](
+            members=[grader.agent for grader in self.graders],
+            input_transform=lambda task: ChatMessageContent(
+                role=AuthorRole.USER,
+                content=prompt_template.render(question=task, answer=answer)
+            ),
+        )  # type: ignore
+        return await self.orchestrator.invoke(runtime=self.runtime, task=question)  # type: ignore
 
-        chat = ChatHistory()
-        return await asyncio.gather(*(interact_with_grader(grader, chat) for grader in self.graders))
-
-    async def _sequential_processing(self, question: Question, answer: Answer) -> List:
+    async def _sequential_processing(self, question: Question, answer: Answer) -> List[ChatMessageContent]:
         """
         Execute the 'interact' method of all graders sequentially.
 
@@ -263,12 +294,34 @@ class AnswerOrchestrator:
         :param answer: The corresponding answer object.
         :return: A list of dictionaries mapping grader identifiers to their responses.
         """
-        answers = []
-        for index, grader in enumerate(self.graders):
-            chat = ChatHistory()
-            result = await grader.interact(question, answer, chat)
-            answers.append({f"agent_{index}": result})
-        return answers
+        prompt_template = JINJA_ENV.get_template("correct.jinja")
+        self.orchestrator = SequentialOrchestration[Question, ChatMessageContent](
+            members=[grader.agent for grader in self.graders],
+            input_transform=lambda task: ChatMessageContent(
+                role=AuthorRole.USER,
+                content=prompt_template.render(question=task, answer=answer)
+            ),
+        )  # type: ignore
+        return await self.orchestrator.invoke(runtime=self.runtime, task=question)  # type: ignore
+
+    async def _group_processing(self, question: Question, answer: Answer) -> List[ChatMessageContent]:
+        """
+        Execute the 'interact' method of all graders sequentially.
+
+        :param question: The question to be processed.
+        :param answer: The corresponding answer object.
+        :return: A list of dictionaries mapping grader identifiers to their responses.
+        """
+        prompt_template = JINJA_ENV.get_template("correct.jinja")
+        self.orchestrator = GroupChatOrchestration[Question, ChatMessageContent](
+            members=[grader.agent for grader in self.graders],
+            manager=RoundRobinGroupChatManager(max_rounds=5),
+            input_transform=lambda task: ChatMessageContent(
+                role=AuthorRole.USER,
+                content=prompt_template.render(question=task, answer=answer)
+            ),
+        )  # type: ignore
+        return await self.orchestrator.invoke(runtime=self.runtime, task=question)  # type: ignore
 
     async def run_interaction(
             self,

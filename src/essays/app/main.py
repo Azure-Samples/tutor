@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 
 from azure.identity.aio import DefaultAzureCredential
 
-from app.schemas import RESPONSES, BodyMessage, ErrorMessage, SuccessMessage, ChatResponse, Grader, Essay, Resource, Assembly
+from app.schemas import RESPONSES, BodyMessage, ErrorMessage, SuccessMessage, ChatResponse, Evaluator, Essay, Resource, Swarm
 from app.cosmos_crud import CosmosCRUD
 from app.essays import EssayOrchestrator
 
@@ -290,7 +290,7 @@ async def list_graders_endpoint() -> JSONResponse:
 
 
 @app.post("/graders", tags=["CRUD - Avaliadores"])
-async def create_grader(grader: Grader) -> JSONResponse:
+async def create_grader(grader: Evaluator) -> JSONResponse:
     crud = CosmosCRUD(COSMOS_GRADER_TABLE)
     created = await crud.create_item(grader.model_dump())
     response_body: SuccessMessage = SuccessMessage(
@@ -302,7 +302,7 @@ async def create_grader(grader: Grader) -> JSONResponse:
 
 
 @app.put("/graders/{grader_id}", tags=["CRUD - Avaliadores"])
-async def update_grader(grader_id: str, grader: Grader) -> JSONResponse:
+async def update_grader(grader_id: str, grader: Evaluator) -> JSONResponse:
     crud = CosmosCRUD(COSMOS_GRADER_TABLE)
     try:
         existing = await crud.read_item(grader_id)
@@ -350,7 +350,7 @@ async def list_assemblies_endpoint() -> JSONResponse:
 
 
 @app.post("/assemblies", tags=["CRUD - Montagens"])
-async def create_assembly(assembly: Assembly) -> JSONResponse:
+async def create_assembly(assembly: Swarm) -> JSONResponse:
     crud = CosmosCRUD(COSMOS_ASSEMBLY_TABLE)
     created = await crud.create_item(assembly.model_dump())
     response_body: SuccessMessage = SuccessMessage(
@@ -362,7 +362,7 @@ async def create_assembly(assembly: Assembly) -> JSONResponse:
 
 
 @app.put("/assemblies/{assembly_id}", tags=["CRUD - Montagens"])
-async def update_assembly(assembly_id: str, assembly: Assembly) -> JSONResponse:
+async def update_assembly(assembly_id: str, assembly: Swarm) -> JSONResponse:
     crud = CosmosCRUD(COSMOS_ASSEMBLY_TABLE)
     try:
         existing = await crud.read_item(assembly_id)

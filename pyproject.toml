@@ -21,6 +21,9 @@ semantic-kernel = "^1.20.0"
 autogen = "^0.8.2"
 azure-ai-projects = "^1.0.0b8"
 azure-ai-inference = "^1.0.0b9"
+azure-cognitiveservices-vision-computervision = "^0.9.1"
+azure-ai-vision-imageanalysis = "^1.0.0"
+openpyxl = "^3.1.5"
 
 
 [tool.poetry.group.dev.dependencies]

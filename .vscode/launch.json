@@ -63,8 +63,9 @@
       "console": "integratedTerminal"
     },
     {
-      "name": "Python Debugger: Python File",
+      "name": "Essay Demo Debugger",
       "type": "debugpy",
+      "cwd": "${workspaceFolder}\\src\\essays",
       "request": "launch",
       "program": "${file}"
     }
