@@ -152,7 +152,7 @@ async def grader_interaction(payload: ChatResponse) -> JSONResponse:
     Expects a request body containing the 'case_id' and 'prompt'.
     Returns the evaluated resource from the agents involved.
     """
-    aggregated_response = await resource_orchestrator.run_interaction(payload.case_id, payload.essay, payload.resources)
+    aggregated_response = await resource_orchestrator.invoke(payload.case_id, payload.essay, payload.resources)
     return JSONResponse({"text": jsonable_encoder(aggregated_response)})
 
 

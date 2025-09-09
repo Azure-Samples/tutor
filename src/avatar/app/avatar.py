@@ -30,8 +30,8 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler(stream=sys.stdout))
 
-AI_PROJECT = AIProjectClient.from_connection_string(
-    conn_str=os.getenv("AZURE_PROJECT_CONNECTION_STRING", ""),
+AI_PROJECT = AIProjectClient(
+    endpoint=os.getenv("AZURE_MODEL_URL", ""),
     credential=DefaultAzureCredential()
 )
 

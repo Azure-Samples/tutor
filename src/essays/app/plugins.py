@@ -26,13 +26,13 @@ import os
 import time
 import logging
 import base64
-import requests
-
-from dotenv import load_dotenv
 
 from typing import Any, Union
 from io import BytesIO
 from PIL import Image
+import requests
+
+from dotenv import load_dotenv
 
 from azure.ai.vision.imageanalysis.aio import ImageAnalysisClient
 from azure.ai.vision.imageanalysis.models import VisualFeatures
@@ -63,7 +63,7 @@ class ImageProcessor:
     def __init__(self):
         """
         Initialize the ImageProcessor with an Azure AI Vision key and endpoint.
-        
+
         Args:
             key (str): The Azure AI Vision subscription key.
             endpoint (str): The endpoint URL for Azure AI Vision service.
@@ -77,10 +77,10 @@ class ImageProcessor:
     async def ingest_image(self, image_url: str) -> str:
         """
         Ingest an image from a URL and convert it to bytes.
-        
+
         Args:
             image_url (str): URL of the image to ingest.
-            
+
         Returns:
             bytes: The image content as bytes.
             
@@ -100,7 +100,7 @@ class ImageProcessor:
     async def load_images(self, image_sources: list[Union[str, bytes]]) -> list[bytes]:
         """
         Load multiple images from various sources (URLs or bytes) into an array of bytes.
-        
+
         Args:
             image_sources (list[Union[str, bytes]]): list of image URLs or byte arrays.
             
@@ -125,11 +125,9 @@ class ImageProcessor:
         """
         Save a set of images with their metadata to the database.
 
-
         Args:
             images (list[bytes]): list of images as bytes.
             metadata (list[dict[str, Any]]): list of metadata for each image.
-
 
         Returns:
             list[dict[str, Any]]: list of responses from the database.
