@@ -37,6 +37,7 @@ class TransliterationChatManager(GroupChatManager):
     This custom manager coordinates the interaction between translation and review agents,
     determines when to terminate the chat, and selects the next agent to act based on the chat history.
     """
+
     async def filter_results(self, chat_history: ChatHistory) -> MessageResult:
         """
         Extracts the latest transliteration and review results from the chat history and composes a combined response.
@@ -123,18 +124,15 @@ class TransliterationChatManager(GroupChatManager):
             StringResult: The name of the next agent to act.
         """
         agents = list(participant_descriptions.keys())
-        # Se não há mensagens de agentes ainda (apenas user), começa com transliteração
         if not chat_history.messages or (
             len(chat_history.messages) == 1 and chat_history.messages[0].role == AuthorRole.USER
         ):
             return StringResult(result=agents[0], reason="Primeira rodada: transliteração.")
-        # Determina se o último respondente foi o reviewer pelo conteúdo
         last_msg = chat_history.messages[-1]
         last_agent = getattr(last_msg, 'name', '')
         is_reviewer = False
         if "TranslationReviewerAgent" in last_agent:
             is_reviewer = True
-        # Busca pelo score na última avaliação
         score = None
         aprovacao = "reexecutar"
         if is_reviewer:

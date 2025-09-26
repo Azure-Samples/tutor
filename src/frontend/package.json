@@ -23,7 +23,9 @@
     "react-apexcharts": "^1.4.1",
     "react-dom": "^18",
     "react-icons": "^5.5.0",
-    "react-modal": "^3.16.1"
+    "react-markdown": "^10.1.0",
+    "react-modal": "^3.16.1",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@types/node": "22.5.0",

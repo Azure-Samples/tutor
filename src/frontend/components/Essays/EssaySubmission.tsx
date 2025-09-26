@@ -2,11 +2,20 @@
 import React, { useState, useRef } from "react";
 import { FaUpload, FaFileAlt, FaHistory, FaSpinner } from "react-icons/fa";
 import { essaysEngine } from "@/utils/api";
+import { v4 as uuidv4 } from 'uuid';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
+// Backend /assemblies returns Swarm objects: { id, topic_name, agents }
+// We adapt to what the UI needs by adding friendly name/description fields.
 interface EssayCase {
   id: string;
-  name: string;
-  description: string;
+  topic_name: string; // original backend field used as the display label
+  agents: any[];
+  name?: string; // derived (topic_name)
+  description?: string; // currently not provided by backend
+  content?: string; // reference text / prompt body
+  explanation?: string; // instructions / rubric
 }
 
 interface Evaluation {
@@ -36,31 +45,83 @@ const EssaySubmission: React.FC = () => {
   const [loadingCases, setLoadingCases] = useState(true);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [essayLookup, setEssayLookup] = useState<Record<string, any>>({});
 
-  // Load available essay cases
+  // Load available essay cases (assemblies)
   React.useEffect(() => {
     setLoadingCases(true);
     essaysEngine.get("/assemblies")
       .then(res => {
-        // Failsafe: ensure data is an array
-        const content = Array.isArray(res.data?.content) ? res.data.content : [];
-        setCases(content);
+        const raw = Array.isArray(res.data?.content) ? res.data.content : [];
+        const mapped: EssayCase[] = raw.map((r: any) => ({
+          id: r.id,
+          topic_name: r.topic_name,
+            // Provide fallbacks so UI never breaks
+          agents: r.agents || [],
+          name: r.topic_name,
+          description: r.description || ""
+        }));
+        if (mapped.length === 0) {
+          // Fallback: try to derive cases from existing essays if assemblies not seeded yet
+          return essaysEngine.get('/essays').then(er => {
+            const essays = Array.isArray(er.data?.content) ? er.data.content : [];
+            const essayCases: EssayCase[] = essays.map((e: any) => ({
+              id: e.id,
+              topic_name: e.topic || e.theme || e.id,
+              agents: [],
+              name: e.topic || e.theme || e.id,
+              description: e.explanation || '',
+              content: e.content,
+              explanation: e.explanation
+            }));
+            setCases(essayCases);
+            const lookup: Record<string, any> = {};
+            essays.forEach((e: any) => { lookup[e.id] = e; });
+            setEssayLookup(lookup);
+          }).catch(fallbackErr => {
+            console.error('Fallback /essays fetch failed:', fallbackErr);
+            setCases([]);
+          });
+        }
+        setCases(mapped);
       })
-      .catch(() => setCases([]))
+      .catch(err => {
+        console.error('Failed loading /assemblies:', err);
+        setCases([]);
+      })
       .finally(() => setLoadingCases(false));
   }, []);
 
-  // Load submission history
+  // Load submission history (using /resources now, since submissions are stored as resources)
   React.useEffect(() => {
     setLoadingHistory(true);
-    essaysEngine.get("/essays")
+    essaysEngine.get("/resources")
       .then(res => {
-        // Failsafe: ensure data is an array
         const content = Array.isArray(res.data?.content) ? res.data.content : [];
-        setHistory(content);
+        const mapped: Submission[] = content.map((r: any) => ({
+          id: r.id,
+          essayText: r.content,
+          description: Array.isArray(r.objective) ? r.objective.slice(1).join(' ') : '',
+          submittedAt: r.submittedAt || '', // backend currently does not send this
+          essayFileName: undefined,
+          evaluations: []
+        }));
+        setHistory(mapped);
       })
       .catch(() => setHistory([]))
       .finally(() => setLoadingHistory(false));
+  }, []);
+
+  // Independently load essays to enrich lookup for markdown reference/instructions
+  React.useEffect(() => {
+    essaysEngine.get('/essays')
+      .then(res => {
+        const items = Array.isArray(res.data?.content) ? res.data.content : [];
+        const lookup: Record<string, any> = {};
+        items.forEach((e: any) => { lookup[e.id] = e; });
+        setEssayLookup(lookup);
+      })
+      .catch(err => console.warn('Could not load essays for reference text:', err));
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,16 +135,38 @@ const EssaySubmission: React.FC = () => {
     if (!selectedCase || (!essayText && !essayFile)) return;
     setSubmitting(true);
     setEvaluations([]);
-    const formData = new FormData();
-    formData.append("caseId", selectedCase.id);
-    formData.append("description", description);
-    if (essayText) formData.append("essayText", essayText);
-    if (essayFile) formData.append("essayFile", essayFile);
-    const res = await essaysEngine.post("/essays", formData);
-    const data = res.data;
-    setEvaluations(data.evaluations || []);
-    setHistory(h => [data.content, ...h]);
-    setSubmitting(false);
+
+    // NOTE: Backend /resources expects: id, objective (List[str]), content?, essay_id, url?.
+    // We treat a submission as a Resource referencing the selectedCase (assembly) id.
+    const resourcePayload = {
+      id: uuidv4(),
+      objective: description ? ["student_submission", description] : ["student_submission"],
+      content: essayText || (essayFile ? `(uploaded file: ${essayFile.name})` : ''),
+      essay_id: selectedCase.id,
+      url: undefined
+    };
+
+    try {
+      const res = await essaysEngine.post("/resources", resourcePayload);
+      // We don't receive evaluations from this endpoint; keep empty for now.
+      const submission: Submission = {
+        id: resourcePayload.id,
+        essayText: resourcePayload.content,
+        essayFileName: essayFile?.name,
+        description: description,
+        submittedAt: new Date().toISOString(),
+        evaluations: []
+      };
+      setHistory(h => [submission, ...h]);
+      // Clear form
+      setEssayText('');
+      setEssayFile(null);
+      setDescription('');
+    } catch (err) {
+      console.error('Failed to submit resource', err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loadingCases) {
@@ -120,12 +203,31 @@ const EssaySubmission: React.FC = () => {
           >
             <option value="">-- 🚀 Choose your challenge --</option>
             {cases.map(ca => (
-              <option key={ca.id} value={ca.id}>📝 {ca.name || "Untitled"}</option>
+              <option key={ca.id} value={ca.id}>📝 {ca.name || ca.topic_name || "Untitled"}</option>
             ))}
           </select>
         )}
-        {selectedCase && <div className="mt-2 text-cyan-700 text-base italic">{selectedCase.description || "No description."}</div>}
       </div>
+      {selectedCase && (
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="rounded-2xl border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/40 p-4 overflow-y-auto max-h-[360px] prose prose-sm md:prose-base dark:prose-invert">
+            <h3 className="text-lg font-bold mb-2">📄 Reference Text</h3>
+            <div className="break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                { (essayLookup[selectedCase.id]?.content) || selectedCase.content || 'No reference text available.' }
+              </ReactMarkdown>
+            </div>
+          </div>
+          <div className="rounded-2xl border-2 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/40 p-4 overflow-y-auto max-h-[360px] prose prose-sm md:prose-base dark:prose-invert">
+            <h3 className="text-lg font-bold mb-2">🧭 Instructions / Rubric</h3>
+            <div className="break-words">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                { (essayLookup[selectedCase.id]?.explanation) || selectedCase.explanation || selectedCase.description || 'No instructions available.' }
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Essay submission form */}
       <form onSubmit={handleSubmit} className="bg-white dark:bg-boxdark rounded-2xl shadow-lg p-8 mb-8 flex flex-col gap-6 border-2 border-cyan-100 dark:border-cyan-800">
         <label className="font-semibold flex items-center gap-2 text-green-700">

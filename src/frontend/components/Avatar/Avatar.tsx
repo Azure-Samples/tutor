@@ -279,14 +279,12 @@ const AvatarChat: React.FC = () => {
       setError(null);
       setAvatarVideoStream(null); // Reset video stream
       try {
-        // Store language, gender, and voice in a ref for global access
-
         configRef.current.gender = selectedCase?.profile?.gender || "male";
-        configRef.current.language = selectedCase?.profile?.language || "pt-BR";
+        configRef.current.language = selectedCase?.profile?.language || "en-US";
         configRef.current.voice = selectedCase?.profile?.voice || (
           (selectedCase?.profile?.gender || "male") === "feminino"
-            ? "pt-BR-FranciscaNeural"
-            : "pt-BR-AntonioNeural"
+            ? "en-US-AvaMultilingualNeural"
+            : "en-US-AndrewMultilingualNeural"
         );
 
         const { language, voice } = configRef.current;
@@ -428,7 +426,6 @@ const AvatarChat: React.FC = () => {
           </div>
         )}
 
-        {/* Chat History Panel */}
         {chatHistory.length > 0 && (
           <div className="mt-6 w-full max-w-4xl mx-auto bg-white dark:bg-boxdark rounded-xl shadow-md p-4 max-h-[30vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-3 border-b pb-2">Conversation History</h3>

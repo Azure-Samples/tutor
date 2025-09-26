@@ -165,6 +165,7 @@ async def list_essays_endpoint() -> JSONResponse:
         message="Successfully retrieved question data.",
         content=items,
     )
+    print(response_body)
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(response_body))
 
 
