@@ -1,0 +1,95 @@
+[project]
+name = "tutor"
+version = "0.2.0"
+description = "Modernized tutoring platform backends and services"
+readme = "README.md"
+
+authors = [
+    { name = "Ricardo Cataldi", email = "rcataldi@microsoft.com" }
+]
+
+license = { file = "LICENSE.md" }
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=3.10.5",
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.32.0",
+    "python-dotenv>=1.0.1",
+    "jinja2>=3.1.6",
+    "azure-identity>=1.20.0",
+    "azure-core>=1.31.0",
+    "azure-cosmos>=4.9.0",
+    "azure-storage-blob>=12.24.0",
+    "azure-ai-projects>=1.0.0b10",
+    "azure-ai-agents>=1.0.0b2",
+    "agent-framework-azure-ai>=0.2.0.dev0",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.4.0",
+    "tenacity>=9.0.0",
+    "httpx>=0.27.0",
+    "structlog>=24.3.0",
+    "numpy>=2.1.2",
+    "scikit-learn>=1.5.2",
+    "openpyxl>=3.1.5",
+    "moviepy>=2.1.1",
+    "orjson>=3.10.7",
+    "python-multipart>=0.0.9",
+    "rapidfuzz>=3.10.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=24.10.0",
+    "isort>=5.13.2",
+    "pylint>=3.2.7",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.23.7",
+    "ipykernel>=6.29.5",
+    "locust>=2.31.6"
+]
+
+[build-system]
+requires = ["setuptools>=70.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q -s"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "async: marks tests as async (select with '-m async')",
+    "slow: marks tests as slow (select with '-m slow')"
+]
+pythonpath = [
+    "apps/avatar/src",
+    "apps/configuration/src",
+    "apps/essays/src",
+    "apps/questions/src",
+    "apps/upskilling/src",
+]
+
+[tool.pylint]
+fail-under = 9.0
+max-line-length = 100
+max-complexity = 10
+good-names = ["i", "j", "k", "ex", "Run", "_"]
+disable = ["C0114", "C0115", "C0116", "C0301", "W3101"]
+load-plugins = ["pylint.extensions.mccabe"]
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+include = '\\.pyi?$'
+exclude = '(\\.git | \\.hg | \\.mypy_cache | \\.__pycache__ | \\.tox | \\.venv | _build | buck-out | build | dist )/'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 100
+

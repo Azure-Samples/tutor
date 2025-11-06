@@ -4,7 +4,7 @@
     "git.autofetch": true,
     "debug.onTaskErrors": "debugAnyway",
     "terminal.integrated.enableMultiLinePasteWarning": false,
-    "window.zoomLevel": -1,
+    "window.zoomLevel": 0,
     "javascript.updateImportsOnFileMove.enabled": "always",
     "C_Cpp.autocompleteAddParentheses": true,
     "C_Cpp.default.includePath": [
