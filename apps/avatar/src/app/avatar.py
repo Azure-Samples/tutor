@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from functools import partial
-from pathlib import Path
 import time
 from typing import Any, Dict, List
 
-from azure.ai.inference.prompts._patch import PromptTemplate
-from azure.ai.projects import AIProjectClient
 from azure.cosmos import exceptions
-from azure.identity import DefaultAzureCredential
 
-from common.config import TutorSettings
-from common.cosmos import CosmosCRUD
-
+from app.agents.clients import AgentRegistry, AgentSpec
+from app.agents.run import AgentRunContext
+from app.config import AvatarSettings
+from app.cosmos import CosmosCRUD
+from app.prompts import SIMULATION_PROMPT
 from app.schemas import ChatResponse
 
 logger = logging.getLogger(__name__)
@@ -27,18 +23,13 @@ class AvatarChat:
     def __init__(
         self,
         *,
-        settings: TutorSettings,
+        settings: AvatarSettings,
         case_repository: CosmosCRUD,
-        project_client: AIProjectClient | None = None,
+        registry: AgentRegistry | None = None,
     ) -> None:
         self._settings = settings
         self._case_repository = case_repository
-        self._project_client = project_client or AIProjectClient(
-            endpoint=settings.azure_ai.project_endpoint,
-            credential=DefaultAzureCredential(),
-        )
-        self._chat_client = self._project_client.inference.get_chat_completions_client()
-        self._template = PromptTemplate.from_prompty(str(Path(__file__).parent / "prompts" / "simulation.prompty"))
+        self._registry = registry or AgentRegistry(settings.azure_ai.project_endpoint)
         self._case_cache: Dict[str, Dict[str, Any]] = {}
 
     async def respond(self, prompt_data: ChatResponse) -> str:
@@ -61,28 +52,28 @@ class AvatarChat:
         return case
 
     async def _evaluate(self, avatar_data: Dict[str, Any], prompt_data: ChatResponse) -> str:
-        messages = self._template.create_messages(
-            role=avatar_data.get("profile", {}).get("role"),
-            name=avatar_data.get("name"),
-            profile=json.dumps(avatar_data.get("profile", {})),
-            case=avatar_data.get("role"),
-            steps=json.dumps(avatar_data.get("steps", [])),
-            user_prompt=prompt_data.prompt,
+        history_messages = self._coerce_history(prompt_data.chat_history)
+        history_text = self._history_as_text(history_messages)
+
+        system_message = SIMULATION_PROMPT.safe_substitute(
+            name=avatar_data.get("name", ""),
+            profile=json.dumps(avatar_data.get("profile", {}), ensure_ascii=False),
+            role=avatar_data.get("profile", {}).get("role", avatar_data.get("role", "")),
+            steps=json.dumps(avatar_data.get("steps", []), ensure_ascii=False),
+            case=json.dumps(avatar_data.get("role", ""), ensure_ascii=False),
+            previous_chat=history_text or "No prior conversation.",
         )
 
-        for entry in self._coerce_history(prompt_data.chat_history):
-            messages.append(entry)
-
-        loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None,
-            partial(
-                self._chat_client.complete,
-                model=self._settings.azure_ai.default_deployment,
-                messages=messages,
-                **self._template.parameters,
-            ),
+        agent_spec = AgentSpec(
+            name=f"avatar-{avatar_data.get('id', prompt_data.case_id)}",
+            instructions=system_message,
+            deployment=self._settings.azure_ai.default_deployment,
+            temperature=self._settings.azure_ai.temperature,
         )
+
+        agent = self._registry.create(agent_spec)
+        context = AgentRunContext(agent)
+        response = await context.run(prompt_data.prompt)
 
         logger.debug("Avatar service received response: %s", response)
         return self._extract_text(response)
@@ -112,27 +103,23 @@ class AvatarChat:
                 formatted.append({"role": "user", "content": str(message["user"])})
         return formatted
 
-    def _extract_text(self, response: Any) -> str:
-        if not getattr(response, "choices", None):
+    def _history_as_text(self, history: List[Dict[str, str]]) -> str:
+        if not history:
             return ""
-        message = response.choices[0].message
-        content = getattr(message, "content", "")
-        if isinstance(content, str):
-            return content
-        parts: List[str] = []
-        for part in content or []:
-            if isinstance(part, dict) and "text" in part:
-                parts.append(str(part["text"]))
-                continue
-            text_attr = getattr(part, "text", None)
-            if text_attr is not None:
-                parts.append(str(text_attr))
-                continue
-            parts.append(str(part))
-        return "".join(parts)
+        return "\n".join(f"{entry['role'].title()}: {entry['content']}" for entry in history)
+
+    def _extract_text(self, response: Any) -> str:
+        text = getattr(response, "text", None)
+        if text is not None:
+            return str(text)
+        if hasattr(response, "output") and isinstance(response.output, dict):
+            content = response.output.get("message") or response.output.get("content")
+            if isinstance(content, str):
+                return content
+        return str(response)
 
 
-def build_avatar_chat(settings: TutorSettings, case_repository: CosmosCRUD) -> AvatarChat:
+def build_avatar_chat(settings: AvatarSettings, case_repository: CosmosCRUD) -> AvatarChat:
     """Factory to create an `AvatarChat` instance for FastAPI wiring."""
 
     return AvatarChat(settings=settings, case_repository=case_repository)

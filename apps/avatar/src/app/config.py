@@ -1,65 +1,53 @@
-"""Centralised configuration management for Tutor services."""
+"""Configuration objects dedicated to the avatar experience."""
 
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from typing import Iterable
+
+from dotenv import load_dotenv
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-class CosmosConfig(BaseSettings):
-    """Cosmos DB configuration shared across apps."""
-
-    endpoint: str = Field(alias="COSMOS_ENDPOINT")
-    database: str = Field(alias="COSMOS_DATABASE", default="tutor")
-    essay_container: str = Field(alias="COSMOS_ESSAY_TABLE", default="essays")
-    question_container: str = Field(alias="COSMOS_QUESTION_TABLE", default="questions")
-    answer_container: str = Field(alias="COSMOS_ANSWER_TABLE", default="answers")
-    configuration_container: str = Field(alias="COSMOS_CONFIGURATION_TABLE", default="configuration")
-    resources_container: str = Field(alias="COSMOS_RESOURCE_TABLE", default="resources")
-    grader_container: str = Field(alias="COSMOS_GRADER_TABLE", default="graders")
-    assembly_container: str = Field(alias="COSMOS_ASSEMBLY_TABLE", default="assemblies")
-    student_container: str = Field(alias="COSMOS_STUDENT_TABLE", default="students")
-    professor_container: str = Field(alias="COSMOS_PROFESSOR_TABLE", default="professors")
-    course_container: str = Field(alias="COSMOS_COURSE_TABLE", default="courses")
-    class_container: str = Field(alias="COSMOS_CLASS_TABLE", default="classes")
-    group_container: str = Field(alias="COSMOS_GROUP_TABLE", default="groups")
-    avatar_case_container: str = Field(alias="COSMOS_AVATAR_CASE_TABLE", default="avatar_case")
+load_dotenv()
 
 
-class AzureAIConfig(BaseSettings):
-    """Azure AI Foundry configuration for agent execution."""
+def _env(name: str, default: str | None = None) -> str:
+    """Return environment variable value, falling back to default when provided."""
 
-    project_endpoint: str = Field(alias="PROJECT_ENDPOINT")
-    default_deployment: str = Field(alias="MODEL_DEPLOYMENT_NAME", default="gpt-4o")
-    reasoning_deployment: str = Field(alias="MODEL_REASONING_DEPLOYMENT", default="o3-mini")
-
-
-class StorageConfig(BaseSettings):
-    """Azure Storage configuration shared across apps."""
-
-    blob_connection: str = Field(alias="BLOB_CONNECTION_STRING")
-    container_name: str = Field(alias="BLOB_CONTAINER_NAME", default="uploads")
+    value = os.getenv(name, default)
+    if value is None:
+        raise ValueError(f"Environment variable '{name}' is required for avatar configuration")
+    return value
 
 
-class AuthConfig(BaseSettings):
-    """Authentication configuration for Entra ID and local logins."""
+class AvatarCosmosSettings(BaseSettings):
+    """Connection details for the avatar case container."""
 
-    tenant_id: str = Field(alias="ENTRA_TENANT_ID")
-    teacher_client_id: str = Field(alias="ENTRA_TEACHER_CLIENT_ID")
-    teacher_client_secret: str = Field(alias="ENTRA_TEACHER_CLIENT_SECRET")
-    student_secret_salt: str = Field(alias="STUDENT_SECRET_SALT")
+    endpoint: str = Field(default_factory=lambda: _env("COSMOS_ENDPOINT"), alias="COSMOS_ENDPOINT")
+    database: str = Field(default_factory=lambda: _env("COSMOS_DATABASE", "tutor"), alias="COSMOS_DATABASE")
+    case_container: str = Field(
+        default_factory=lambda: _env("COSMOS_AVATAR_CASE_TABLE", "avatar_case"),
+        alias="COSMOS_AVATAR_CASE_TABLE",
+    )
 
 
-class TutorSettings(BaseSettings):
-    """Unified service configuration loaded from environment variables."""
+class AvatarAISettings(BaseSettings):
+    """Azure AI Projects configuration required to run the avatar agent."""
 
-    cosmos: CosmosConfig = CosmosConfig()  # type: ignore[arg-type]
-    azure_ai: AzureAIConfig = AzureAIConfig()  # type: ignore[arg-type]
-    storage: StorageConfig | None = None
-    auth: AuthConfig | None = None
+    project_endpoint: str = Field(default_factory=lambda: _env("PROJECT_ENDPOINT"), alias="PROJECT_ENDPOINT")
+    default_deployment: str = Field(default_factory=lambda: _env("MODEL_DEPLOYMENT_NAME", "gpt-4o"), alias="MODEL_DEPLOYMENT_NAME")
+    temperature: float = Field(default_factory=lambda: float(_env("AVATAR_TEMPERATURE", "0.6")), alias="AVATAR_TEMPERATURE")
+
+
+class AvatarSettings(BaseSettings):
+    """Service-scoped settings assembled from environment variables."""
+
+    cosmos: AvatarCosmosSettings = Field(default_factory=AvatarCosmosSettings)  # type: ignore[arg-type]
+    azure_ai: AvatarAISettings = Field(default_factory=AvatarAISettings)  # type: ignore[arg-type]
     cors_origins: Iterable[str] = Field(default_factory=lambda: ["*"])
 
     model_config = {
@@ -70,7 +58,7 @@ class TutorSettings(BaseSettings):
 
 
 @lru_cache(maxsize=1)
-def get_settings() -> TutorSettings:
+def get_settings() -> AvatarSettings:
     """Return cached settings instance to avoid repeated environment parsing."""
 
-    return TutorSettings()  # type: ignore[call-arg]
+    return AvatarSettings()  # type: ignore[call-arg]

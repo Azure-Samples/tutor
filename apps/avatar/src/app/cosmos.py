@@ -10,13 +10,13 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from .config import CosmosConfig
+from .config import AvatarCosmosSettings
 
 
 class CosmosCRUD:
     """Asynchronous Cosmos DB repository backed by managed identity."""
 
-    def __init__(self, container_name: str, config: CosmosConfig) -> None:
+    def __init__(self, container_name: str, config: AvatarCosmosSettings) -> None:
         self._endpoint = config.endpoint
         self._database = config.database
         self._container = container_name

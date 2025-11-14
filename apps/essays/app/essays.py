@@ -13,9 +13,8 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from common.agents import AgentRegistry, AgentRunContext, AgentSpec
-from common.config import get_settings
-
+from app.agents.clients import AgentRegistry, AgentSpec
+from app.config import get_settings
 from app.schemas import Essay, Resource
 
 
@@ -61,9 +60,8 @@ class EssayEvaluationStrategy:
 
     async def evaluate(self, essay: Essay, resources: Iterable[Resource]) -> EssayEvaluationResult:
         prompt = self._composer.render(self.template_name, essay, resources)
-        agent = self._registry.create(self._build_spec())
-        context = AgentRunContext(agent)
-        response = await context.run(prompt, temperature=0.2)
+        async with self._registry.create(self._build_spec()) as agent:
+            response = await agent.run(prompt, temperature=0.2)
         verdict, strengths, improvements = self._parse_response(str(response.text))
         return EssayEvaluationResult(
             strategy=self.strategy_type(),

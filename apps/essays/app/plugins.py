@@ -1,438 +1,345 @@
-"""
-This module provides advanced image processing capabilities for multi-modal applications by integrating
-Azure AI Vision with Azure CosmosDB and Azure AI Search. It supports image content detection,
-face recognition, OCR, object detection, and embedding generation for images.
+"""Vision agent toolkit exposing Azure AI Vision and CosmosDB helpers."""
 
-Classes:
-    ImageProcessor:
-        Handles image file encoding and performs content detection, face recognition, OCR, 
-        and object detection with Azure AI Vision SDK.
-    ImageEmbedder:
-        Generates image embeddings from images and persists results to CosmosDB and Azure AI Search.
-    ImageAnswer:
-        Applies load, save and frame images for better and complementary usage of vision models.
+from __future__ import annotations
 
-Dependencies:
-    - azure-ai-vision
-    - azure-cosmos
-    - azure-search-documents
-    - azure-identity
-    - requests
-    - numpy
-    - PIL
-"""
-
+import asyncio
+import base64
+import logging
 import os
 import time
-import logging
-import base64
-
-from typing import Any, Union
+from dataclasses import dataclass
 from io import BytesIO
-from PIL import Image
+from typing import Any, Optional, Union
+
 import requests
-
-from dotenv import load_dotenv
-
-from azure.ai.vision.imageanalysis.aio import ImageAnalysisClient
-from azure.ai.vision.imageanalysis.models import VisualFeatures
+from PIL import Image
+from agent_framework.azure import AgentToolkit
+from agent_framework.decorators import ai_function
+from azure.ai.vision.imageanalysis import ImageAnalysisClient, VisualFeatures
 from azure.core.credentials import AzureKeyCredential
 from azure.cosmos.aio import CosmosClient
-
-from semantic_kernel.functions.kernel_function_decorator import kernel_function
-
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ENV_FILE = os.path.join(BASE_DIR, ".env")
-load_dotenv(ENV_FILE)
 
 
 logger = logging.getLogger(__name__)
 
-
-AZURE_VISION_ENDPOINT = os.getenv("AZURE_VISION_ENDPOINT", "")
-AZURE_VISION_KEY = os.getenv("AZURE_VISION_KEY", "")
+__all__ = ["VisionSettings", "VisionToolkit", "build_vision_toolkit"]
 
 
-class ImageProcessor:
-    """
-    Handles image file encoding and performs content detection as well as face recognition, 
-    OCR and object detection with Azure AI Vision SDK.
-    """
+def _get_env(name: str, *, required: bool = False) -> Optional[str]:
+    value = os.getenv(name)
+    if required and not value:
+        raise AttributeError(f"Missing required environment variable: {name}")
+    return value
 
-    def __init__(self):
-        """
-        Initialize the ImageProcessor with an Azure AI Vision key and endpoint.
 
-        Args:
-            key (str): The Azure AI Vision subscription key.
-            endpoint (str): The endpoint URL for Azure AI Vision service.
-        """
-        self.vision_client = ImageAnalysisClient(
-            endpoint=AZURE_VISION_ENDPOINT,
-            credential=AzureKeyCredential(AZURE_VISION_KEY)
+@dataclass(slots=True)
+class VisionSettings:
+    """Strongly typed configuration for the vision toolkit."""
+
+    vision_endpoint: str
+    vision_key: str
+    cosmos_endpoint: Optional[str] = None
+    cosmos_key: Optional[str] = None
+    cosmos_database: Optional[str] = None
+    cosmos_container: Optional[str] = None
+
+    @classmethod
+    def from_env(cls) -> "VisionSettings":
+        return cls(
+            vision_endpoint=_get_env("AZURE_VISION_ENDPOINT", required=True) or "",
+            vision_key=_get_env("AZURE_VISION_KEY", required=True) or "",
+            cosmos_endpoint=_get_env("COSMOS_VISION_ENDPOINT"),
+            cosmos_key=_get_env("COSMOS_KEY"),
+            cosmos_database=_get_env("COSMOS_DATABASE"),
+            cosmos_container=_get_env("COSMOS_CONTAINER"),
         )
 
-    @kernel_function(name="IngestImage", description="Validates and returns the image URL for downstream processing")
-    async def ingest_image(self, image_url: str) -> str:
-        """
-        Ingest an image from a URL and convert it to bytes.
 
-        Args:
-            image_url (str): URL of the image to ingest.
+class VisionToolkit:
+    """Collection of Azure AI Vision helpers exposed as agent tools."""
 
-        Returns:
-            bytes: The image content as bytes.
-            
-        Raises:
-            Exception: If the image cannot be retrieved or processed.
-        """
-        try:
-            # Validate URL reachable
-            response = requests.head(image_url, timeout=10)
+    def __init__(self, settings: VisionSettings | None = None) -> None:
+        self._settings = settings or VisionSettings.from_env()
+        self._vision_credential = AzureKeyCredential(self._settings.vision_key)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _vision_client(self) -> ImageAnalysisClient:
+        return ImageAnalysisClient(
+            endpoint=self._settings.vision_endpoint,
+            credential=self._vision_credential,
+        )
+
+    async def _validate_url(self, url: str) -> None:
+        def _head() -> None:
+            response = requests.head(url, timeout=10)
             response.raise_for_status()
-            return image_url
-        except Exception as e:
-            logger.error("Error validating image URL: %s", e)
-            raise AttributeError(f"Invalid image URL: {e}") from e
 
-    @kernel_function(name="LoadImages", description="Loads multiple images from URLs or byte arrays")
-    async def load_images(self, image_sources: list[Union[str, bytes]]) -> list[bytes]:
-        """
-        Load multiple images from various sources (URLs or bytes) into an array of bytes.
+        await asyncio.to_thread(_head)
 
-        Args:
-            image_sources (list[Union[str, bytes]]): list of image URLs or byte arrays.
-            
-        Returns:
-            list[bytes]: list of images as byte arrays.
-        """
-        images = []
+    async def _download_image(self, url: str) -> bytes:
+        def _get() -> bytes:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            return response.content
+
+        return await asyncio.to_thread(_get)
+
+    def _ensure_cosmos(self) -> None:
+        if not all(
+            [
+                self._settings.cosmos_endpoint,
+                self._settings.cosmos_key,
+                self._settings.cosmos_database,
+                self._settings.cosmos_container,
+            ]
+        ):
+            raise AttributeError("Cosmos configuration is incomplete; cannot persist images.")
+
+    # ------------------------------------------------------------------
+    # Agent tool definitions
+    # ------------------------------------------------------------------
+    @ai_function(name="ingest_image", description="Validate that an image URL is reachable.")
+    async def ingest_image(self, image_url: str) -> str:
+        await self._validate_url(image_url)
+        return image_url
+
+    @ai_function(
+        name="load_images",
+        description="Load images from URLs or byte arrays and return a list of byte buffers.",
+    )
+    async def load_images(self, image_sources: list[Union[str, bytes]]) -> list[Optional[bytes]]:
+        images: list[Optional[bytes]] = []
         for source in image_sources:
-            try:
-                if isinstance(source, str):
-                    image_bytes = await self.ingest_image(source)
-                else:
-                    image_bytes = source
-                images.append(image_bytes)
-            except Exception as e:
-                logger.error("Error loading image: %s", e)
-                images.append(None)
+            if isinstance(source, str):
+                try:  # pragma: no cover - network failures not deterministic
+                    await self._validate_url(source)
+                    images.append(await self._download_image(source))
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Failed to download image '%s': %s", source, exc)
+                    images.append(None)
+            else:
+                images.append(source)
         return images
 
-    @kernel_function(name="SaveImageSet", description="Saves a set of images with metadata to the database")
-    async def save_image_set(self, images: list[bytes], metadata: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """
-        Save a set of images with their metadata to the database.
+    @ai_function(name="save_image_set", description="Persist images and metadata into Cosmos DB.")
+    async def save_image_set(
+        self,
+        images: list[Optional[bytes]],
+        metadata: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        self._ensure_cosmos()
+        assert self._settings.cosmos_endpoint is not None
+        assert self._settings.cosmos_key is not None
+        assert self._settings.cosmos_database is not None
+        assert self._settings.cosmos_container is not None
 
-        Args:
-            images (list[bytes]): list of images as bytes.
-            metadata (list[dict[str, Any]]): list of metadata for each image.
+        results: list[dict[str, Any]] = []
+        async with CosmosClient(self._settings.cosmos_endpoint, credential=self._settings.cosmos_key) as client:
+            database = client.get_database_client(self._settings.cosmos_database)
+            container = database.get_container_client(self._settings.cosmos_container)
 
-        Returns:
-            list[dict[str, Any]]: list of responses from the database.
-        """
-        try:
-            cosmos_endpoint = os.environ.get("COSMOS_VISION_ENDPOINT", "")
-            cosmos_key = os.environ.get("COSMOS_KEY", AZURE_VISION_KEY)
-            cosmos_endpoint = os.environ.get("COSMOS_VISION_ENDPOINT", "")
-            cosmos_key = os.environ.get("COSMOS_KEY", AZURE_VISION_KEY)
-            database_name = os.environ.get("COSMOS_DATABASE", "")
-            container_name = os.environ.get("COSMOS_CONTAINER", "")
-
-            client = CosmosClient(cosmos_endpoint, credential=cosmos_key)
-            database = client.get_database_client(database_name)
-            container = database.get_container_client(container_name)
-
-            results = []
-            for i, (image_bytes, meta) in enumerate(zip(images, metadata)):
-                if image_bytes is None:
+            for index, (image_bytes, meta) in enumerate(zip(images, metadata, strict=False)):
+                if not image_bytes:
                     continue
 
-                encoded = base64.b64encode(image_bytes).decode('utf-8')
+                encoded = base64.b64encode(image_bytes).decode("utf-8")
                 item = {
-                    "id": meta.get("id", f"image-{int(time.time())}-{i}"),
+                    "id": meta.get("id", f"image-{int(time.time())}-{index}"),
                     "image_base64": encoded,
                     "metadata": meta,
                     "type": "image",
-                    "timestamp": time.time()
+                    "timestamp": time.time(),
                 }
-
                 response = await container.upsert_item(item)
                 results.append(response)
 
-            return results
+        return results
 
-        except Exception as e:
-            logger.error("Error saving image set: %s", e)
-            raise AttributeError(f"Failed to save image set: {str(e)}") from e
-
-    @kernel_function(name="AddCaptions", description="Uses Azure AI Vision to add captions to images")
-    async def add_captions(self, images: list[bytes]) -> list[dict[str, str]]:
-        """
-        Uses Azure AI Vision SDK to add captions to images.
-
-        Args:
-            images (list[bytes): list of images as bytes.
-
-        Returns:
-            list[dict[str, str]]: list of captions for each image.
-        """
-        captions = []
-
-        async with self.vision_client as client:
+    @ai_function(name="add_captions", description="Generate captions for supplied images.")
+    async def add_captions(self, images: list[Optional[bytes]]) -> list[dict[str, Any]]:
+        captions: list[dict[str, Any]] = []
+        async with self._vision_client() as client:
             for image in images:
-                if image is None:
+                if not image:
                     captions.append({"caption": "No image available"})
                     continue
-
                 try:
-                    analysis_result= await client.analyze(
+                    result = await client.analyze(
                         image_data=image,
-                        visual_features=[VisualFeatures.CAPTION]
+                        visual_features=[VisualFeatures.CAPTION],
                     )
-                    if hasattr(analysis_result, 'caption') and analysis_result.caption:
-                        captions.append({
-                            "caption": analysis_result.caption.text,  # Use .content instead of .text
-                            "confidence": analysis_result.caption.confidence
-                        })
-                    else:
-                        captions.append({"caption": "No caption generated"})
-
-                except Exception as e:
-                    logger.error("Error generating caption: %s", e)
-                    captions.append({"caption": f"Caption error: {str(e)}"})
-
+                    caption_text = getattr(result.caption, "content", None) or getattr(result.caption, "text", "")
+                    captions.append(
+                        {
+                            "caption": caption_text or "No caption generated",
+                            "confidence": getattr(result.caption, "confidence", 0.0),
+                        }
+                    )
+                except Exception as exc:  # pragma: no cover - SDK/network error
+                    logger.error("Caption generation failed: %s", exc)
+                    captions.append({"caption": f"Caption error: {exc}"})
         return captions
 
-    @kernel_function(name="ExtractTags", description="Extracts tags from images using Azure AI Vision")
-    async def extract_tags(self, images: list[bytes]) -> list[dict[str, Any]]:
-        """
-        Uses Azure AI Vision SDK to extract tags from images.
-        
-        Args:
-            images (list[bytes]): list of images as bytes.
-            
-        Returns:
-            list[dict[str, Any]]: list of tag sets for each image.
-        """
-        all_tags = []
-        async with self.vision_client as client:
+    @ai_function(name="extract_tags", description="Extract vision tags and confidences for images.")
+    async def extract_tags(self, images: list[Optional[bytes]]) -> list[dict[str, Any]]:
+        tag_sets: list[dict[str, Any]] = []
+        async with self._vision_client() as client:
             for image in images:
-                if image is None:
-                    all_tags.append({"tags": []})
+                if not image:
+                    tag_sets.append({"tags": []})
                     continue
-
                 try:
-                    result= await client.analyze(
+                    result = await client.analyze(
                         image_data=image,
-                        visual_features=[VisualFeatures.TAGS]
+                        visual_features=[VisualFeatures.TAGS],
                     )
-
                     tags = []
                     if result.tags:
                         for tag in result.tags.list:
-                            tags.append({
-                                "name": tag.get("name"),
-                                "confidence": tag.get("confidence")
-                            })
+                            tags.append({"name": tag.get("name"), "confidence": tag.get("confidence")})
+                    tag_sets.append({"tags": tags})
+                except Exception as exc:  # pragma: no cover
+                    logger.error("Tag extraction failed: %s", exc)
+                    tag_sets.append({"tags": [], "error": str(exc)})
+        return tag_sets
 
-                    all_tags.append({"tags": tags})
-
-                except Exception as e:
-                    logger.error("Error extracting tags: %s", e)
-                    all_tags.append({"tags": [], "error": str(e)})
-
-        return all_tags
-
-    @kernel_function(name="CropImages", description="Crops images to their region of interest")
-    async def crop_images(self, images: list[bytes]) -> list[bytes]:
-        """
-        Uses Azure AI Vision SDK to crop images to the region of interest.
-        
-        Args:
-            images (list[bytes]): list of images as bytes.
-            
-        Returns:
-            list[bytes]: list of cropped images.
-        """
-        cropped_images = []
-
-        for image in images:
-            if image is None:
-                cropped_images.append(None)
-                continue
-
-            try:
-                image_data = Image.open(image)
-                original_size = image_data.size
-                result = await self.vision_client.analyze(
-                    image_data=image,
-                    visual_features=[VisualFeatures.SMART_CROPS, VisualFeatures.OBJECTS]
-                )
-
-                if result.objects and len(result.objects) > 0:
-                    valid_objects = [obj for obj in result.objects if hasattr(obj, 'bounding_box')]
-                    largest_object = max(valid_objects, key=lambda x: (max(p.x for p in x.bounding_box) - min(p.x for p in x.bounding_box)) * (max(p.y for p in x.bounding_box) - min(p.y for p in x.bounding_box)))
-                    bbox = largest_object.bounding_box
-                    x_coords = [p.x for p in bbox]
-                    y_coords = [p.y for p in bbox]
-                    min_x, max_x = min(x_coords), max(x_coords)
-                    min_y, max_y = min(y_coords), max(y_coords)
-
-                    crop_box = (
-                        int(min_x * original_size[0]),
-                        int(min_y * original_size[1]),
-                        int(max_x * original_size[0]),
-                        int(max_y * original_size[1])
+    @ai_function(name="crop_images", description="Crop images around the largest detected object.")
+    async def crop_images(self, images: list[Optional[bytes]]) -> list[Optional[bytes]]:
+        cropped: list[Optional[bytes]] = []
+        async with self._vision_client() as client:
+            for image in images:
+                if not image:
+                    cropped.append(None)
+                    continue
+                try:
+                    original = Image.open(BytesIO(image))
+                    result = await client.analyze(
+                        image_data=image,
+                        visual_features=[VisualFeatures.SMART_CROPS, VisualFeatures.OBJECTS],
                     )
-                    cropped = image_data.crop(crop_box)
-
+                    objects = [obj for obj in result.objects or [] if hasattr(obj, "bounding_box")]
+                    if not objects:
+                        cropped.append(image)
+                        continue
+                    largest = max(
+                        objects,
+                        key=lambda obj: (max(p.x for p in obj.bounding_box) - min(p.x for p in obj.bounding_box))
+                        * (max(p.y for p in obj.bounding_box) - min(p.y for p in obj.bounding_box)),
+                    )
+                    xs = [point.x for point in largest.bounding_box]
+                    ys = [point.y for point in largest.bounding_box]
+                    crop_box = (
+                        int(min(xs) * original.width),
+                        int(min(ys) * original.height),
+                        int(max(xs) * original.width),
+                        int(max(ys) * original.height),
+                    )
                     buffer = BytesIO()
-                    cropped.save(buffer, format="PNG")
-                    cropped_images.append(buffer.getvalue())
-                else:
-                    cropped_images.append(image)
+                    original.crop(crop_box).save(buffer, format="PNG")
+                    cropped.append(buffer.getvalue())
+                except Exception as exc:  # pragma: no cover
+                    logger.error("Image crop failed: %s", exc)
+                    cropped.append(image)
+        return cropped
 
-            except Exception as e:
-                logger.error("Error cropping image: %s", e)
-                cropped_images.append(image)
-
-        return cropped_images
-
-
-class ImageAnswer:
-    """
-    Applies load, save, and frame images for better and complementary usage of vision models.
-    """
-
-    def __init__(self):
-        """
-        Initialize the ImageAnswer with an Azure AI Vision key and endpoint.
-        
-        Args:
-            key (str): The Azure AI Vision subscription key.
-            endpoint (str): The endpoint URL for Azure AI Vision service.
-        """
-        self.vision_client = ImageAnalysisClient(
-            endpoint=AZURE_VISION_ENDPOINT,
-            credential=AzureKeyCredential(AZURE_VISION_KEY)
-        )
-
-    @kernel_function(name="ExtractText", description="Extracts text from image bytes or via URL using OCR")
+    @ai_function(name="extract_text", description="Run OCR over an image (bytes or URL).")
     async def extract_text(self, image: Union[str, bytes]) -> dict[str, Any]:
-        """
-        Uses Azure AI Vision SDK to detect image text with OCR and adds it to the image data.
+        async with self._vision_client() as client:
+            try:
+                if isinstance(image, str):
+                    await self._validate_url(image)
+                    result = await client.analyze_from_url(
+                        image_url=image,
+                        visual_features=[VisualFeatures.READ],
+                    )
+                else:
+                    result = await client.analyze(
+                        image_data=image,
+                        visual_features=[VisualFeatures.READ],
+                    )
+            except Exception as exc:  # pragma: no cover
+                logger.error("OCR failed: %s", exc)
+                raise ValueError(f"Failed to extract text from image: {exc}") from exc
 
-        Args:
-            image (bytes): The image content as bytes.
+        regions: list[dict[str, Any]] = []
+        read_section = getattr(result, "read", None)
+        if read_section and getattr(read_section, "blocks", None):
+            for block in read_section.blocks:
+                if not getattr(block, "lines", None):
+                    continue
+                for line in block.lines:
+                    text = getattr(line, "content", None) or getattr(line, "text", "")
+                    if not text:
+                        continue
+                    polygon = getattr(line, "bounding_polygon", None) or []
+                    if polygon:
+                        xs = [point.x for point in polygon]
+                        ys = [point.y for point in polygon]
+                        regions.append(
+                            {
+                                "text": text,
+                                "bounding_box": {
+                                    "x": min(xs),
+                                    "y": min(ys),
+                                    "width": max(xs) - min(xs),
+                                    "height": max(ys) - min(ys),
+                                },
+                                "confidence": getattr(line, "confidence", 0.0),
+                            }
+                        )
+                    else:
+                        regions.append({"text": text, "confidence": getattr(line, "confidence", 0.0)})
 
-        Returns:
-            dict[str, Any]: dictionary containing extracted text and related metadata.
-        """
-        try:
-            # Handle URL or bytes: always pass bytes to analyze
-            if isinstance(image, str):
-                result = await self.vision_client.analyze_from_url(
-                    image_url=image,
-                    visual_features=[VisualFeatures.READ]
-                )
-            else:
-                result = await self.vision_client.analyze(
-                    image_data=image,
-                    visual_features=[VisualFeatures.READ]
-                )
+        combined_text = " ".join(region.get("text", "") for region in regions).strip()
+        language = getattr(read_section, "language", "unknown") if read_section else "unknown"
+        return {"text": combined_text, "regions": regions, "language": language}
 
-            extracted_text = ""
-            text_regions = []
-
-            if hasattr(result, 'read') and result.read:
-                if hasattr(result.read, 'blocks') and result.read.blocks:
-                    for block in result.read.blocks:
-                        if hasattr(block, 'lines') and block.lines:
-                            for line in block.lines:
-                                line_text = line.text if hasattr(line, 'text') else ""
-                                if line_text:
-                                    extracted_text += line_text + " "
-                                if hasattr(line, 'bounding_polygon') and line.bounding_polygon:
-                                    bbox = line.bounding_polygon
-                                    if isinstance(bbox, list) and all(hasattr(point, 'x') for point in bbox):
-                                        x_coords = [point.x for point in bbox]
-                                        y_coords = [point.y for point in bbox]
-                                        min_x, max_x = min(x_coords), max(x_coords)
-                                        min_y, max_y = min(y_coords), max(y_coords)
-                                        text_regions.append({
-                                            "text": line_text,
-                                            "bounding_box": {
-                                                "x": min_x,
-                                                "y": min_y,
-                                                "width": max_x - min_x,
-                                                "height": max_y - min_y
-                                            },
-                                            "confidence": 0.0
-                                        })
-
-                language = "unknown"
-
-                return {
-                    "text": extracted_text.strip(),
-                    "regions": text_regions,
-                    "language": language
-                }
-            return {
-                "text": "",
-                "regions": [],
-                "language": "unknown"
-            }
-
-        except Exception as e:
-            logger.error("Error extracting text: %s", e)
-            raise ValueError(f"Failed to extract text from image: {str(e)}") from e
-
-    @kernel_function(name="DetectObjects", description="Detects and identifies objects in images")
+    @ai_function(name="detect_objects", description="Detect objects present in an image byte buffer.")
     async def detect_objects(self, image: bytes) -> dict[str, Any]:
-        """
-        Uses Azure AI Vision SDK to detect objects in an image.
-        
-        Args:
-            image (bytes): The image content as bytes.
-            
-        Returns:
-            dict[str, Any]: dictionary containing detected objects and related metadata.
-        """
-        try:
-            result = await self.vision_client.analyze(
-                image_data=image,
-                visual_features=[VisualFeatures.OBJECTS]
+        async with self._vision_client() as client:
+            try:
+                result = await client.analyze(
+                    image_data=image,
+                    visual_features=[VisualFeatures.OBJECTS],
+                )
+            except Exception as exc:  # pragma: no cover
+                logger.error("Object detection failed: %s", exc)
+                return {"objects": [], "count": 0, "error": str(exc)}
+
+        objects = []
+        for obj in result.objects or []:
+            xs = [point.x for point in obj.bounding_box]
+            ys = [point.y for point in obj.bounding_box]
+            objects.append(
+                {
+                    "name": obj.name,
+                    "confidence": obj.confidence,
+                    "bounding_box": {
+                        "x": min(xs),
+                        "y": min(ys),
+                        "width": max(xs) - min(xs),
+                        "height": max(ys) - min(ys),
+                    },
+                }
             )
-            
-            # Extract objects
-            objects = []
-            
-            if result.objects:
-                for obj in result.objects:
-                    x_coords = [p.x for p in obj.bounding_box]
-                    y_coords = [p.y for p in obj.bounding_box]
-                    x_val = min(x_coords)
-                    y_val = min(y_coords)
-                    width_val = max(x_coords) - x_val
-                    height_val = max(y_coords) - y_val
-                    objects.append({
-                        "name": obj.name,
-                        "confidence": obj.confidence,
-                        "bounding_box": {
-                            "x": x_val,
-                            "y": y_val,
-                            "width": width_val,
-                            "height": height_val
-                        }
-                    })
-            
-            return {
-                "objects": objects,
-                "count": len(objects)
-            }
-            
-        except Exception as e:
-            logger.error("Error detecting objects: %s", e)
-            return {"objects": [], "count": 0, "error": str(e)}
+        return {"objects": objects, "count": len(objects)}
+
+
+def build_vision_toolkit(settings: VisionSettings | None = None) -> AgentToolkit:
+    """Create an `AgentToolkit` bundling the vision tools for registration."""
+
+    toolkit = VisionToolkit(settings=settings)
+    return AgentToolkit(
+        tools=[
+            toolkit.ingest_image,
+            toolkit.load_images,
+            toolkit.save_image_set,
+            toolkit.add_captions,
+            toolkit.extract_tags,
+            toolkit.crop_images,
+            toolkit.extract_text,
+            toolkit.detect_objects,
+        ]
+    )

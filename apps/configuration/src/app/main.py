@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.cosmos_crud import CosmosCRUD
+from app.cosmos import CosmosCRUD
 from app.schemas import (
     RESPONSES,
     BodyMessage,

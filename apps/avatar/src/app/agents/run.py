@@ -25,11 +25,11 @@ class AgentRunContext:
     async def run(self, message: str, **options: Any) -> AgentRunResponse:
         """Execute the agent with a single message and return the response."""
 
-        return await self._agent.run(message, self._thread, **options)
+        return await self._agent.run(message, thread=self._thread, **options)
 
     async def stream(self, message: str, **options: Any) -> AsyncIterator[str]:
         """Yield streaming text results from the agent."""
 
-        async for update in self._agent.run_stream(message, self._thread, **options):
+        async for update in self._agent.run_stream(message, thread=self._thread, **options):
             if update.text:
                 yield update.text

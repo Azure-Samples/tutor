@@ -15,9 +15,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.avatar import AvatarChat, build_avatar_chat
+from app.config import get_settings
+from app.cosmos import CosmosCRUD
 from app.schemas import BodyMessage, Case, ChatResponse, ErrorMessage, RESPONSES, SuccessMessage
-from common.config import TutorSettings, get_settings
-from common.cosmos import CosmosCRUD
 
 
 settings = get_settings()
@@ -50,7 +50,7 @@ def _success(title: str, message: str, content: Any) -> JSONResponse:
 
 @lru_cache(maxsize=1)
 def _case_repository() -> CosmosCRUD:
-    return CosmosCRUD(settings.cosmos.avatar_case_container, settings.cosmos)
+    return CosmosCRUD(settings.cosmos.case_container, settings.cosmos)  # pylint: disable=no-member
 
 
 @lru_cache(maxsize=1)

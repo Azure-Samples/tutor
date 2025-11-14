@@ -22,29 +22,38 @@ def essays_module(monkeypatch):
     return essays_app
 
 
+DEFAULT_RESPONSE = "Overall verdict\n\nStrengths: Solid thesis\n\nImprovements: Tighten conclusion"
+
+
 class _StubAgentRegistry:
+    response_text = DEFAULT_RESPONSE
+
     def __init__(self, *_args, **_kwargs):
         self.specs = []
 
     def create(self, spec):
         self.specs.append(spec)
-        return types.SimpleNamespace(get_new_thread=lambda: "thread-id")
+        return _StubAgent(self.response_text)
 
 
-class _StubRunContext:
-    def __init__(self, *_args, **_kwargs):
-        pass
+class _StubAgent:
+    def __init__(self, text):
+        self._text = text
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return False
 
     async def run(self, *_args, **_kwargs):
-        return types.SimpleNamespace(
-            text="Overall verdict\n\nStrengths: Solid thesis\n\nImprovements: Tighten conclusion"
-        )
+        return types.SimpleNamespace(text=self._text)
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_uses_default_strategy(monkeypatch, essays_module):
     monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr(essays_module, "AgentRunContext", _StubRunContext)
+    _StubAgentRegistry.response_text = DEFAULT_RESPONSE
     monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
 
     async def _stub_ensure(self, assembly_id):
@@ -62,17 +71,12 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_module):
     assert result.improvements == ["Tighten conclusion"]
 
 
-class _NarrativeRunContext(_StubRunContext):
-    async def run(self, *_args, **_kwargs):
-        return types.SimpleNamespace(
-            text="Narrative verdict\n\nStrengths: Vivid imagery\n\nImprovements: Clarify ending"
-        )
-
-
 @pytest.mark.asyncio
 async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_module):
     monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr(essays_module, "AgentRunContext", _NarrativeRunContext)
+    _StubAgentRegistry.response_text = (
+        "Narrative verdict\n\nStrengths: Vivid imagery\n\nImprovements: Clarify ending"
+    )
     monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
 
     async def _stub_ensure(self, assembly_id):  # pragma: no cover - monkeypatched helper
@@ -96,17 +100,12 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_module):
     assert "Narrative verdict" in result.verdict
 
 
-class _AnalyticalRunContext(_StubRunContext):
-    async def run(self, *_args, **_kwargs):
-        return types.SimpleNamespace(
-            text="Analytical verdict\n\nStrengths: Rigorous evidence\n\nImprovements: Expand counterpoints"
-        )
-
-
 @pytest.mark.asyncio
 async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essays_module):
     monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr(essays_module, "AgentRunContext", _AnalyticalRunContext)
+    _StubAgentRegistry.response_text = (
+        "Analytical verdict\n\nStrengths: Rigorous evidence\n\nImprovements: Expand counterpoints"
+    )
     monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
 
     async def _stub_ensure(self, assembly_id):
@@ -168,7 +167,7 @@ async def test_ensure_assembly_exists_raises(monkeypatch, essays_module):
         return _StubCosmosClient(existing_ids=set(), not_found=not_found)
 
     monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr(essays_module, "AgentRunContext", _StubRunContext)
+    _StubAgentRegistry.response_text = DEFAULT_RESPONSE
     monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
     monkeypatch.setattr(essays_module, "CosmosClient", _client_factory)
     monkeypatch.setattr(essays_module.exceptions, "CosmosResourceNotFoundError", not_found)
@@ -187,7 +186,7 @@ async def test_ensure_assembly_exists_succeeds(monkeypatch, essays_module):
         return _StubCosmosClient(existing_ids={"assembly-present"}, not_found=not_found)
 
     monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr(essays_module, "AgentRunContext", _StubRunContext)
+    _StubAgentRegistry.response_text = DEFAULT_RESPONSE
     monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
     monkeypatch.setattr(essays_module, "CosmosClient", _client_factory)
     monkeypatch.setattr(essays_module.exceptions, "CosmosResourceNotFoundError", not_found)

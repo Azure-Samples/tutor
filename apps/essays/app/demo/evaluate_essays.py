@@ -287,7 +287,9 @@ async def main():
             theme=None,
             file_url=url
         )
+
         resources: list[Resource] = []
+
         try:
             async with orchestrator:
                 raw_evaluation = await orchestrator.invoke(
