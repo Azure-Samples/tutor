@@ -1,5 +1,5 @@
 [project]
-name = "tutor"
+name = "tutor_avatar"
 version = "0.2.0"
 description = "Modernized tutoring platform backends and services"
 readme = "README.md"

@@ -1,5 +1,5 @@
 [project]
-name = "tutor"
+name = "tutor_essays"
 version = "0.2.0"
 description = "Modernized tutoring platform backends and services"
 readme = "README.md"
@@ -23,6 +23,7 @@ dependencies = [
     "azure-ai-projects>=1.0.0b10",
     "azure-ai-agents>=1.0.0b2",
     "agent-framework-azure-ai>=0.2.0.dev0",
+    "pypdf>=4.0.0",
     "pydantic>=2.9.2",
     "pydantic-settings>=2.4.0",
     "tenacity>=9.0.0",
@@ -36,6 +37,7 @@ dependencies = [
     "python-multipart>=0.0.9",
     "rapidfuzz>=3.10.0",
     "azure-ai-vision-imageanalysis>=1.0.0",
+    "pypdf>=4.2.0",
 ]
 
 [project.optional-dependencies]

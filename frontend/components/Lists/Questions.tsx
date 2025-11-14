@@ -5,6 +5,7 @@ import { Question } from "@/types/question";
 import FormsModal from "@/components/common/Modals";
 import { FaTrash, FaPen, FaPlus } from "react-icons/fa";
 import QuestionForm from "@/components/Forms/Questions";
+import { unwrapContent } from "@/types/api";
 
 const QuestionsList: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -26,13 +27,8 @@ const QuestionsList: React.FC = () => {
     try {
       const res = await questionsEngine.get("/questions");
       console.log("Questions API response:", res.data);
-      // Try common property names for the questions array
-      setQuestions(
-        res.data.result ||
-        res.data.questions ||
-        res.data.content ||
-        []
-      );
+      const data = unwrapContent<Question[]>(res.data);
+      setQuestions(Array.isArray(data) ? data : []);
     } catch {
       setQuestions([]);
     }

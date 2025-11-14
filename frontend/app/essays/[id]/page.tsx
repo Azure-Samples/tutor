@@ -5,6 +5,7 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import type { Essay } from "@/types/essays";
 import { essaysEngine } from "@/utils/api";
+import { unwrapContent } from "@/types/api";
 
 const EssayDetailPage: React.FC = () => {
   const { id } = useParams();
@@ -17,7 +18,8 @@ const EssayDetailPage: React.FC = () => {
     setLoading(true);
     essaysEngine.get(`/essays/${id}`)
       .then(res => {
-        setEssay(res.data.content || null);
+        const data = unwrapContent<Essay | null>(res.data);
+        setEssay(data ?? null);
         setLoading(false);
       })
       .catch(() => {

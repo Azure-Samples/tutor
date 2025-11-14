@@ -18,12 +18,12 @@
     {
       "name": "Essay",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\essays",
+      "cwd": "${workspaceFolder}\\apps\\essays\\src",
       "request": "launch",
       "module": "uvicorn",
       "python": "${workspaceFolder}\\apps\\essays\\.venv\\Scripts\\python.exe",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\src"
+        "Path": "${env:Path};${workspaceFolder}\\apps\\essays"
       },
       "args": ["app.main:app", "--reload", "--port", "8083"],
       "jinja": true,

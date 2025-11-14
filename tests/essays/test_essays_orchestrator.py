@@ -21,6 +21,9 @@ def essays_app_module_fixture(monkeypatch):
     essays_root = repo_root / "apps" / "essays"
     if str(essays_root) not in sys.path:
         sys.path.insert(0, str(essays_root))
+    essays_src = essays_root / "src"
+    if str(essays_src) not in sys.path:
+        sys.path.insert(0, str(essays_src))
 
     from app.config import get_settings  # pylint: disable=import-error
 

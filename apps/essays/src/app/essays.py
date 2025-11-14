@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -13,9 +15,15 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from app.agents.clients import FoundryAgentService
+from app.agents.clients import AgentAttachment, FoundryAgentService
 from app.config import get_settings
+from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text
 from app.schemas import Essay, ProvisionedAgent, Resource, Swarm
+
+try:
+    from pypdf.errors import PdfReadError  # type: ignore[import]
+except ImportError:  # pragma: no cover - older PyPDF versions expose errors differently
+    PdfReadError = ValueError  # type: ignore[assignment]
 
 
 class EssayStrategyType(str, Enum):
@@ -64,7 +72,8 @@ class EssayEvaluationStrategy:
         resources: Iterable[Resource],
     ) -> EssayEvaluationResult:
         prompt = self._composer.render(self.template_name, essay, resources)
-        response_text = await self._agent_service.run_agent(agent.id, prompt)
+        attachments = self._build_image_attachments(resources)
+        response_text = await self._agent_service.run_agent(agent.id, prompt, attachments=attachments)
         verdict, strengths, improvements = self._parse_response(response_text)
         return EssayEvaluationResult(
             strategy=self.strategy_type(),
@@ -72,6 +81,27 @@ class EssayEvaluationStrategy:
             strengths=strengths,
             improvements=improvements,
         )
+
+    def _build_image_attachments(self, resources: Iterable[Resource]) -> list[AgentAttachment]:
+        attachments: list[AgentAttachment] = []
+        for resource in resources:
+            encoded = resource.encoded_content
+            content_type = resource.content_type
+            if not encoded or not content_type or not content_type.lower().startswith("image/"):
+                continue
+            try:
+                payload = base64.b64decode(encoded)
+            except binascii.Error:  # pragma: no cover - invalid payloads are skipped
+                continue
+            file_name = resource.file_name or f"{resource.id or 'resource'}.bin"
+            attachments.append(
+                AgentAttachment(
+                    file_name=file_name,
+                    content_type=content_type,
+                    payload=payload,
+                )
+            )
+        return attachments
 
     def strategy_type(self) -> EssayStrategyType:
         raise NotImplementedError
@@ -134,10 +164,10 @@ class EssayOrchestrator:
         self._resolver = StrategyResolver()
         prompt_dir = Path(__file__).parent / "prompts"
         self._composer = PromptComposer(prompt_dir)
-        self._agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
-        self._cosmos_endpoint = settings.cosmos.endpoint
-        self._database_name = settings.cosmos.database
-        self._assembly_container = settings.cosmos.assembly_container
+        self._agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)  # pylint: disable=no-member
+        self._cosmos_endpoint = settings.cosmos.endpoint  # pylint: disable=no-member
+        self._database_name = settings.cosmos.database  # pylint: disable=no-member
+        self._assembly_container = settings.cosmos.assembly_container  # pylint: disable=no-member
         self._credential = DefaultAzureCredential()
         self._strategies: dict[EssayStrategyType, EssayEvaluationStrategy] = {
             EssayStrategyType.ANALYTICAL: AnalyticalEssayStrategy(
@@ -152,13 +182,14 @@ class EssayOrchestrator:
         }
 
     async def invoke(self, assembly_id: str, essay: Essay, resources: Iterable[Resource]) -> EssayEvaluationResult:
-        swarm = await self._load_swarm(assembly_id)
-        strategy_type = self._resolver.resolve(essay, resources)
+        prepared_resources = self._prepare_resources(list(resources))
+        swarm = await self._load_swarm(assembly_id, fallback_essay_id=essay.id)
+        strategy_type = self._resolver.resolve(essay, prepared_resources)
         strategy = self._strategies[strategy_type]
         agent = self._select_agent(swarm, strategy_type)
-        return await strategy.evaluate(agent, essay, resources)
+        return await strategy.evaluate(agent, essay, prepared_resources)
 
-    async def _load_swarm(self, assembly_id: str) -> Swarm:
+    async def _load_swarm(self, assembly_id: str, fallback_essay_id: str | None = None) -> Swarm:
         async with CosmosClient(self._cosmos_endpoint, self._credential) as client:
             database = client.get_database_client(self._database_name)
             try:
@@ -176,7 +207,15 @@ class EssayOrchestrator:
             raise ValueError(f"Assembly '{assembly_id}' is missing provisioned agents")
         topic = record.get("topic_name") or record.get("topicName") or "Essay Evaluation"
         swarm_id = record.get("id") or assembly_id
-        return Swarm(id=swarm_id, topic_name=topic, agents=agents)
+        essay_id = (
+            record.get("essay_id")
+            or record.get("essayId")
+            or record.get("essayID")
+            or fallback_essay_id
+        )
+        if not essay_id:
+            raise ValueError(f"Assembly '{assembly_id}' did not include an essay identifier")
+        return Swarm(id=swarm_id, topic_name=topic, agents=agents, essay_id=essay_id)
 
     async def _hydrate_agents(self, items: Sequence[Any]) -> list[ProvisionedAgent]:
         provisioned: list[ProvisionedAgent] = []
@@ -226,3 +265,22 @@ class EssayOrchestrator:
             if any(keyword in haystack for keyword in candidates):
                 return agent
         return swarm.agents[0]
+
+    def _prepare_resources(self, resources: Iterable[Resource]) -> list[Resource]:
+        prepared: list[Resource] = []
+        for resource in resources:
+            updated = resource
+            if (
+                resource.content_type in ALLOWED_PDF_TYPES
+                and not resource.content
+                and resource.encoded_content
+            ):
+                try:
+                    payload = base64.b64decode(resource.encoded_content)
+                    extracted = extract_pdf_text(payload)
+                except (binascii.Error, PdfReadError, ValueError):  # pragma: no cover - corrupted payloads are skipped
+                    extracted = None
+                if extracted:
+                    updated = resource.model_copy(update={"content": extracted})
+            prepared.append(updated)
+        return prepared

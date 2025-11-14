@@ -58,9 +58,10 @@ class CosmosCRUD:
         item: dict[str, Any],
         partition_key: str | None = None,
     ) -> Any:
-        key = partition_key or item_id
         async with self._container_client() as container:
-            return await container.replace_item(item=item_id, body=item, partition_key=key)
+            record = item.copy()
+            record.setdefault("id", item_id)
+            return await container.upsert_item(record)
 
     async def delete_item(self, item_id: str, partition_key: str | None = None) -> Any:
         key = partition_key or item_id

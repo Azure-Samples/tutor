@@ -3,7 +3,7 @@ A package that manages the response bodies.
 """
 from dataclasses import dataclass
 
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field
 
 from starlette.status import (
@@ -55,7 +55,7 @@ class ErrorMessage:
 
 
 class Essay(BaseModel):
-    id: str = Field(..., description="Question ID")
+    id: str = Field(..., description="Essay ID")
     topic: str
     content: str
     explanation: Optional[str] = Field(None, description="Question Explanation")
@@ -68,6 +68,10 @@ class Essay(BaseModel):
         None,
         description="URL of original essay file (image or selectable text), if available"
     )
+    assembly_id: Optional[str] = Field(
+        None,
+        description="Identifier of the assembly that should be used to evaluate this essay"
+    )
 
 
 
@@ -79,7 +83,7 @@ class AgentDefinition(BaseModel):
     instructions: str = Field(..., description="System instructions for the agent")
     deployment: str = Field(..., description="Model deployment name registered in Azure AI Foundry")
     temperature: Optional[float] = Field(
-        None,
+        default=None,
         description="Optional temperature override applied when the agent runs",
         ge=0.0,
         le=2.0,
@@ -92,6 +96,10 @@ class Resource(BaseModel):
     objective: List[str] = Field(..., description="Correction objectives (spelling, semantics, structure, argumentation, conceptual, etc.)")
     content: Optional[str] = Field(None, description="Detailed description of the evaluation criterion")
     essay_id: str = Field(..., description="ID of the essay to which this criterion applies")
+    file_name: Optional[str] = Field(None, description="Original file name if the resource was uploaded")
+    content_type: Optional[str] = Field(None, description="MIME type describing the uploaded resource")
+    encoded_content: Optional[str] = Field(None, description="Base64 encoded payload for binary resources")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata derived from the uploaded resource")
 
 
 class ChatResponse(BaseModel):
@@ -115,6 +123,7 @@ class Swarm(BaseModel):
     id: str = Field(..., description="Assembly ID")
     topic_name: str = Field(..., description="Topic to Answer")
     agents: List[ProvisionedAgent] = Field(..., description="Provisioned agent definitions")
+    essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
 
 
 class SwarmDefinition(BaseModel):
@@ -122,6 +131,7 @@ class SwarmDefinition(BaseModel):
 
     id: str = Field(..., description="Assembly ID")
     topic_name: str = Field(..., description="Topic to Answer")
+    essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
     agents: List[AgentDefinition] = Field(..., description="Agent definitions provisioning Azure AI Foundry agents")
 
 

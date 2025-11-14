@@ -1,0 +1,31 @@
+Dado o seguinte ensaio:
+
+# Ensaio
+Tema: {{ essay.theme or 'N/A' }}
+Tópico: {{ essay.topic }}
+URL do arquivo: {{ essay.file_url or 'nenhum' }}
+{% if essay.content %}
+Conteúdo:
+{{ essay.content }}
+{% else %}
+Conteúdo: não fornecido em texto. Leia integralmente os recursos anexados (incluindo imagens) para extrair o texto do ensaio antes de avaliá-lo.
+{% endif %}
+
+Agora, avalie de acordo com os seguintes critérios:
+{% for res in resources %}
+- ID do critério: {{ res.id }}
+  Objetivos: {{ res.objective | join(', ') }}
+  URL de referência: {{ res.url or 'nenhum' }}
+  Nome do arquivo: {{ res.file_name or 'nenhum' }}
+  Tipo de conteúdo: {{ res.content_type or 'texto' }}
+  Metadados: {{ res.metadata or 'nenhum' }}
+  {% if res.content %}
+  Detalhes: {{ res.content }}
+  {% elif res.content_type and res.content_type.startswith('image/') %}
+  Detalhes: A redação está fornecida como imagem (arquivo {{ res.file_name or res.id }}). Extraia todo o texto dessa imagem usando visão antes de avaliar; não solicite conteúdo adicional ao usuário.
+  {% else %}
+  Detalhes: n/a
+  {% endif %}
+{% endfor %}
+
+Forneça uma correção detalhada guiada por esses objetivos.
