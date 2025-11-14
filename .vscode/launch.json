@@ -61,7 +61,7 @@
       "name": "Frontend",
       "type": "node",
       "request": "launch",
-      "cwd": "${workspaceFolder}\\src\\frontend",
+      "cwd": "${workspaceFolder}\\frontend",
       "runtimeExecutable": "yarn",
       "runtimeArgs": ["dev"],
       "console": "integratedTerminal"

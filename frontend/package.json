@@ -1,6 +1,39 @@
 {
+  "name": "tutor",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
   "dependencies": {
-    "react-icons": "^5.5.0"
+    "axios": "^1.13.2",
+    "clsx": "2.1.1",
+    "flatpickr": "^4.6.13",
+    "jest": "^30.2.0",
+    "jsvectormap": "^1.7.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.47.0",
+    "next": "14.2.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-icons": "^5.0.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "uuid": "^9.0.1",
+    "zustand": "4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.30",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0",
+    "autoprefixer": "10.4.16",
+    "eslint": "8.57.0",
+    "eslint-config-next": "14.2.5",
+    "postcss": "8.4.35",
+    "tailwindcss": "3.4.14",
+    "typescript": "5.6.3"
   },
   "packageManager": "yarn@1.22.21+sha1.1959a18351b811cdeedbd484a8f86c3cc3bbaf72"
 }

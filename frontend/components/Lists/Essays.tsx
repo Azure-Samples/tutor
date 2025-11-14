@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { essaysEngine } from "@/utils/api";
 import FormsModal from "@/components/common/Modals";
-import { FaTrash, FaPen, FaPlus, FaUser, FaFileAlt, FaListAlt } from "react-icons/fa";
+import { FaTrash, FaPen, FaPlus } from "react-icons/fa";
 import EssayForm from "@/components/Forms/Essays";
 import type { Essay } from "@/types/essays";
 
@@ -14,6 +14,22 @@ const EssaysList: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  const fetchEssays = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(false);
+      const res = await essaysEngine.get("/essays");
+      setEssays(res.data.content || []);
+    } catch (error) {
+      console.error("Error fetching essays:", error);
+      setEssays([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const closeAllModals = () => {
     setShowCreateModal(false);
@@ -22,12 +38,8 @@ const EssaysList: React.FC = () => {
   };
 
   useEffect(() => {
-    setLoading(true);
-    essaysEngine.get("/essays").then((res) => {
-      setEssays(res.data.content || []);
-      setLoading(false);
-    });
-  }, []);
+    fetchEssays();
+  }, [fetchEssays]);
 
   const handleEditClick = (essay: Essay) => {
     setSelectedEssay(essay);
@@ -44,16 +56,29 @@ const EssaysList: React.FC = () => {
   const confirmDelete = async () => {
     if (!selectedEssay?.id) return;
     await essaysEngine.delete(`/essays/${selectedEssay.id}`);
-    setEssays(essays.filter((e) => e.id !== selectedEssay.id));
+    setEssays((prev) => prev.filter((e) => e.id !== selectedEssay.id));
     closeAllModals();
     setSelectedEssay(null);
   };
+
+  const showEmptyState = !loading && (loadError || essays.length === 0);
 
   return (
     <div className="w-full p-0">
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <span className="text-lg text-cyan-500 animate-pulse">Loading essays...</span>
+        </div>
+      ) : showEmptyState ? (
+        <div className="rounded-xl border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900 p-6 shadow">
+          <p className="text-xl font-bold text-yellow-800 dark:text-yellow-200 mb-4 text-center">
+            No Essay was found. What about creating one?
+          </p>
+          <EssayForm
+            onSuccess={() => {
+              fetchEssays();
+            }}
+          />
         </div>
       ) : (
         <>
@@ -96,21 +121,25 @@ const EssaysList: React.FC = () => {
                 ))}
               </tbody>
             </table>
-            {essays.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <span className="text-5xl mb-4">🌈</span>
-                <p className="text-xl text-cyan-700 dark:text-cyan-200 font-bold mb-2">No essays yet!</p>
-                <p className="text-green-700 dark:text-green-200 mb-4">Click <span className="font-bold">New Essay</span> to create your first essay and make learning magical!</p>
-              </div>
-            )}
           </div>
         </>
       )}
       <FormsModal open={showCreateModal} onClose={closeAllModals} title="Create a New Essay">
-        <EssayForm onSuccess={closeAllModals} />
+        <EssayForm
+          onSuccess={() => {
+            closeAllModals();
+            fetchEssays();
+          }}
+        />
       </FormsModal>
       <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Essay">
-        <EssayForm essayData={selectedEssay!} onSuccess={closeAllModals} />
+        <EssayForm
+          essayData={selectedEssay!}
+          onSuccess={() => {
+            closeAllModals();
+            fetchEssays();
+          }}
+        />
       </FormsModal>
       <FormsModal open={showDeleteModal && !showCreateModal && !showEditModal} onClose={closeAllModals} title="Confirm Delete">
         <div className="p-6">

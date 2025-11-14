@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Sequence
 
 import jinja2
 
@@ -13,9 +13,9 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from app.agents.clients import AgentRegistry, AgentSpec
+from app.agents.clients import FoundryAgentService
 from app.config import get_settings
-from app.schemas import Essay, Resource
+from app.schemas import Essay, ProvisionedAgent, Resource, Swarm
 
 
 class EssayStrategyType(str, Enum):
@@ -53,16 +53,19 @@ class EssayEvaluationStrategy:
 
     template_name = "correct.jinja"
 
-    def __init__(self, registry: AgentRegistry, composer: PromptComposer, deployment: str) -> None:
-        self._registry = registry
+    def __init__(self, agent_service: FoundryAgentService, composer: PromptComposer) -> None:
+        self._agent_service = agent_service
         self._composer = composer
-        self._deployment = deployment
 
-    async def evaluate(self, essay: Essay, resources: Iterable[Resource]) -> EssayEvaluationResult:
+    async def evaluate(
+        self,
+        agent: ProvisionedAgent,
+        essay: Essay,
+        resources: Iterable[Resource],
+    ) -> EssayEvaluationResult:
         prompt = self._composer.render(self.template_name, essay, resources)
-        async with self._registry.create(self._build_spec()) as agent:
-            response = await agent.run(prompt, temperature=0.2)
-        verdict, strengths, improvements = self._parse_response(str(response.text))
+        response_text = await self._agent_service.run_agent(agent.id, prompt)
+        verdict, strengths, improvements = self._parse_response(response_text)
         return EssayEvaluationResult(
             strategy=self.strategy_type(),
             verdict=verdict,
@@ -71,9 +74,6 @@ class EssayEvaluationStrategy:
         )
 
     def strategy_type(self) -> EssayStrategyType:
-        raise NotImplementedError
-
-    def _build_spec(self) -> AgentSpec:
         raise NotImplementedError
 
     def _parse_response(self, text: str) -> tuple[str, list[str], list[str]]:
@@ -99,18 +99,6 @@ class AnalyticalEssayStrategy(EssayEvaluationStrategy):
     def strategy_type(self) -> EssayStrategyType:  # noqa: D401 - short override
         return EssayStrategyType.ANALYTICAL
 
-    def _build_spec(self) -> AgentSpec:
-        instructions = (
-            "You are an analytical writing coach. Provide evidence-based feedback on thesis strength, "
-            "argument coherence, and use of references. Summarise in bullet form when possible."
-        )
-        return AgentSpec(
-            name="analytical-reviewer",
-            instructions=instructions,
-            deployment=self._deployment,
-            max_tokens=800,
-        )
-
 
 class NarrativeEssayStrategy(EssayEvaluationStrategy):
     """Strategy specialised for narrative or creative writing."""
@@ -118,36 +106,12 @@ class NarrativeEssayStrategy(EssayEvaluationStrategy):
     def strategy_type(self) -> EssayStrategyType:  # noqa: D401
         return EssayStrategyType.NARRATIVE
 
-    def _build_spec(self) -> AgentSpec:
-        instructions = (
-            "You are a creative writing editor. Focus feedback on voice, pacing, emotional impact, and "
-            "consistency of narrative perspective. Highlight memorable lines and areas to tighten."
-        )
-        return AgentSpec(
-            name="narrative-reviewer",
-            instructions=instructions,
-            deployment=self._deployment,
-            max_tokens=800,
-        )
-
 
 class DefaultEssayStrategy(EssayEvaluationStrategy):
     """Fallback strategy used when no specialised routing is required."""
 
     def strategy_type(self) -> EssayStrategyType:  # noqa: D401
         return EssayStrategyType.DEFAULT
-
-    def _build_spec(self) -> AgentSpec:
-        instructions = (
-            "You evaluate student essays. Provide balanced feedback that covers structure, clarity, grammar, "
-            "and alignment to the prompt. Include at least one actionable suggestion."
-        )
-        return AgentSpec(
-            name="general-reviewer",
-            instructions=instructions,
-            deployment=self._deployment,
-            max_tokens=600,
-        )
 
 
 class StrategyResolver:
@@ -170,30 +134,31 @@ class EssayOrchestrator:
         self._resolver = StrategyResolver()
         prompt_dir = Path(__file__).parent / "prompts"
         self._composer = PromptComposer(prompt_dir)
-        self._registry = AgentRegistry(settings.azure_ai.project_endpoint)
+        self._agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
         self._cosmos_endpoint = settings.cosmos.endpoint
         self._database_name = settings.cosmos.database
         self._assembly_container = settings.cosmos.assembly_container
         self._credential = DefaultAzureCredential()
         self._strategies: dict[EssayStrategyType, EssayEvaluationStrategy] = {
             EssayStrategyType.ANALYTICAL: AnalyticalEssayStrategy(
-                self._registry, self._composer, settings.azure_ai.reasoning_deployment
+                self._agent_service, self._composer
             ),
             EssayStrategyType.NARRATIVE: NarrativeEssayStrategy(
-                self._registry, self._composer, settings.azure_ai.default_deployment
+                self._agent_service, self._composer
             ),
             EssayStrategyType.DEFAULT: DefaultEssayStrategy(
-                self._registry, self._composer, settings.azure_ai.default_deployment
+                self._agent_service, self._composer
             ),
         }
 
     async def invoke(self, assembly_id: str, essay: Essay, resources: Iterable[Resource]) -> EssayEvaluationResult:
-        await self._ensure_assembly_exists(assembly_id)
+        swarm = await self._load_swarm(assembly_id)
         strategy_type = self._resolver.resolve(essay, resources)
         strategy = self._strategies[strategy_type]
-        return await strategy.evaluate(essay, resources)
+        agent = self._select_agent(swarm, strategy_type)
+        return await strategy.evaluate(agent, essay, resources)
 
-    async def _ensure_assembly_exists(self, assembly_id: str) -> None:
+    async def _load_swarm(self, assembly_id: str) -> Swarm:
         async with CosmosClient(self._cosmos_endpoint, self._credential) as client:
             database = client.get_database_client(self._database_name)
             try:
@@ -203,6 +168,61 @@ class EssayOrchestrator:
 
             container = database.get_container_client(self._assembly_container)
             try:
-                await container.read_item(item=assembly_id, partition_key=assembly_id)
+                record = await container.read_item(item=assembly_id, partition_key=assembly_id)
             except exceptions.CosmosResourceNotFoundError as exc:
                 raise ValueError(f"Assembly not found: {assembly_id}") from exc
+        agents = await self._hydrate_agents(record.get("agents", []))
+        if not agents:
+            raise ValueError(f"Assembly '{assembly_id}' is missing provisioned agents")
+        topic = record.get("topic_name") or record.get("topicName") or "Essay Evaluation"
+        swarm_id = record.get("id") or assembly_id
+        return Swarm(id=swarm_id, topic_name=topic, agents=agents)
+
+    async def _hydrate_agents(self, items: Sequence[Any]) -> list[ProvisionedAgent]:
+        provisioned: list[ProvisionedAgent] = []
+        for entry in items:
+            if isinstance(entry, dict):
+                provisioned.append(ProvisionedAgent.model_validate(entry))
+                continue
+            if isinstance(entry, str):
+                remote = await self._agent_service.get_agent(entry)
+                provisioned.append(self._materialize_agent(remote))
+                continue
+        return provisioned
+
+    def _materialize_agent(self, remote: Any) -> ProvisionedAgent:
+        agent_id = getattr(remote, "id", None)
+        if not agent_id:
+            raise ValueError("Azure AI agent response did not include an id")
+        name = getattr(remote, "name", agent_id)
+        instructions = getattr(remote, "instructions", "")
+        deployment = (
+            getattr(remote, "model", None)
+            or getattr(remote, "model_id", None)
+            or getattr(remote, "deployment_name", None)
+            or ""
+        )
+        temperature = getattr(remote, "temperature", None)
+        return ProvisionedAgent(
+            id=agent_id,
+            name=name,
+            instructions=instructions,
+            deployment=deployment,
+            temperature=temperature,
+        )
+
+    def _select_agent(self, swarm: Swarm, strategy_type: EssayStrategyType) -> ProvisionedAgent:
+        if not swarm.agents:
+            raise ValueError(f"Swarm '{swarm.id}' does not contain agents")
+
+        keywords = {
+            EssayStrategyType.ANALYTICAL: ["analytic", "analysis", "analytical"],
+            EssayStrategyType.NARRATIVE: ["narrative", "creative", "story"],
+            EssayStrategyType.DEFAULT: ["general", "default", "review"],
+        }
+        candidates = keywords.get(strategy_type, [])
+        for agent in swarm.agents:
+            haystack = f"{agent.name} {agent.instructions}".lower()
+            if any(keyword in haystack for keyword in candidates):
+                return agent
+        return swarm.agents[0]

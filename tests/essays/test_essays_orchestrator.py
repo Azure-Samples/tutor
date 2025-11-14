@@ -1,22 +1,32 @@
+"""Tests for the essay orchestrator using Azure AI Foundry agents."""
+
+# pylint: disable=redefined-outer-name
+
 import importlib
-import types
+import sys
+from pathlib import Path
 
 import pytest
 
 
 @pytest.fixture
-def essays_module(monkeypatch):
+def essays_app_module_fixture(monkeypatch):
     monkeypatch.setenv("COSMOS_ENDPOINT", "https://localhost:8081/")
     monkeypatch.setenv("COSMOS_DATABASE", "unit-test-db")
     monkeypatch.setenv("PROJECT_ENDPOINT", "https://fake-endpoint.azure.com/")
     monkeypatch.setenv("MODEL_DEPLOYMENT_NAME", "gpt-4o")
     monkeypatch.setenv("MODEL_REASONING_DEPLOYMENT", "o3-mini")
 
-    from common import config as common_config
+    repo_root = Path(__file__).resolve().parents[2]
+    essays_root = repo_root / "apps" / "essays"
+    if str(essays_root) not in sys.path:
+        sys.path.insert(0, str(essays_root))
 
-    common_config.get_settings.cache_clear()
+    from app.config import get_settings  # pylint: disable=import-error
 
-    import essays.app.essays as essays_app
+    get_settings.cache_clear()
+
+    import app.essays as essays_app
 
     importlib.reload(essays_app)
     return essays_app
@@ -25,70 +35,82 @@ def essays_module(monkeypatch):
 DEFAULT_RESPONSE = "Overall verdict\n\nStrengths: Solid thesis\n\nImprovements: Tighten conclusion"
 
 
-class _StubAgentRegistry:
+class _StubFoundryAgentService:
     response_text = DEFAULT_RESPONSE
 
     def __init__(self, *_args, **_kwargs):
-        self.specs = []
+        self.calls: list[tuple[str, str]] = []
 
-    def create(self, spec):
-        self.specs.append(spec)
-        return _StubAgent(self.response_text)
+    async def run_agent(self, agent_id: str, prompt: str) -> str:
+        self.calls.append((agent_id, prompt))
+        return self.response_text
 
 
-class _StubAgent:
-    def __init__(self, text):
-        self._text = text
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *_args):
-        return False
-
-    async def run(self, *_args, **_kwargs):
-        return types.SimpleNamespace(text=self._text)
+class _FakeCredential:  # noqa: D401 - simple stub credential
+    pass
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_uses_default_strategy(monkeypatch, essays_module):
-    monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    _StubAgentRegistry.response_text = DEFAULT_RESPONSE
-    monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
+async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
+    _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
+    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    async def _stub_ensure(self, assembly_id):
-        self._checked = assembly_id
+    provisioned = module.ProvisionedAgent(
+        id="agent-default",
+        name="General Reviewer",
+        instructions="Provide general feedback",
+        deployment="gpt-4o",
+    )
 
-    monkeypatch.setattr(essays_module.EssayOrchestrator, "_ensure_assembly_exists", _stub_ensure, raising=False)
+    async def _stub_load(_self, assembly_id):
+        return module.Swarm(id=assembly_id, topic_name="Topic", agents=[provisioned])
 
-    orchestrator = essays_module.EssayOrchestrator()
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
 
-    essay = essays_module.Essay(id="essay-1", topic="History", content="Text")
+    orchestrator = module.EssayOrchestrator()
+
+    essay = module.Essay(id="essay-1", topic="History", content="Text")
     result = await orchestrator.invoke("assembly-1", essay, [])
 
-    assert result.strategy is essays_module.EssayStrategyType.DEFAULT
+    assert result.strategy is module.EssayStrategyType.DEFAULT
     assert result.strengths == ["Solid thesis"]
     assert result.improvements == ["Tighten conclusion"]
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_module):
-    monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    _StubAgentRegistry.response_text = (
+async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
+    _StubFoundryAgentService.response_text = (
         "Narrative verdict\n\nStrengths: Vivid imagery\n\nImprovements: Clarify ending"
     )
-    monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
+    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    async def _stub_ensure(self, assembly_id):  # pragma: no cover - monkeypatched helper
-        self._checked = assembly_id
+    narrative_agent = module.ProvisionedAgent(
+        id="agent-narrative",
+        name="Narrative Coach",
+        instructions="Support creative storytelling",
+        deployment="gpt-4o",
+    )
+    default_agent = module.ProvisionedAgent(
+        id="agent-default",
+        name="General Reviewer",
+        instructions="Provide general feedback",
+        deployment="gpt-4o",
+    )
 
-    monkeypatch.setattr(essays_module.EssayOrchestrator, "_ensure_assembly_exists", _stub_ensure, raising=False)
+    async def _stub_load(_self, assembly_id):  # pragma: no cover - monkeypatched helper
+        return module.Swarm(id=assembly_id, topic_name="Topic", agents=[default_agent, narrative_agent])
 
-    orchestrator = essays_module.EssayOrchestrator()
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
 
-    essay = essays_module.Essay(id="essay-2", topic="Literature", content="Story")
+    orchestrator = module.EssayOrchestrator()
+
+    essay = module.Essay(id="essay-2", topic="Literature", content="Story")
     resources = [
-        essays_module.Resource(
+        module.Resource(
             id="res-1",
             essay_id="essay-2",
             objective=["Creative expression"],
@@ -96,29 +118,37 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_module):
     ]
     result = await orchestrator.invoke("assembly-2", essay, resources)
 
-    assert result.strategy is essays_module.EssayStrategyType.NARRATIVE
+    assert result.strategy is module.EssayStrategyType.NARRATIVE
     assert "Narrative verdict" in result.verdict
 
 
 @pytest.mark.asyncio
-async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essays_module):
-    monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    _StubAgentRegistry.response_text = (
+async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
+    _StubFoundryAgentService.response_text = (
         "Analytical verdict\n\nStrengths: Rigorous evidence\n\nImprovements: Expand counterpoints"
     )
-    monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
+    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    async def _stub_ensure(self, assembly_id):
-        self._checked = assembly_id
+    analytical_agent = module.ProvisionedAgent(
+        id="agent-analytical",
+        name="Analytical Reviewer",
+        instructions="Analyse evidence",
+        deployment="o3-mini",
+    )
 
-    monkeypatch.setattr(essays_module.EssayOrchestrator, "_ensure_assembly_exists", _stub_ensure, raising=False)
+    async def _stub_load(_self, assembly_id):
+        return module.Swarm(id=assembly_id, topic_name="Topic", agents=[analytical_agent])
 
-    orchestrator = essays_module.EssayOrchestrator()
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
 
-    essay = essays_module.Essay(id="essay-3", topic="Science", content="Analysis", theme="Analytical Essay")
+    orchestrator = module.EssayOrchestrator()
+
+    essay = module.Essay(id="essay-3", topic="Science", content="Analysis", theme="Analytical Essay")
     result = await orchestrator.invoke("assembly-3", essay, [])
 
-    assert result.strategy is essays_module.EssayStrategyType.ANALYTICAL
+    assert result.strategy is module.EssayStrategyType.ANALYTICAL
     assert result.strengths == ["Rigorous evidence"]
 
 
@@ -130,7 +160,19 @@ class _StubContainer:
     async def read_item(self, item, partition_key):
         if item not in self._existing_ids or partition_key not in self._existing_ids:
             raise self._not_found("missing")
-        return {"id": item}
+        return {
+            "id": item,
+            "topic_name": "Topic",
+            "agents": [
+                {
+                    "id": "agent-1",
+                    "name": "General Reviewer",
+                    "instructions": "Review essays",
+                    "deployment": "gpt-4o",
+                    "temperature": 0.2,
+                }
+            ],
+        }
 
 
 class _StubDatabase:
@@ -160,37 +202,48 @@ class _StubCosmosClient:
 
 
 @pytest.mark.asyncio
-async def test_ensure_assembly_exists_raises(monkeypatch, essays_module):
+async def test_load_swarm_raises_for_missing_assembly(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
     def _client_factory(*_args, **_kwargs):
         return _StubCosmosClient(existing_ids=set(), not_found=not_found)
 
-    monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    _StubAgentRegistry.response_text = DEFAULT_RESPONSE
-    monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
-    monkeypatch.setattr(essays_module, "CosmosClient", _client_factory)
-    monkeypatch.setattr(essays_module.exceptions, "CosmosResourceNotFoundError", not_found)
+    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
+    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
+    monkeypatch.setattr(module, "CosmosClient", _client_factory)
+    monkeypatch.setattr(module.exceptions, "CosmosResourceNotFoundError", not_found)
 
-    orchestrator = essays_module.EssayOrchestrator()
+    orchestrator = module.EssayOrchestrator()
+    essay = module.Essay(id="essay-missing", topic="History", content="Text")
 
     with pytest.raises(ValueError):
-        await orchestrator._ensure_assembly_exists("assembly-missing")
+        await orchestrator.invoke("assembly-missing", essay, [])
 
 
 @pytest.mark.asyncio
-async def test_ensure_assembly_exists_succeeds(monkeypatch, essays_module):
+async def test_load_swarm_returns_agents(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
     def _client_factory(*_args, **_kwargs):
         return _StubCosmosClient(existing_ids={"assembly-present"}, not_found=not_found)
 
-    monkeypatch.setattr(essays_module, "AgentRegistry", _StubAgentRegistry)
-    _StubAgentRegistry.response_text = DEFAULT_RESPONSE
-    monkeypatch.setattr(essays_module, "DefaultAzureCredential", lambda: object())
-    monkeypatch.setattr(essays_module, "CosmosClient", _client_factory)
-    monkeypatch.setattr(essays_module.exceptions, "CosmosResourceNotFoundError", not_found)
+    created: list[_StubFoundryAgentService] = []
 
-    orchestrator = essays_module.EssayOrchestrator()
+    class _RecordingService(_StubFoundryAgentService):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            created.append(self)
 
-    await orchestrator._ensure_assembly_exists("assembly-present")
+    monkeypatch.setattr(module, "FoundryAgentService", _RecordingService)
+    _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
+    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
+    monkeypatch.setattr(module, "CosmosClient", _client_factory)
+    monkeypatch.setattr(module.exceptions, "CosmosResourceNotFoundError", not_found)
+
+    orchestrator = module.EssayOrchestrator()
+    essay = module.Essay(id="essay-present", topic="History", content="Text")
+
+    await orchestrator.invoke("assembly-present", essay, [])
+    assert created[0].calls[0][0] == "agent-1"

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { avatarEngine } from "@/utils/api";
 import { Case } from "@/types/cases";
 import FormsModal from "@/components/common/Modals";
@@ -18,6 +18,22 @@ const CasesList: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  const fetchCases = useCallback(async () => {
+    try {
+      setLoading(true);
+      setLoadError(false);
+      const res = await avatarEngine.get("/cases");
+      setCases(res.data.result || []);
+    } catch (error) {
+      console.error("Error fetching cases:", error);
+      setCases([]);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const closeAllModals = () => {
     setShowCreateModal(false);
@@ -28,12 +44,8 @@ const CasesList: React.FC = () => {
   };
 
   useEffect(() => {
-    setLoading(true);
-    avatarEngine.get("/cases").then((res) => {
-      setCases(res.data.result || []);
-      setLoading(false);
-    });
-  }, []);
+    fetchCases();
+  }, [fetchCases]);
 
   const handleStepsClick = (c: Case) => {
     setSelectedCase(c);
@@ -70,16 +82,29 @@ const CasesList: React.FC = () => {
   const confirmDelete = async () => {
     if (!selectedCase?.id) return;
     await avatarEngine.delete(`/cases/${selectedCase.id}`);
-    setCases(cases.filter((c) => c.id !== selectedCase.id));
+    setCases((prev) => prev.filter((c) => c.id !== selectedCase.id));
     closeAllModals();
     setSelectedCase(null);
   };
+
+  const showEmptyState = !loading && (loadError || cases.length === 0);
 
   return (
     <div className="w-full p-0">
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <span className="text-lg text-cyan-500 animate-pulse">Loading cases...</span>
+        </div>
+      ) : showEmptyState ? (
+        <div className="rounded-xl border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900 p-6 shadow">
+          <p className="text-xl font-bold text-yellow-800 dark:text-yellow-200 mb-4 text-center">
+            No Case was found. What about creating one?
+          </p>
+          <CaseForm
+            onSuccess={() => {
+              fetchCases();
+            }}
+          />
         </div>
       ) : (
         <>
@@ -129,18 +154,16 @@ const CasesList: React.FC = () => {
                 ))}
               </tbody>
             </table>
-            {cases.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-16">
-                <span className="text-5xl mb-4">🌈</span>
-                <p className="text-xl text-cyan-700 dark:text-cyan-200 font-bold mb-2">No cases yet!</p>
-                <p className="text-green-700 dark:text-green-200 mb-4">Click <span className="font-bold">New Case</span> to create your first scenario and make learning magical!</p>
-              </div>
-            )}
           </div>
         </>
       )}
       <FormsModal open={showCreateModal} onClose={closeAllModals} title="Create a New Case">
-        <CaseForm onSuccess={closeAllModals} />
+        <CaseForm
+          onSuccess={() => {
+            closeAllModals();
+            fetchCases();
+          }}
+        />
       </FormsModal>
       <FormsModal open={showStepsModal && !showCreateModal && !showEditModal && !showProfileModal && !showDeleteModal} onClose={closeAllModals} title="Case Steps">
         {selectedCase ? (
@@ -157,7 +180,13 @@ const CasesList: React.FC = () => {
         )}
       </FormsModal>
       <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Case">
-        <CaseForm caseData={selectedCase!} onSuccess={closeAllModals} />
+        <CaseForm
+          caseData={selectedCase!}
+          onSuccess={() => {
+            closeAllModals();
+            fetchCases();
+          }}
+        />
       </FormsModal>
       <FormsModal open={showProfileModal && !showCreateModal && !showStepsModal && !showEditModal && !showDeleteModal} onClose={closeAllModals} title="Case Profile">
         {modalLoading ? (

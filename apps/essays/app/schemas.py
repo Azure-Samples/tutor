@@ -1,7 +1,6 @@
 """
 A package that manages the response bodies.
 """
-import json
 from dataclasses import dataclass
 
 from typing import Dict, List, Optional, Union
@@ -17,8 +16,7 @@ from starlette.status import (
     HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
-    HTTP_418_IM_A_TEAPOT,
-    HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_418_IM_A_TEAPOT
 )
 
 
@@ -72,6 +70,22 @@ class Essay(BaseModel):
     )
 
 
+
+class AgentDefinition(BaseModel):
+    """Definition of an Azure AI Foundry agent used within a swarm."""
+
+    id: Optional[str] = Field(None, description="Existing Azure AI Foundry agent ID")
+    name: str = Field(..., description="Friendly agent name")
+    instructions: str = Field(..., description="System instructions for the agent")
+    deployment: str = Field(..., description="Model deployment name registered in Azure AI Foundry")
+    temperature: Optional[float] = Field(
+        None,
+        description="Optional temperature override applied when the agent runs",
+        ge=0.0,
+        le=2.0,
+    )
+
+
 class Resource(BaseModel):
     id: str = Field(..., description="Evaluation criterion ID")
     url: Optional[str] = Field(None, description="Reference URL for the evaluation criterion (optional)")
@@ -89,27 +103,26 @@ class ChatResponse(BaseModel):
     resources: list[Resource]
 
 
-class Evaluator(BaseModel):
-    id: str = Field(..., description="Evaluator ID")
-    name: str = Field(..., description="Evaluator name", max_length=32)
-    deployment: str = Field(..., description="Azure AI Foundry model deployment to use")
-    instructions: str = Field(..., description="System prompt for the evaluator")
-    description: Optional[str] = Field(None, description="Optional human readable description")
+class ProvisionedAgent(AgentDefinition):
+    """Representation of an agent persisted in Azure AI Foundry."""
+
+    id: str = Field(..., description="Azure AI Foundry agent ID")
 
 
 class Swarm(BaseModel):
-    """
-    Represents an Assemble with an id, list of judges, and roles.
-
-    Attributes:
-        id (int): The unique identifier for the assemble.
-        judges (List[Judge]): A list of Judge objects.
-        roles (List[str]): A list of roles.
-    """
+    """Represents a swarm stored in Cosmos DB with its provisioned agents."""
 
     id: str = Field(..., description="Assembly ID")
-    agents: List[Evaluator] = Field(..., description="Judges Assemblies")
     topic_name: str = Field(..., description="Topic to Answer")
+    agents: List[ProvisionedAgent] = Field(..., description="Provisioned agent definitions")
+
+
+class SwarmDefinition(BaseModel):
+    """Payload used to create or update a swarm along with its agent definitions."""
+
+    id: str = Field(..., description="Assembly ID")
+    topic_name: str = Field(..., description="Topic to Answer")
+    agents: List[AgentDefinition] = Field(..., description="Agent definitions provisioning Azure AI Foundry agents")
 
 
 RESPONSES = {
@@ -123,5 +136,4 @@ RESPONSES = {
     HTTP_401_UNAUTHORIZED: {"model": BodyMessage},
     HTTP_403_FORBIDDEN: {"model": BodyMessage},
     HTTP_418_IM_A_TEAPOT: {"model": BodyMessage},
-    HTTP_422_UNPROCESSABLE_ENTITY: {"model": BodyMessage},
 }

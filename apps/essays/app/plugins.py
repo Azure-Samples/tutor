@@ -62,9 +62,6 @@ class VisionToolkit:
         self._settings = settings or VisionSettings.from_env()
         self._vision_credential = AzureKeyCredential(self._settings.vision_key)
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
     def _vision_client(self) -> ImageAnalysisClient:
         return ImageAnalysisClient(
             endpoint=self._settings.vision_endpoint,
@@ -97,9 +94,6 @@ class VisionToolkit:
         ):
             raise AttributeError("Cosmos configuration is incomplete; cannot persist images.")
 
-    # ------------------------------------------------------------------
-    # Agent tool definitions
-    # ------------------------------------------------------------------
     @ai_function(name="ingest_image", description="Validate that an image URL is reachable.")
     async def ingest_image(self, image_url: str) -> str:
         await self._validate_url(image_url)
