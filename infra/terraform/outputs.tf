@@ -246,3 +246,38 @@ output "SERVICE_FRONTEND_RESOURCE_ID" {
   description = "Resource ID for frontend service target."
   value       = azurerm_static_web_app.frontend.id
 }
+
+output "AVATAR_APP_BASE_URL" {
+  description = "Public base URL for avatar backend service."
+  value       = try(azurerm_container_app.backend_services["avatar"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["avatar"].latest_revision_fqdn}" : ""
+}
+
+output "CONFIGURATION_APP_BASE_URL" {
+  description = "Public base URL for configuration backend service."
+  value       = try(azurerm_container_app.backend_services["configuration"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["configuration"].latest_revision_fqdn}" : ""
+}
+
+output "ESSAYS_APP_BASE_URL" {
+  description = "Public base URL for essays backend service."
+  value       = try(azurerm_container_app.backend_services["essays"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["essays"].latest_revision_fqdn}" : ""
+}
+
+output "QUESTIONS_APP_BASE_URL" {
+  description = "Public base URL for questions backend service."
+  value       = try(azurerm_container_app.backend_services["questions"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["questions"].latest_revision_fqdn}" : ""
+}
+
+output "UPSKILLING_APP_BASE_URL" {
+  description = "Public base URL for upskilling backend service."
+  value       = try(azurerm_container_app.backend_services["upskilling"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["upskilling"].latest_revision_fqdn}" : ""
+}
+
+output "WEB_APP_BASE_URL" {
+  description = "Public base URL for chat backend service."
+  value       = try(azurerm_container_app.backend_services["chat"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["chat"].latest_revision_fqdn}" : ""
+}
+
+output "TRANSCRIPTION_APP_BASE_URL" {
+  description = "Public base URL for transcription backend service."
+  value       = try(azurerm_container_app.backend_services["questions"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["questions"].latest_revision_fqdn}" : ""
+}
