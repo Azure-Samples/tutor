@@ -9,8 +9,8 @@ from typing import Iterable, List
 
 import jinja2
 
-from common.agents import AgentRegistry, AgentRunContext, AgentSpec
-from common.config import get_settings
+from tutor_lib.agents import AgentRegistry, AgentRunContext, AgentSpec
+from tutor_lib.config import get_settings
 
 from .schemas import AgentFeedback, ParagraphEvaluation, PlanParagraph, PlanRequest
 

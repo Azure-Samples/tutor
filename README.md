@@ -9,8 +9,8 @@
 ### Prerequisites
 
 - **OS:** Windows, Linux, or macOS
-- **Python:** 3.10+
-- **Node.js:** 18+
+- **Python:** 3.13+
+- **Node.js:** 22+
 - **Docker:** (for building backend containers)
 - **Azure CLI:** (for cloud deployment)
 - **Git**
@@ -27,35 +27,48 @@
 2. **Install Python dependencies:**
 
    ```pwsh
-   pip install poetry
-   poetry install
+   py -3.13 -m pip install --upgrade uv
+   py -3.13 -m uv venv .venv
+   .\\.venv\\Scripts\\Activate.ps1
+   uv pip install --python .venv -e .\\lib[dev] -e .\\apps\\configuration[dev] -e .\\apps\\questions[dev] -e .\\apps\\essays[dev] -e .\\apps\\avatar[dev] -e .\\apps\\upskilling[dev]
    ```
 
 3. **Install frontend dependencies:**
 
    ```pwsh
-   cd src/frontend
-   npm install
+   cd frontend
+   pnpm install
    ```
 
 ### Quickstart (Local)
 
-1. **Run backend services:**
+> **Full guide:** See [docs/local-development.md](docs/local-development.md) for detailed setup, environment variables, per-service ports, sampling commands, and troubleshooting.
 
-   For each backend app (avatar, essays, questions, configuration):
+1. **Configure environment:**
 
    ```pwsh
-   cd src/<app>/app
-   poetry run uvicorn main:app --reload
+   cp .env.example .env
+   # Edit .env with your Azure resource endpoints (Cosmos DB, AI Foundry, etc.)
    ```
 
-   See each app's [README](src/avatar/README.md), [README](src/essays/README.md), [README](src/questions/README.md), [README](src/configuration/README.md) for details.
-
-2. **Run the frontend:**
+2. **Run backend services:**
 
    ```pwsh
-   cd src/frontend
-   npm run dev
+   ..\.venv\Scripts\Activate.ps1
+   # Load .env into session — see docs/local-development.md §4.5
+
+   # Run a single service (e.g., chat on port 8086)
+   cd apps/chat/src
+   uvicorn app.main:app --reload --port 8086
+   ```
+
+   See the [Local Development Guide](docs/local-development.md#5-running-backend-services) for all service ports and minimal-set recommendations.
+
+3. **Run the frontend:**
+
+   ```pwsh
+   cd frontend
+   pnpm dev
    ```
 
    Open [http://localhost:3000](http://localhost:3000) in your browser.
@@ -64,10 +77,12 @@
 
 1. **Provision Azure resources:**
 
-   Use the Bicep files in [`infra/`](infra/main.bicep) to deploy all required Azure resources:
+   Use Azure Developer CLI with the Terraform project in [`infra/terraform`](infra/terraform):
 
    ```pwsh
-   az deployment sub create --location <location> --template-file infra/main.bicep --parameters rgName=<resource-group> location=<location> environment=prod
+   azd auth login
+   azd env new <environment>
+   azd provision
    ```
 
 2. **Build and push backend containers:**
@@ -141,11 +156,12 @@ By using conversation history and memory, "The Tutor" ensures continuity in the 
 
 ## Resources
 
-- [Frontend README](src/frontend/README.md)
-- [Avatar Backend README](src/avatar/README.md)
-- [Essays Backend README](src/essays/README.md)
-- [Questions Backend README](src/questions/README.md)
-- [Configuration Backend README](src/configuration/README.md)
+- [Frontend README](frontend/README.md)
+- [Avatar Backend README](apps/avatar/src/README.md)
+- [Essays Backend README](apps/essays/README.md)
+- [Questions Backend README](apps/questions/README.md)
+- [Configuration Backend README](apps/configuration/src/README.md)
+- [Local Development Guide](docs/local-development.md)
 - [Infrastructure Bicep](infra/main.bicep)
 - [Changelog](CHANGELOG.md)
 - [Contributing Guide](CONTRIBUTING.md)

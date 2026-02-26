@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
@@ -8,7 +9,8 @@ import { essaysEngine } from "@/utils/api";
 import { unwrapContent } from "@/types/api";
 
 const EssayDetailPage: React.FC = () => {
-  const { id } = useParams();
+  const params = useParams<{ id: string }>();
+  const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [essay, setEssay] = useState<Essay | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -16,8 +18,9 @@ const EssayDetailPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    essaysEngine.get(`/essays/${id}`)
-      .then(res => {
+    essaysEngine
+      .get(`/essays/${id}`)
+      .then((res) => {
         const data = unwrapContent<Essay | null>(res.data);
         setEssay(data ?? null);
         setLoading(false);

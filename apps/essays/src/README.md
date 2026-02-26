@@ -15,7 +15,7 @@ This service provides the avatar-based conversational engine for The Tutor platf
 
 ## Infrastructure Requirements
 
-- Python 3.10+
+- Python 3.13+
 - FastAPI
 - Azure Speech
 - Azure OpenAI
@@ -25,17 +25,17 @@ This service provides the avatar-based conversational engine for The Tutor platf
 1. Install dependencies:
 
    ```pwsh
-   poetry install
+   uv pip install --python .venv -e .[dev]
    ```
 
 2. Start the API:
 
    ```pwsh
-   poetry run uvicorn app.main:app --reload
+   uvicorn app.main:app --reload
    ```
 
 ## Deploying to Azure
 
 - Build a Docker image and push to ACR
-- Deploy as a container app using the provided Bicep infra
+- Deploy as a container app using the `azd` + Terraform infrastructure
 - Configure environment variables for Azure Speech and OpenAI

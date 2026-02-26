@@ -12,8 +12,8 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from common.agents import AgentRegistry, AgentRunContext, AgentSpec
-from common.config import get_settings
+from tutor_lib.agents import AgentRegistry, AgentRunContext, AgentSpec
+from tutor_lib.config import get_settings
 
 from app.schemas import Answer, Assembly, Grader, Question
 

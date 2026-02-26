@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from app.cosmos import CosmosCRUD
 from app.schemas import (
+    BulkRosterSyncRequest,
     RESPONSES,
     BodyMessage,
     Class,
@@ -24,7 +25,8 @@ from app.schemas import (
     Student,
     SuccessMessage,
 )
-from common.config import get_settings
+from tutor_lib.config import get_settings
+from tutor_lib.middleware import configure_entra_auth, require_roles
 
 
 settings = get_settings()
@@ -51,6 +53,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+configure_entra_auth(app)
 
 
 @lru_cache(maxsize=8)
@@ -85,15 +88,14 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content=jsonable_encoder(body))
 
 
-def get_current_user(request: Request) -> str:
-    user = request.headers.get("X-User-Id")
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return user
+require_professor = require_roles("professor", "admin")
 
 
-def require_professor(user: str = Depends(get_current_user)) -> str:
-    return user
+async def _bulk_create(container: str, items: list[dict[str, Any]]) -> int:
+    crud = _crud(container)
+    for item in items:
+        await crud.create_item(item)
+    return len(items)
 
 
 @app.post("/students", tags=["Students"])
@@ -171,3 +173,25 @@ async def assign_cases_to_group(
     group["assigned_case_ids"] = assignment.case_ids
     await crud.update_item(group_id, group)
     return _success("Group Updated", "Cases assigned", group)
+
+
+@app.post("/lms/bulk-sync", tags=["Groups", "Students", "Professors", "Courses", "Classes"])
+async def bulk_sync_roster(
+    payload: BulkRosterSyncRequest,
+    _: str = Depends(require_professor),
+) -> JSONResponse:
+    students = [item.model_dump() for item in payload.students]
+    professors = [item.model_dump() for item in payload.professors]
+    courses = [item.model_dump() for item in payload.courses]
+    classes = [item.model_dump() for item in payload.classes]
+    groups = [item.model_dump() for item in payload.groups]
+
+    counts = {
+        "students": await _bulk_create(settings.cosmos.student_container, students),
+        "professors": await _bulk_create(settings.cosmos.professor_container, professors),
+        "courses": await _bulk_create(settings.cosmos.course_container, courses),
+        "classes": await _bulk_create(settings.cosmos.class_container, classes),
+        "groups": await _bulk_create(settings.cosmos.group_container, groups),
+    }
+
+    return _success("Bulk Sync Completed", "Roster synchronized", counts)

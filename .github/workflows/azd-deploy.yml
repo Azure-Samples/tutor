@@ -1,0 +1,138 @@
+name: Azure Deploy (azd)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "azure.yaml"
+      - "infra/terraform/**"
+      - "apps/**"
+      - "frontend/**"
+      - "lib/**"
+      - ".github/workflows/azd-deploy.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      AZURE_ENV_NAME: prod
+      AZURE_LOCATION: eastus
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Set up Azure Developer CLI
+        uses: Azure/setup-azd@v2
+
+      - name: Preflight checks
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+        run: |
+          set -euo pipefail
+
+          command -v azd >/dev/null
+          command -v terraform >/dev/null
+          command -v docker >/dev/null
+          docker info >/dev/null
+
+          : "${AZURE_CLIENT_ID:?Missing secret AZURE_CLIENT_ID}"
+          : "${AZURE_TENANT_ID:?Missing secret AZURE_TENANT_ID}"
+          : "${AZURE_SUBSCRIPTION_ID:?Missing secret AZURE_SUBSCRIPTION_ID}"
+          : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
+          : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
+          : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
+
+          test -f infra/terraform/provider.conf.json || {
+            echo "Missing required file infra/terraform/provider.conf.json"
+            exit 1
+          }
+          test -f infra/terraform/main.tfvars.json || {
+            echo "Missing required file infra/terraform/main.tfvars.json"
+            exit 1
+          }
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Ensure deployment environment exists
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
+        run: |
+          azd env select "$AZURE_ENV_NAME" || azd env new "$AZURE_ENV_NAME" --no-prompt
+          azd env set AZURE_LOCATION "$AZURE_LOCATION"
+          azd env set RS_RESOURCE_GROUP "$TFSTATE_RESOURCE_GROUP"
+          azd env set RS_STORAGE_ACCOUNT "$TFSTATE_STORAGE_ACCOUNT"
+          azd env set RS_CONTAINER_NAME "$TFSTATE_CONTAINER"
+          if [ -z "$TFSTATE_KEY" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          fi
+          azd env set RS_KEY "$TFSTATE_KEY"
+
+      - name: Build Terraform backend config
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
+        run: |
+          : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
+          : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
+          : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
+          if [ -z "$TFSTATE_KEY" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          fi
+          cat > infra/terraform/backend.hcl <<EOF
+          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
+          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
+          container_name       = "$TFSTATE_CONTAINER"
+          key                  = "$TFSTATE_KEY"
+          EOF
+
+      - name: Validate Terraform configuration with remote backend
+        run: |
+          cd infra/terraform
+          terraform init -reconfigure -backend-config=backend.hcl
+          terraform state pull >/dev/null
+          terraform validate
+
+      - name: Provision infrastructure
+        run: azd provision --no-prompt
+
+      - name: Deploy backend services
+        run: |
+          azd deploy avatar --no-prompt
+          azd deploy chat --no-prompt
+          azd deploy configuration --no-prompt
+          azd deploy essays --no-prompt
+          azd deploy evaluation --no-prompt
+          azd deploy lms-gateway --no-prompt
+          azd deploy questions --no-prompt
+          azd deploy upskilling --no-prompt
+
+      - name: Frontend deployment ownership
+        run: |
+          echo "Frontend SWA is deployed by .github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
+          echo "azd-deploy.yml intentionally deploys infrastructure and backend services only."

@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode } from "react";
-import { Transcription } from "@/types/case";
+import { Transcription } from "@/types/transcription";
 
 interface TranscriptionContextProps {
   transcriptions: { [specialistId: string]: Transcription[] }; // Armazenar as transcrições por especialista

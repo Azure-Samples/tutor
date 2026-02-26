@@ -5,10 +5,10 @@ from __future__ import annotations
 import asyncio
 import inspect
 import logging
+from io import BytesIO
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
-from io import BytesIO
 from typing import Any, AsyncIterator, Callable, Iterable, Sequence, cast
 
 from azure.ai.agents.aio import AgentsClient

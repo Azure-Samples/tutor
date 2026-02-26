@@ -64,7 +64,7 @@ const QuestionForm: React.FC = () => {
               Answer
             </label>
             <textarea
-              value={question.answer}
+              value={question.answer ?? ""}
               onChange={(e) => setQuestion({ ...question, answer: e.target.value })}
               className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
               placeholder="Type the answer"

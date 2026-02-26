@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaPen, FaFileAlt, FaListAlt, FaBell, FaHashtag, FaUsersCog, FaLink } from "react-icons/fa";
-import { v4 as uuidv4 } from "uuid";
 
 import type { AgentDefinition, Essay, ProvisionedAgent, SwarmDefinition } from "@/types/essays";
 import { unwrapContent } from "@/types/api";
@@ -12,6 +11,13 @@ const DEFAULT_ESSAY: Essay = {
   explanation: "",
   theme: "",
   assembly_id: null,
+};
+
+const createEssayId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
 type EssayFormProps = {
@@ -194,7 +200,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
     try {
       const essayPayload: Essay = { ...form };
       if (!isEdit) {
-        essayPayload.id = essayPayload.id ?? uuidv4();
+        essayPayload.id = essayPayload.id ?? createEssayId();
       }
 
       const request = isEdit

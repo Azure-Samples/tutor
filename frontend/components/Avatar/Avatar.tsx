@@ -220,7 +220,11 @@ class AvatarHandler {
   }
 }
 
-const AvatarChat: React.FC = () => {
+type AvatarChatProps = {
+  initialCaseId?: string;
+};
+
+const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLDivElement>(null);
   const [spokenText, setSpokenText] = useState("");
@@ -249,7 +253,14 @@ const AvatarChat: React.FC = () => {
       try {
         const response = await avatarEngine.get("/cases/");
         if (response.status === 200) {
-          setAvailableCases(response.data.result || []);
+          const cases = response.data.result || [];
+          setAvailableCases(cases);
+          if (initialCaseId) {
+            const found = cases.find((item: Case) => item.id === initialCaseId);
+            if (found) {
+              setSelectedCase(found);
+            }
+          }
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -259,7 +270,7 @@ const AvatarChat: React.FC = () => {
     };
 
     fetchCases();
-  }, []);
+  }, [initialCaseId]);
 
   useEffect(() => {
     if (!avatarHandlerRef.current) {

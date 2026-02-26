@@ -41,6 +41,7 @@ from app.schemas import (
     SwarmDefinition,
 )
 from app.config import get_settings
+from tutor_lib.middleware import configure_entra_auth
 
 
 ESSAY_FIELDS: tuple[str, ...] = (
@@ -94,6 +95,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+configure_entra_auth(app)
 
 
 @app.exception_handler(RequestValidationError)

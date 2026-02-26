@@ -62,7 +62,7 @@ const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }
         <FaPen /> Answer
       </label>
       <textarea
-        value={form.answer}
+        value={form.answer ?? ""}
         onChange={e => setForm({ ...form, answer: e.target.value })}
         className="w-full rounded-2xl border-2 border-blue-200 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200 px-4 py-3 text-lg transition-all duration-200 bg-blue-50 dark:bg-blue-900 placeholder:text-blue-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[240px]"
         placeholder="Type the answer"

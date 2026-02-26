@@ -26,6 +26,7 @@ dependencies = [
     "pypdf>=4.0.0",
     "pydantic>=2.9.2",
     "pydantic-settings>=2.4.0",
+    "PyJWT[crypto]>=2.10.1",
     "tenacity>=9.0.0",
     "httpx>=0.27.0",
     "structlog>=24.3.0",
@@ -42,9 +43,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black>=24.10.0",
-    "isort>=5.13.2",
-    "pylint>=3.2.7",
+    "ruff>=0.9.10",
     "pytest>=8.3.3",
     "pytest-asyncio>=0.23.7",
     "ipykernel>=6.29.5",
@@ -67,32 +66,11 @@ markers = [
     "slow: marks tests as slow (select with '-m slow')"
 ]
 pythonpath = [
+    "lib/src",
     "apps/avatar/src",
     "apps/configuration/src",
     "apps/essays/src",
-    "apps/questions/src",
-    "apps/upskilling/src",
+    "apps/questions/app",
+    "apps/upskilling/app",
 ]
-
-[tool.pylint]
-fail-under = 9.0
-max-line-length = 100
-max-complexity = 10
-good-names = ["i", "j", "k", "ex", "Run", "_"]
-disable = ["C0114", "C0115", "C0116", "C0301", "W3101"]
-load-plugins = ["pylint.extensions.mccabe"]
-
-[tool.black]
-line-length = 100
-target-version = ["py313"]
-include = '\\.pyi?$'
-exclude = '(\\.git | \\.hg | \\.mypy_cache | \\.__pycache__ | \\.tox | \\.venv | _build | buck-out | build | dist )/'
-
-[tool.isort]
-profile = "black"
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-line_length = 100
 

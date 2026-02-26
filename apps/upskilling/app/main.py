@@ -20,7 +20,8 @@ from .schemas import (
     PlanRequest,
     SuccessMessage,
 )
-from common.config import get_settings
+from tutor_lib.config import get_settings
+from tutor_lib.middleware import configure_entra_auth
 
 
 settings = get_settings()
@@ -43,6 +44,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+configure_entra_auth(app)
 
 
 @lru_cache(maxsize=8)

@@ -1,0 +1,4 @@
+name_prefix  = "tutor"
+environment  = "dev"
+location     = "eastus"
+cosmos_db_name = "tutor"

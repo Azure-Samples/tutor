@@ -18,6 +18,7 @@ from app.avatar import AvatarChat, build_avatar_chat
 from app.config import get_settings
 from app.cosmos import CosmosCRUD
 from app.schemas import BodyMessage, Case, ChatResponse, ErrorMessage, RESPONSES, SuccessMessage
+from tutor_lib.middleware import configure_entra_auth
 
 
 settings = get_settings()
@@ -41,6 +42,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+configure_entra_auth(app)
 
 
 def _success(title: str, message: str, content: Any) -> JSONResponse:

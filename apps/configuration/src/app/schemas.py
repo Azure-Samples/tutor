@@ -16,7 +16,6 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_418_IM_A_TEAPOT,
-    HTTP_422_UNPROCESSABLE_ENTITY,
 )
 
 
@@ -103,6 +102,14 @@ class GroupCaseAssignment(BaseModel):
     case_ids: List[str] = Field(default_factory=list)
 
 
+class BulkRosterSyncRequest(BaseModel):
+    students: List[Student] = Field(default_factory=list)
+    professors: List[Professor] = Field(default_factory=list)
+    courses: List[Course] = Field(default_factory=list)
+    classes: List[Class] = Field(default_factory=list)
+    groups: List[Group] = Field(default_factory=list)
+
+
 RESPONSES = {
     HTTP_200_OK: {"model": BodyMessage},
     HTTP_201_CREATED: {"model": BodyMessage},
@@ -114,5 +121,5 @@ RESPONSES = {
     HTTP_401_UNAUTHORIZED: {"model": BodyMessage},
     HTTP_403_FORBIDDEN: {"model": BodyMessage},
     HTTP_418_IM_A_TEAPOT: {"model": BodyMessage},
-    HTTP_422_UNPROCESSABLE_ENTITY: {"model": BodyMessage},
+    422: {"model": BodyMessage},
 }
