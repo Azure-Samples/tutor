@@ -10,7 +10,7 @@
     "format": "biome check --write ."
   },
   "engines": {
-    "node": ">=22"
+    "node": "22.x"
   },
   "dependencies": {
     "apexcharts": "^5.6.0",
