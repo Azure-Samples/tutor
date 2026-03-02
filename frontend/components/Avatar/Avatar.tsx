@@ -261,7 +261,7 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   useEffect(() => {
     const fetchCases = async () => {
       try {
-        const response = await avatarEngine.get("/cases/");
+        const response = await avatarEngine.get("/cases");
         if (response.status === 200) {
           const cases = response.data.result || [];
           setAvailableCases(cases);
