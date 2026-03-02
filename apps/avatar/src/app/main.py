@@ -38,11 +38,22 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
+    allow_origin_regex=r"https://.*\.azurestaticapps\.net",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 configure_entra_auth(app)
+
+
+@app.get("/health", tags=["Avatar"])
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/ready", tags=["Avatar"])
+async def ready() -> dict[str, str]:
+    return {"status": "ready"}
 
 
 def _success(title: str, message: str, content: Any) -> JSONResponse:
@@ -94,7 +105,8 @@ async def avatar_profile() -> JSONResponse:
 @app.post("/create-case", tags=["Configuration"])
 async def create_case(case: Case) -> JSONResponse:
     payload = case.model_dump()
-    payload.setdefault("id", str(uuid.uuid4()))
+    if not payload.get("id"):
+        payload["id"] = str(uuid.uuid4())
     await _case_repository().create_item(payload)
     return _success("Case Created", "Case stored", payload)
 

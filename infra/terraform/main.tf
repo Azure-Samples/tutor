@@ -10,10 +10,32 @@ locals {
     "evaluation",
     "lms-gateway",
   ]
+  apim_service_paths = {
+    avatar        = "api/avatar"
+    configuration = "api/configuration"
+    essays        = "api/essays"
+    questions     = "api/questions"
+    upskilling    = "api/upskilling"
+    chat          = "api/chat"
+    evaluation    = "api/evaluation"
+    "lms-gateway" = "api/lms-gateway"
+  }
+  apim_operation_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
+  apim_operations = {
+    for operation in flatten([
+      for service_name, _ in local.apim_service_paths : [
+        for method in local.apim_operation_methods : {
+          key          = "${service_name}-${lower(method)}"
+          service_name = service_name
+          method       = method
+        }
+      ]
+    ]) : operation.key => operation
+  }
   agent_role_scopes = {
     "Cosmos DB Built-in Data Contributor" = azurerm_cosmosdb_account.main.id
-    "Storage Blob Data Contributor"        = azurerm_storage_account.uploads.id
-    "AcrPull"                              = azurerm_container_registry.main.id
+    "Storage Blob Data Contributor"       = azurerm_storage_account.uploads.id
+    "AcrPull"                             = azurerm_container_registry.main.id
   }
 
   agent_role_assignments = {
@@ -150,6 +172,18 @@ resource "azurerm_container_app" "backend_services" {
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = 0.5
       memory = "1Gi"
+
+      liveness_probe {
+        path      = "/health"
+        port      = 8000
+        transport = "HTTP"
+      }
+
+      readiness_probe {
+        path      = "/ready"
+        port      = 8000
+        transport = "HTTP"
+      }
     }
   }
 
@@ -167,6 +201,55 @@ resource "azurerm_container_app" "backend_services" {
   tags = {
     "azd-env-name"     = var.environment
     "azd-service-name" = each.key
+  }
+}
+
+resource "azurerm_api_management" "main" {
+  name                = "${var.name_prefix}-${var.environment}-apim"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  publisher_name      = "Tutor Platform"
+  publisher_email     = "platform@contoso.com"
+  sku_name            = "Consumption_0"
+
+  tags = {
+    "azd-env-name" = var.environment
+  }
+}
+
+resource "azurerm_api_management_api" "backend_services" {
+  for_each = local.apim_service_paths
+
+  name                  = "${replace(each.key, "-", "")}-api"
+  resource_group_name   = azurerm_resource_group.main.name
+  api_management_name   = azurerm_api_management.main.name
+  revision              = "1"
+  display_name          = "${each.key} API"
+  path                  = each.value
+  protocols             = ["https"]
+  service_url           = "https://${azurerm_container_app.backend_services[each.key].latest_revision_fqdn}"
+  subscription_required = false
+}
+
+resource "azurerm_api_management_api_operation" "backend_catch_all" {
+  for_each = local.apim_operations
+
+  operation_id        = replace(each.key, "-", "")
+  api_name            = azurerm_api_management_api.backend_services[each.value.service_name].name
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.main.name
+  display_name        = "${each.value.method} catch-all"
+  method              = each.value.method
+  url_template        = "/{*path}"
+
+  template_parameter {
+    name     = "path"
+    required = true
+    type     = "string"
+  }
+
+  response {
+    status_code = 200
   }
 }
 

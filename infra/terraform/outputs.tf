@@ -247,6 +247,16 @@ output "SERVICE_FRONTEND_RESOURCE_ID" {
   value       = azurerm_static_web_app.frontend.id
 }
 
+output "APIM_BASE_URL" {
+  description = "Base URL for Azure API Management gateway."
+  value       = azurerm_api_management.main.gateway_url
+}
+
+output "NEXT_PUBLIC_APIM_BASE_URL" {
+  description = "Frontend APIM gateway base URL."
+  value       = azurerm_api_management.main.gateway_url
+}
+
 output "AVATAR_APP_BASE_URL" {
   description = "Public base URL for avatar backend service."
   value       = try(azurerm_container_app.backend_services["avatar"].latest_revision_fqdn, "") != "" ? "https://${azurerm_container_app.backend_services["avatar"].latest_revision_fqdn}" : ""

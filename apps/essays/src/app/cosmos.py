@@ -6,7 +6,6 @@ from collections.abc import AsyncIterator, Iterable
 from contextlib import asynccontextmanager
 from typing import Any
 
-from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
@@ -26,11 +25,6 @@ class CosmosCRUD:
         async with DefaultAzureCredential() as credential:
             async with CosmosClient(self._endpoint, credential=credential) as client:
                 database = client.get_database_client(self._database)
-                try:
-                    await database.read()
-                except exceptions.CosmosResourceNotFoundError:
-                    await client.create_database(self._database)
-                    database = client.get_database_client(self._database)
                 container = database.get_container_client(self._container)
                 yield container
 

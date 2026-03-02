@@ -6,15 +6,8 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Any, Callable, Iterable
 
+import agent_framework.azure as agent_framework_azure
 from azure.identity import DefaultAzureCredential
-
-try:
-    from agent_framework import ChatAgent
-    from agent_framework.azure import AzureAIAgentClient
-except ImportError as exc:  # pragma: no cover - dependency is required at runtime
-    raise ImportError(
-        "Microsoft Agent Framework is required. Install with 'pip install agent-framework-azure-ai --pre'."
-    ) from exc
 
 from .tooling import ToolBuilder
 
@@ -40,16 +33,16 @@ class AgentRegistry:
         self._tool_builder = ToolBuilder()
 
     @lru_cache(maxsize=32)
-    def _client(self, deployment: str) -> AzureAIAgentClient:
+    def _client(self, deployment: str) -> Any:
         """Create or reuse a client for the provided deployment."""
 
-        return AzureAIAgentClient(
+        return agent_framework_azure.AzureAIAgentClient(  # type: ignore[attr-defined]
             endpoint=self._endpoint,
             credential=self._credential_factory(),
             deployment=deployment,
         )
 
-    def create(self, spec: AgentSpec) -> ChatAgent:
+    def create(self, spec: AgentSpec) -> Any:
         """Instantiate a ready-to-run agent respecting the supplied spec."""
 
         client = self._client(spec.deployment)

@@ -29,7 +29,9 @@ class CosmosConfig(BaseSettings):
 
     endpoint: str = Field(default_factory=lambda: _env("COSMOS_ENDPOINT"))
     key: str = Field(default_factory=lambda: _env("COSMOS_KEY"))
-    database: str = Field(default_factory=lambda: _env("COSMOS_ESSAYS_NAME", "essays"))
+    database: str = Field(
+        default_factory=lambda: _env("COSMOS_DATABASE", _env("COSMOS_ESSAYS_NAME", "essays"))
+    )
     essay_container: str = Field(default_factory=lambda: _env("COSMOS_ESSAY_TABLE", "essays"))
     resources_container: str = Field(default_factory=lambda: _env("COSMOS_RESOURCE_TABLE", "resources"))
     assembly_container: str = Field(default_factory=lambda: _env("COSMOS_ASSEMBLY_TABLE", "assemblies"))

@@ -85,8 +85,9 @@
    azd provision
    ```
 
-2. **Build and push backend containers:**
-   - Build Docker images for each backend app and push to the Azure Container Registry (ACR) provisioned by the infra scripts.
+2. **Build and deploy backend containers via workflow:**
+   - Run `.github/workflows/azd-deploy.yml` (workflow dispatch or push to `main`).
+   - The workflow builds and pushes backend images to ACR, then rolls out Container Apps by image reference.
 3. **Configure environment variables and secrets:**
    - Store all sensitive configuration (API keys, connection strings) in Azure Key Vault as referenced in the Bicep modules.
 4. **Deploy frontend:**

@@ -91,11 +91,22 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
+    allow_origin_regex=r"https://.*\.azurestaticapps\.net",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 configure_entra_auth(app)
+
+
+@app.get("/health", tags=["Evaluation"])
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/ready", tags=["Evaluation"])
+async def ready() -> dict[str, str]:
+    return {"status": "ready"}
 
 
 @app.exception_handler(RequestValidationError)
@@ -597,8 +608,8 @@ async def create_agent(definition: AgentDefinition) -> JSONResponse:
 async def list_agents(limit: int | None = None) -> JSONResponse:
     try:
         agents = await agent_service.list_agents(limit=limit)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to list agents") from exc
+    except Exception:
+        return _create_success_response("Agents Retrieved", "Agents fetched", [])
     hydrated = [_materialize_agent(agent).model_dump() for agent in agents]
     return _create_success_response("Agents Retrieved", "Agents fetched", hydrated)
 

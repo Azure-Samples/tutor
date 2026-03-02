@@ -16,6 +16,7 @@ Set these in repository or environment secrets:
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
+- `NEXT_PUBLIC_APIM_BASE_URL` (used by Static Web Apps frontend build)
 
 ## Workflow Defaults
 
@@ -54,6 +55,40 @@ azd provision
 ```pwsh
 azd deploy --all
 ```
+
+## APIM-First Deployment Order (Required)
+
+Use this order to avoid frontend calls falling back to localhost or stale service URLs:
+
+1. Provision infrastructure first (creates/updates APIM and routing resources):
+
+```pwsh
+azd provision
+```
+
+1. Deploy backend services through GitHub Actions workflow builds (recommended):
+
+- Run `.github/workflows/azd-deploy.yml` with `workflow_dispatch`.
+- The workflow now builds and pushes backend images to ACR, then updates Container Apps by image reference.
+- Local `azd deploy <service>` Docker builds are no longer required for normal production delivery.
+
+1. Validate APIM routes before frontend deployment:
+
+```pwsh
+$apim = azd env get-value NEXT_PUBLIC_APIM_BASE_URL
+Invoke-RestMethod "$apim/api/avatar/health"
+Invoke-RestMethod "$apim/api/configuration/ready"
+Invoke-RestMethod "$apim/api/essays/health"
+Invoke-RestMethod "$apim/api/questions/ready"
+Invoke-RestMethod "$apim/api/upskilling/health"
+Invoke-RestMethod "$apim/api/chat/ready"
+Invoke-RestMethod "$apim/api/evaluation/health"
+Invoke-RestMethod "$apim/api/lms-gateway/ready"
+```
+
+1. Frontend redeploy only after APIM is functional:
+   - Set GitHub secret `NEXT_PUBLIC_APIM_BASE_URL` to the APIM gateway URL.
+   - Run `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` (`workflow_dispatch`) to redeploy only the frontend.
 
 ## Terraform Validation Before Deployment
 
@@ -122,7 +157,8 @@ After deployment:
 1. Confirm workflow succeeded in GitHub Actions.
 2. Verify Container Apps revisions are healthy.
 3. Check service logs in Log Analytics for startup errors.
-4. Validate frontend endpoint and critical backend APIs.
+4. Validate APIM endpoint and critical backend APIs through APIM paths.
+5. Validate frontend endpoint after the SWA workflow completes.
 
 ## Rollback
 

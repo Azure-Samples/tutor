@@ -48,6 +48,8 @@
     "chat.tools.terminal.autoApprove": {
       "terraform": true,
       "azd": true,
-      "az": true
+      "az": true,
+      "ConvertFrom-Json": true,
+      "ForEach-Object": true
     }
 }

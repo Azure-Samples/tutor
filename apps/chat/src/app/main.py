@@ -23,6 +23,11 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/ready")
+async def ready() -> dict[str, str]:
+    return {"status": "ready"}
+
+
 @app.post("/chat/guide")
 async def guide(payload: GuidanceRequest) -> dict[str, str]:
     return {

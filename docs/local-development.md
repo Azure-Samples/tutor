@@ -137,8 +137,8 @@ cp .env.example .env
 | `AI_SPEECH_KEY` | Speech Services key |
 | `AZURE_VISION_ENDPOINT` | Azure AI Vision endpoint |
 | `AZURE_VISION_KEY` | Azure AI Vision key |
-| `AZURE_MODEL_KEY` | Azure OpenAI key (legacy — essays own config) |
-| `AZURE_MODEL_URL` | Azure OpenAI endpoint (legacy) |
+| `AZURE_MODEL_KEY` | Azure OpenAI key |
+| `AZURE_MODEL_URL` | Azure OpenAI endpoint |
 
 </details>
 
@@ -261,15 +261,22 @@ Opens at [http://localhost:3000](http://localhost:3000).
 
 ### Frontend → Backend Routing
 
-The frontend sends API calls to `NEXT_PUBLIC_API_BASE_URL` (defaults to `localhost:8000` in `frontend/process.env`).
+The frontend supports explicit service-level routing using `NEXT_PUBLIC_*` variables.
 
-If you are running services on unique ports (§5.2), update the file `frontend/process.env`:
+If you are running services on unique ports (§5.2), set these values in `frontend/.env.local` (or `frontend/process.env`):
 
 ```env
-NEXT_PUBLIC_API_BASE_URL = "localhost:8081"
+NEXT_PUBLIC_API_BASE_URL="http://localhost:8086"
+NEXT_PUBLIC_AVATAR_APP_BASE_URL="http://localhost:8081"
+NEXT_PUBLIC_CONFIGURATION_APP_BASE_URL="http://localhost:8082"
+NEXT_PUBLIC_ESSAYS_APP_BASE_URL="http://localhost:8083"
+NEXT_PUBLIC_QUESTIONS_APP_BASE_URL="http://localhost:8084"
+NEXT_PUBLIC_UPSKILLING_APP_BASE_URL="http://localhost:8085"
+NEXT_PUBLIC_WEB_APP_BASE_URL="http://localhost:8086"
+NEXT_PUBLIC_TRANSCRIPTION_APP_BASE_URL="http://localhost:8084"
 ```
 
-> **Note:** The current frontend is configured for a single backend URL. For full multi-service routing, the frontend routes each feature to its own service path — check the components under `frontend/components/Chat/`, `frontend/components/Essays/`, etc. to see which endpoint each UI feature calls.
+> **Note:** Backward-compatible env aliases were removed. Use only the `NEXT_PUBLIC_*` variables above.
 
 ### APIM Gateway Routing (recommended)
 
@@ -291,7 +298,20 @@ The frontend client in `frontend/utils/api.ts` automatically routes service call
 | `webApp` / `webApi` | `/api/chat` | chat |
 | `transcriptionApi` | `/api/questions` | questions |
 
-If `NEXT_PUBLIC_APIM_BASE_URL` is not set, the frontend falls back to service-specific local URLs (`*_APP_BASE_URL`) and then localhost defaults.
+In **production** builds, `NEXT_PUBLIC_APIM_BASE_URL` is required and the frontend fails fast if missing.
+
+In **local development**, if `NEXT_PUBLIC_APIM_BASE_URL` is not set, the frontend uses the service-specific `NEXT_PUBLIC_*_APP_BASE_URL` values and then localhost defaults.
+
+### Production deployment sequence
+
+Deploy APIM before frontend publication:
+
+1. `azd provision`
+2. Deploy backend Container Apps
+3. Validate APIM health/readiness routes
+4. Redeploy Static Web App with `NEXT_PUBLIC_APIM_BASE_URL` set
+
+See [azd Deployment Runbook](./runbooks/azd-deployment.md) for exact commands.
 
 ---
 
@@ -490,7 +510,11 @@ taskkill /PID <pid> /F
 
 ### Frontend can't reach backends
 
-Ensure `NEXT_PUBLIC_API_BASE_URL` in `frontend/process.env` points to the correct service port. The frontend was originally designed to talk to a single backend — if testing a specific feature, point it to that service's port.
+Ensure the relevant `NEXT_PUBLIC_*_APP_BASE_URL` variable points to the correct local service port. The frontend now reads only `NEXT_PUBLIC_*` keys.
+
+### Frontend production build fails with APIM env error
+
+If you see `NEXT_PUBLIC_APIM_BASE_URL is required in production deployments`, configure APIM first and set `NEXT_PUBLIC_APIM_BASE_URL` in your SWA deployment workflow secrets.
 
 ### Essays service: `COSMOS_KEY` required
 

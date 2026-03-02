@@ -40,11 +40,22 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=list(settings.cors_origins),
+    allow_origin_regex=r"https://.*\.azurestaticapps\.net",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 configure_entra_auth(app)
+
+
+@app.get("/health", tags=["Planning"])
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/ready", tags=["Planning"])
+async def ready() -> dict[str, str]:
+    return {"status": "ready"}
 
 
 @lru_cache(maxsize=8)
