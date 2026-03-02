@@ -44,6 +44,20 @@ const createClient = (baseURL: string | undefined, fallback?: string): AxiosInst
   const client = axios.create({
     baseURL: normalizeBaseURL(baseURL) || normalizeBaseURL(fallback),
   });
+  client.interceptors.request.use((config) => {
+    if (config.baseURL) {
+      config.baseURL = normalizeBaseURL(config.baseURL);
+    }
+
+    if (typeof config.url === "string" && config.url.startsWith("http://")) {
+      const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(config.url);
+      if (!isLocal) {
+        config.url = `https://${config.url.slice("http://".length)}`;
+      }
+    }
+
+    return config;
+  });
   client.interceptors.response.use(unwrapResponse, (error) => {
     const data = error?.response?.data;
     if (data && typeof data === "object" && "detail" in data) {

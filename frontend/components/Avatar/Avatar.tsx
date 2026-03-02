@@ -8,6 +8,7 @@ import type { Case } from "@/types/cases";
 
 const speechKey = process.env.NEXT_PUBLIC_SPEECH_KEY || "";
 const speechRegion = process.env.NEXT_PUBLIC_SPEECH_REGION || "";
+const hasSpeechClientConfig = Boolean(speechKey && speechRegion);
 
 type AvatarConfig = {
   character: string;
@@ -25,6 +26,10 @@ class AvatarHandler {
   public onVideoStream?: (stream: MediaStream) => void;
 
   constructor(config: AvatarConfig) {
+    if (!hasSpeechClientConfig) {
+      throw new Error("Speech configuration is missing. Set NEXT_PUBLIC_SPEECH_KEY and NEXT_PUBLIC_SPEECH_REGION.");
+    }
+
     const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
 
     speechConfig.speechSynthesisLanguage = "pt-BR";
@@ -191,8 +196,13 @@ class AvatarHandler {
   }
 
   public startMicrophone(onRecognized: (text: string) => void, language: string) {
-    const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-    this.speechRecognizer = new SpeechSDK.SpeechRecognizer(this.speechConfig, audioConfig);
+    try {
+      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      this.speechRecognizer = new SpeechSDK.SpeechRecognizer(this.speechConfig, audioConfig);
+    } catch (error) {
+      console.error("Failed to initialize microphone input:", error);
+      return;
+    }
 
     this.speechRecognizer.recognized = (s, e) => {
       if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
@@ -273,6 +283,11 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   }, [initialCaseId]);
 
   useEffect(() => {
+    if (!hasSpeechClientConfig) {
+      setError("Avatar speech is not configured in this environment.");
+      return;
+    }
+
     if (!avatarHandlerRef.current) {
       avatarHandlerRef.current = new AvatarHandler({
         character: "harry",
