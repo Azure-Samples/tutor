@@ -49,7 +49,7 @@ The frontend enables:
 3. Configure API endpoints:
    - Edit `.env.local` or `process.env` to point to your backend API URLs.
    - Use `NEXT_PUBLIC_*` variables only (legacy aliases are not supported).
-   - Common keys: `NEXT_PUBLIC_APIM_BASE_URL`, `NEXT_PUBLIC_AVATAR_APP_BASE_URL`, `NEXT_PUBLIC_ESSAYS_APP_BASE_URL`, `NEXT_PUBLIC_QUESTIONS_APP_BASE_URL`, `NEXT_PUBLIC_CONFIGURATION_APP_BASE_URL`, `NEXT_PUBLIC_UPSKILLING_APP_BASE_URL`, `NEXT_PUBLIC_WEB_APP_BASE_URL`.
+   - Common keys: `NEXT_PUBLIC_APIM_BASE_URL`, `NEXT_PUBLIC_AVATAR_APP_BASE_URL`, `NEXT_PUBLIC_ESSAYS_APP_BASE_URL`, `NEXT_PUBLIC_QUESTIONS_APP_BASE_URL`, `NEXT_PUBLIC_CONFIGURATION_APP_BASE_URL`, `NEXT_PUBLIC_UPSKILLING_APP_BASE_URL`, `NEXT_PUBLIC_WEB_APP_BASE_URL`, `NEXT_PUBLIC_SPEECH_KEY`, `NEXT_PUBLIC_SPEECH_REGION`.
    - In production, always use `https://` URLs for direct service variables to avoid browser mixed-content blocking.
 
 ## Deploying to Azure
