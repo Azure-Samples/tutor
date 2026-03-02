@@ -6,9 +6,16 @@ import { FaMicrophone, FaMicrophoneSlash, FaChevronDown } from "react-icons/fa";
 import AvatarUserVideo from "./AvatarUserVideo";
 import type { Case } from "@/types/cases";
 
-const speechKey = process.env.NEXT_PUBLIC_SPEECH_KEY || "";
-const speechRegion = process.env.NEXT_PUBLIC_SPEECH_REGION || "";
-const hasSpeechClientConfig = Boolean(speechKey && speechRegion);
+type SpeechSessionPayload = {
+  authorizationToken: string;
+  region: string;
+  expiresOn: number;
+  relay: {
+    Urls: string[];
+    Username: string;
+    Password: string;
+  };
+};
 
 type AvatarConfig = {
   character: string;
@@ -17,26 +24,36 @@ type AvatarConfig = {
 };
 
 class AvatarHandler {
-  public speechConfig: SpeechSDK.SpeechConfig;
+  public speechConfig!: SpeechSDK.SpeechConfig;
   private avatarConfig: SpeechSDK.AvatarConfig;
   private peerConnection!: RTCPeerConnection;
   private avatarSynthesizer!: SpeechSDK.AvatarSynthesizer;
   private speechRecognizer!: SpeechSDK.SpeechRecognizer;
   private isSessionActive: boolean = false;
+  private speechSession?: SpeechSessionPayload;
   public onVideoStream?: (stream: MediaStream) => void;
 
   constructor(config: AvatarConfig) {
-    if (!hasSpeechClientConfig) {
-      throw new Error("Speech configuration is missing. Set NEXT_PUBLIC_SPEECH_KEY and NEXT_PUBLIC_SPEECH_REGION.");
+    this.avatarConfig = new SpeechSDK.AvatarConfig(config.character, config.style, config.videoFormat);
+  }
+
+  public async ensureSpeechReady(forceRefresh = false): Promise<SpeechSDK.SpeechConfig> {
+    if (!this.speechSession || forceRefresh) {
+      const response = await avatarEngine.get("/speech/session-token");
+      this.speechSession = response.data as SpeechSessionPayload;
     }
 
-    const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(speechKey, speechRegion);
+    if (!this.speechSession?.authorizationToken || !this.speechSession?.region) {
+      throw new Error("Speech session payload is incomplete.");
+    }
 
-    speechConfig.speechSynthesisLanguage = "pt-BR";
-    speechConfig.speechSynthesisVoiceName = "pt-BR-AntonioNeural";
-
-    this.speechConfig = speechConfig;
-    this.avatarConfig = new SpeechSDK.AvatarConfig(config.character, config.style, config.videoFormat);
+    this.speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(
+      this.speechSession.authorizationToken,
+      this.speechSession.region,
+    );
+    this.speechConfig.speechSynthesisLanguage = "pt-BR";
+    this.speechConfig.speechSynthesisVoiceName = "pt-BR-AntonioNeural";
+    return this.speechConfig;
   }
 
   public updateLanguage(language: string, voice: string) {
@@ -46,29 +63,15 @@ class AvatarHandler {
   }
 
   private async fetchIceServers(): Promise<RTCIceServer[]> {
-    const response = await fetch(
-      `https://${speechRegion}.tts.speech.microsoft.com/cognitiveservices/avatar/relay/token/v1`,
-      {
-        method: "GET",
-        headers: {
-          "Ocp-Apim-Subscription-Key": speechKey,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      console.error("Failed to fetch ICE server information:", response);
-      throw new Error("Failed to fetch ICE server information");
+    const speechSession = this.speechSession;
+    if (!speechSession?.relay?.Urls?.length) {
+      throw new Error("Speech relay information is missing.");
     }
 
-    console.log("ICE server information fetched successfully. \nResponse: ", response);
-
-    const data = await response.json();
-
-    return data.Urls.map((url: string) => ({
+    return speechSession.relay.Urls.map((url: string) => ({
       urls: url,
-      username: data.Username,
-      credential: data.Password,
+      username: speechSession.relay.Username,
+      credential: speechSession.relay.Password,
     }));
   }
 
@@ -78,6 +81,7 @@ class AvatarHandler {
       return this.peerConnection;
     }
 
+    await this.ensureSpeechReady();
     const iceServers = await this.fetchIceServers();
     this.peerConnection = new RTCPeerConnection({ iceServers });
 
@@ -196,28 +200,34 @@ class AvatarHandler {
   }
 
   public startMicrophone(onRecognized: (text: string) => void, language: string) {
-    try {
-      const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
-      this.speechRecognizer = new SpeechSDK.SpeechRecognizer(this.speechConfig, audioConfig);
-    } catch (error) {
-      console.error("Failed to initialize microphone input:", error);
-      return;
-    }
+    this.ensureSpeechReady()
+      .then(() => {
+        try {
+          const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+          this.speechRecognizer = new SpeechSDK.SpeechRecognizer(this.speechConfig, audioConfig);
+        } catch (error) {
+          console.error("Failed to initialize microphone input:", error);
+          return;
+        }
 
-    this.speechRecognizer.recognized = (s, e) => {
-      if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
-        console.log("Recognized text:", e.result.text);
-        onRecognized(e.result.text);
-      }
-    };
+        this.speechRecognizer.recognized = (s, e) => {
+          if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech) {
+            console.log("Recognized text:", e.result.text);
+            onRecognized(e.result.text);
+          }
+        };
 
-    this.speechConfig.speechRecognitionLanguage = language;
-    console.log(`Updated STT recognition language to ${language}`);
+        this.speechConfig.speechRecognitionLanguage = language;
+        console.log(`Updated STT recognition language to ${language}`);
 
-    this.speechRecognizer.startContinuousRecognitionAsync(
-      () => console.log("Microphone recognition started."),
-      (error) => console.error("Failed to start microphone recognition:", error)
-    );
+        this.speechRecognizer.startContinuousRecognitionAsync(
+          () => console.log("Microphone recognition started."),
+          (error) => console.error("Failed to start microphone recognition:", error)
+        );
+      })
+      .catch((error) => {
+        console.error("Failed to initialize speech session:", error);
+      });
   }
 
   public stopMicrophone() {
@@ -283,11 +293,6 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   }, [initialCaseId]);
 
   useEffect(() => {
-    if (!hasSpeechClientConfig) {
-      setError("Avatar speech is not configured in this environment.");
-      return;
-    }
-
     if (!avatarHandlerRef.current) {
       avatarHandlerRef.current = new AvatarHandler({
         character: "harry",
@@ -305,6 +310,8 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
       setError(null);
       setAvatarVideoStream(null); // Reset video stream
       try {
+        await avatarHandlerRef.current.ensureSpeechReady(true);
+
         configRef.current.gender = selectedCase?.profile?.gender || "male";
         configRef.current.language = selectedCase?.profile?.language || "en-US";
         configRef.current.voice = selectedCase?.profile?.voice || (

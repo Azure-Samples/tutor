@@ -43,11 +43,19 @@ class AvatarAISettings(BaseSettings):
     temperature: float = Field(default_factory=lambda: float(_env("AVATAR_TEMPERATURE", "0.6")), alias="AVATAR_TEMPERATURE")
 
 
+class AvatarSpeechSettings(BaseSettings):
+    """Azure Speech configuration for AAD-based browser session brokering."""
+
+    resource_id: str = Field(default_factory=lambda: _env("SPEECH_RESOURCE_ID"), alias="SPEECH_RESOURCE_ID")
+    region: str = Field(default_factory=lambda: _env("SPEECH_REGION"), alias="SPEECH_REGION")
+
+
 class AvatarSettings(BaseSettings):
     """Service-scoped settings assembled from environment variables."""
 
     cosmos: AvatarCosmosSettings = Field(default_factory=AvatarCosmosSettings)  # type: ignore[arg-type]
     azure_ai: AvatarAISettings = Field(default_factory=AvatarAISettings)  # type: ignore[arg-type]
+    speech: AvatarSpeechSettings = Field(default_factory=AvatarSpeechSettings)  # type: ignore[arg-type]
     cors_origins: Iterable[str] = Field(default_factory=lambda: ["*"])
 
     model_config = {

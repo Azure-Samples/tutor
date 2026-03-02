@@ -39,3 +39,5 @@ This service provides the avatar-based conversational engine for The Tutor platf
 - Build a Docker image and push to ACR
 - Deploy as a container app using the `azd` + Terraform infrastructure
 - Configure environment variables for Azure Speech and OpenAI
+   - `SPEECH_RESOURCE_ID`: Full Azure resource ID of the Speech resource
+   - `SPEECH_REGION`: Azure region of the Speech resource (for example, `westus2`)
