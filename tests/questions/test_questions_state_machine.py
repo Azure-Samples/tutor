@@ -1,0 +1,107 @@
+import types
+
+import pytest
+
+from questions.app.questions import (
+    QuestionEvaluationStatus,
+    QuestionStateMachine,
+    evaluate_question,
+)
+from questions.app.schemas import Answer, Grader, Question
+
+
+@pytest.fixture(autouse=True)
+def _configure_environment(monkeypatch):
+    monkeypatch.setenv("COSMOS_ENDPOINT", "https://localhost:8081/")
+    monkeypatch.setenv("PROJECT_ENDPOINT", "https://fake-endpoint.azure.com/")
+    monkeypatch.setenv("COSMOS_DATABASE", "unit-test-db")
+    monkeypatch.setenv("COSMOS_QUESTION_TABLE", "questions")
+    monkeypatch.setenv("COSMOS_ANSWER_TABLE", "answers")
+    monkeypatch.setenv("COSMOS_GRADER_TABLE", "graders")
+    monkeypatch.setenv("COSMOS_ASSEMBLY_TABLE", "assemblies")
+
+
+class _StubAgentRegistry:
+    def __init__(self, *_args, **_kwargs):
+        self.created_specs = []
+
+    def create(self, spec):
+        self.created_specs.append(spec)
+        return types.SimpleNamespace(get_new_thread=lambda: "thread-id")
+
+
+class _StubRunContext:
+    def __init__(self, *_args, **_kwargs):
+        pass
+
+    async def run(self, *_args, **_kwargs):
+        return types.SimpleNamespace(
+            text="Strong verdict with high confidence\nHigh confidence justification"
+        )
+
+
+@pytest.mark.asyncio
+async def test_evaluate_question_returns_completed(monkeypatch):
+    monkeypatch.setattr("questions.app.questions.AgentRegistry", _StubAgentRegistry)
+    monkeypatch.setattr("questions.app.questions.AgentRunContext", _StubRunContext)
+
+    async def _fake_ensure(self):
+        self.graders = [
+            Grader(
+                id="grader-1",
+                name="Accuracy Grader",
+                deployment="fake-deployment",
+                instructions="Assess accuracy",
+                dimension="accuracy",
+            )
+        ]
+
+    monkeypatch.setattr(QuestionStateMachine, "ensure_assembly", _fake_ensure)
+
+    result = await evaluate_question(
+        assembly_id="assembly-123",
+        question=Question(id="q1", topic="Math", question="2+2", explanation=None),
+        answer=Answer(id="a1", text="4", question_id="q1", respondent="Student"),
+    )
+
+    assert result.status is QuestionEvaluationStatus.COMPLETED
+    assert result.overall.startswith("Strong verdict")
+    assert len(result.dimensions) == 1
+    dim = result.dimensions[0]
+    assert dim.dimension == "accuracy"
+    assert dim.confidence == pytest.approx(0.9)
+    assert dim.notes[0] == "Strong verdict with high confidence"
+
+
+class _LowConfidenceRunContext(_StubRunContext):
+    async def run(self, *_args, **_kwargs):
+        return types.SimpleNamespace(text="Needs work\nLow confidence in assessment")
+
+
+@pytest.mark.asyncio
+async def test_confidence_inference_handles_low_confidence(monkeypatch):
+    monkeypatch.setattr("questions.app.questions.AgentRegistry", _StubAgentRegistry)
+    monkeypatch.setattr("questions.app.questions.AgentRunContext", _LowConfidenceRunContext)
+
+    async def _fake_ensure(self):
+        self.graders = [
+            Grader(
+                id="grader-2",
+                name="Clarity Grader",
+                deployment="fake-deployment",
+                instructions="Assess clarity",
+                dimension="clarity",
+            )
+        ]
+
+    monkeypatch.setattr(QuestionStateMachine, "ensure_assembly", _fake_ensure)
+
+    result = await evaluate_question(
+        assembly_id="assembly-456",
+        question=Question(id="q2", topic="Writing", question="Explain scene", explanation=None),
+        answer=Answer(id="a2", text="It's okay", question_id="q2", respondent="Student"),
+    )
+
+    dim = result.dimensions[0]
+    assert dim.confidence == pytest.approx(0.4)
+    assert "Low confidence" in " ".join(dim.notes)

@@ -932,3 +932,26 @@ __blobstorage__
 __queuestorage__
 __azurite_db*__.json
 .python_packages
+
+.data/
+
+# Terraform artifacts
+.terraform/
+*.tfstate
+*.tfstate.*
+infra/terraform/backend.hcl
+infra/terraform/*.auto.tfvars
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Azure SWA build artifacts
+*-swa-oryx/
+
+# Local SWA generated artifacts
+frontend/public/.swa/

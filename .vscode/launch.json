@@ -4,11 +4,12 @@
     {
       "name": "Avatar",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\avatar",
+      "cwd": "${workspaceFolder}\\apps\\avatar\\src",
       "request": "launch",
       "module": "uvicorn",
+      "python": "${workspaceFolder}\\apps\\avatar\\.venv\\Scripts\\python.exe",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\src"
+        "Path": "${env:Path};${workspaceFolder}\\apps\\avatar"
       },
       "args": ["app.main:app", "--reload", "--port", "8084"],
       "jinja": true,
@@ -17,11 +18,12 @@
     {
       "name": "Essay",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\essays",
+      "cwd": "${workspaceFolder}\\apps\\essays\\src",
       "request": "launch",
       "module": "uvicorn",
+      "python": "${workspaceFolder}\\apps\\essays\\.venv\\Scripts\\python.exe",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\src"
+        "Path": "${env:Path};${workspaceFolder}\\apps\\essays"
       },
       "args": ["app.main:app", "--reload", "--port", "8083"],
       "jinja": true,
@@ -33,6 +35,7 @@
       "cwd": "${workspaceFolder}\\src\\questions",
       "request": "launch",
       "module": "uvicorn",
+      "python": "${workspaceFolder}\\apps\\questions\\.venv\\Scripts\\python.exe",
       "env": {
         "Path": "${env:Path};${workspaceFolder}\\src"
       },
@@ -46,6 +49,7 @@
       "cwd": "${workspaceFolder}\\src\\configuration",
       "request": "launch",
       "module": "uvicorn",
+      "python": "${workspaceFolder}\\apps\\configuration\\.venv\\Scripts\\python.exe",
       "env": {
         "Path": "${env:Path};${workspaceFolder}\\src"
       },
@@ -54,10 +58,21 @@
       "justMyCode": false
     },
     {
-      "name": "Python Debugger: Python File",
-      "type": "debugpy",
+      "name": "Frontend",
+      "type": "node",
       "request": "launch",
-      "program": "${file}"
+      "cwd": "${workspaceFolder}\\frontend",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["dev"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Essay Demo Debugger",
+      "type": "debugpy",
+      "cwd": "${workspaceFolder}\\src\\essays",
+      "request": "launch",
+      "program": "${file}",
+      "python": "${workspaceFolder}\\apps\\essays\\.venv\\Scripts\\python.exe"
     }
   ]
 }

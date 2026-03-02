@@ -4,7 +4,7 @@
     "git.autofetch": true,
     "debug.onTaskErrors": "debugAnyway",
     "terminal.integrated.enableMultiLinePasteWarning": false,
-    "window.zoomLevel": -1,
+    "window.zoomLevel": 0,
     "javascript.updateImportsOnFileMove.enabled": "always",
     "C_Cpp.autocompleteAddParentheses": true,
     "C_Cpp.default.includePath": [
@@ -17,7 +17,12 @@
     "python.analysis.completeFunctionParens": true,
     "python.analysis.diagnosticMode": "workspace",
     "python.analysis.fixAll": [],
-    "python.analysis.extraPaths": [],
+    "python.analysis.extraPaths": [
+      "${workspaceFolder}/lib/src",
+      "${workspaceFolder}/apps/questions/app",
+      "${workspaceFolder}/apps/upskilling/app",
+      "${workspaceFolder}/apps/configuration/src"
+    ],
     "python.analysis.indexing": false,
     "python.analysis.typeCheckingMode": "basic",
     "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python",
@@ -39,5 +44,12 @@
       "tests"
     ],
     "python.testing.unittestEnabled": false,
-    "python.testing.pytestEnabled": true
+    "python.testing.pytestEnabled": true,
+    "chat.tools.terminal.autoApprove": {
+      "terraform": true,
+      "azd": true,
+      "az": true,
+      "ConvertFrom-Json": true,
+      "ForEach-Object": true
+    }
 }

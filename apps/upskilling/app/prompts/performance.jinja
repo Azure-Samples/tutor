@@ -1,0 +1,27 @@
+You are examining class performance trends to advise the professor.
+
+# PLAN CONTEXT
+Timeframe: {{ context.timeframe }}
+Topic: {{ context.topic }}
+Class ID: {{ context.class_id }}
+
+# HISTORICAL PERFORMANCE
+{% if performance_history %}
+{% for snapshot in performance_history %}
+- Period: {{ snapshot.period }} | Topic: {{ snapshot.topic }} | Proficiency: {{ '%.0f' % (snapshot.proficiency * 100) }}%
+  Strengths: {{ snapshot.highlights or ['None captured'] | join('; ') }}
+  Gaps: {{ snapshot.gaps or ['None captured'] | join('; ') }}
+{% endfor %}
+{% else %}
+No historical performance data provided.
+{% endif %}
+
+# PARAGRAPH UNDER REVIEW
+Title: {{ paragraph.title }}
+Content:
+"""
+{{ paragraph.content }}
+"""
+
+Provide an overall verdict on how well this paragraph targets the class needs using the data above.
+Follow with explicit sections titled "Strengths:" and "Improvements:" enumerating key points.

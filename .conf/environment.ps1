@@ -8,22 +8,28 @@ function ExecuteCommand($command) {
     }
 }
 
-# Go to the financial_analyst_py folder
 $rootFolder = (Get-Item -Path "$PSScriptRoot\..").FullName
-try {
-    Set-Location -Path "$rootFolder\src"
-} catch {
-    Write-Host "Error changing directory: $_"
+Set-Location -Path $rootFolder
+
+if (-not (Test-Path ".venv")) {
+    ExecuteCommand "py -3.13 -m pip install --upgrade uv"
+    ExecuteCommand "py -3.13 -m uv venv .venv"
 }
 
-# Configure the package to use local .venv
-$command = "poetry config virtualenvs.in-project true"
-ExecuteCommand $command
+ExecuteCommand ".\.venv\Scripts\Activate.ps1"
+ExecuteCommand "uv pip install --python .venv -e .\lib[dev]"
 
-# Select Python 3.10 as the package version
-$command = "poetry env use python3.12"
-ExecuteCommand $command
+$services = @(
+    "apps/avatar",
+    "apps/configuration",
+    "apps/essays",
+    "apps/questions",
+    "apps/upskilling"
+)
 
-# Select Python 3.10 as the package version
-$command = "poetry install"
-ExecuteCommand $command
+foreach ($service in $services) {
+    ExecuteCommand "uv pip install --python .venv -e .\$service[dev]"
+}
+
+ExecuteCommand "uv pip install --python .venv pre-commit ruff"
+Write-Host "Environment setup complete."
