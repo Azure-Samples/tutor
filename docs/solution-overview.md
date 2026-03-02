@@ -36,7 +36,7 @@ The system is positioned as an **LMS enhancer**: it consumes LMS context (course
 |---------|------|---------|---------------|
 | **Configuration** | 8081 | CRUD + Repository | Students, professors, courses, classes, groups, pedagogical rules, feature flags |
 | **Questions** | 8082 | State Machine | Question evaluation pipeline: Pending → Evaluating → Completed (objective + discursive) |
-| **Essays** | 8083 | Strategy + Orchestrator | Essay submission with OCR, multi-strategy ENEM-aligned evaluation, RAG grounding, Foundry agent provisioning |
+| **Essays** | 8083 | Strategy + Orchestrator | Essay submission with OCR (Azure AI Document Intelligence — Phase A in progress, issue #18), multi-strategy ENEM-aligned evaluation (Phase B), RAG grounding (Phase B), Foundry agent provisioning |
 | **Avatar** | 8084 | Agent + Speech | Real-time avatar interaction using Azure Speech SDK + AI Agents |
 | **Upskilling** | 8085 | Visitor Pattern | Performance, content complexity, guidance-coach, and ENEM alignment analysis |
 | **Content** *(target)* | 8089 | Pipeline | Pedagogical material ingestion: upload → OCR → chunk → AI Search index |
@@ -62,8 +62,8 @@ The system is positioned as an **LMS enhancer**: it consumes LMS context (course
 | Azure OpenAI (gpt-4o) | `aoai.bicep` | LLM inference with private endpoints |
 | Azure Speech Services | `speech.bicep` | TTS/STT for avatar |
 | Azure Static Web App | `staticwapp.bicep` | Frontend hosting |
-| Azure AI Document Intelligence | `docintel.bicep` *(target)* | OCR for handwritten essays and pedagogical materials |
-| Azure AI Search | `search.bicep` *(target)* | Vector + keyword index for RAG grounding |
+| Azure AI Document Intelligence | `docintel.bicep` *(target — Phase B infra; SDK wired in essays-svc in Phase A)* | OCR for handwritten essays and pedagogical materials |
+| Azure AI Search | `search.bicep` *(target — Phase B)* | Vector + keyword index for RAG grounding |
 | Microsoft Fabric | *(external)* | Read-only semantic model for standardized assessments, attendance, task completion indicators |
 
 ### 2.4 Data Store

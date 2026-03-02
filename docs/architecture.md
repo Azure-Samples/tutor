@@ -142,6 +142,12 @@ C4Container
 
 ### 3.1 Essay Evaluation Flow (with OCR + ENEM)
 
+> **Implementation status:**
+> - Steps 1–4 (upload → Blob): ✅ Live
+> - Steps 5–6 (OCR via Document Intelligence): 🔧 Phase A — branch `feat/ocr-essay-ingestion` (issue #18)
+> - Steps 7–8 (RAG via AI Search): ⏳ Phase B (issue #19)
+> - Steps 9 (ENEM strategy + Foundry evaluation): ⏳ Phase B
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -160,13 +166,14 @@ sequenceDiagram
     APIM->>Essays: Forward (authenticated)
     Essays->>Blob: Store original document
 
-    alt Handwritten essay (image/PDF)
-        Essays->>DocIntel: OCR extraction (cloud)
-        DocIntel-->>Essays: Extracted text + layout
+    alt Handwritten essay (image/PDF) — Phase A
+        Essays->>DocIntel: OCR extraction via prebuilt-read model
+        DocIntel-->>Essays: Extracted text + layout confidence scores
+        Note over Essays: Falls back to pypdf/PIL if DI endpoint not configured
     end
 
-    Essays->>Essays: Select strategy (ENEM/analytical/narrative/default)
-    Essays->>AISearch: Query rubrics + exemplars for grounding (RAG)
+    Essays->>Essays: Select strategy (ENEM/analytical/narrative/default) — Phase B
+    Essays->>AISearch: Query rubrics + exemplars for grounding (RAG) — Phase B
     AISearch-->>Essays: Relevant pedagogical context
     Essays->>Foundry: Create evaluation agent thread (with rubric context)
     Foundry-->>Essays: Agent response (feedback, ENEM competency scores)

@@ -425,6 +425,7 @@
   - Implement OCR pipeline: extract text from uploaded PDFs/images
   - Handle handwritten essay scanning (prebuilt-read model)
   - Business Need: BN-PED-1 (handwritten essay OCR), BN-PED-2 (material text extraction)
+  > **Phase A (branch `feat/ocr-essay-ingestion`, issue #18):** SDK is added directly to `apps/essays/pyproject.toml` (not `tutor-lib`) to keep the scope small and deliverable independently. Migration to `tutor-lib` occurs when `content-svc` is built in Phase B. The `DOCUMENT_INTELLIGENCE_ENDPOINT` env var gates whether DI or the local `pypdf`/PIL fallback is used — see ADR-010 for the integration flow diagram.
 
 - [ ] **P9-03**: Integrate Azure AI Search for RAG
   - Add `azure-search-documents` SDK to `tutor-lib`
@@ -444,6 +445,7 @@
   - Strategy selection based on essay config (analytical, narrative, persuasive, ENEM)
   - Add discursive question evaluation to questions-svc
   - Business Need: BN-PED-1
+  > **Deferred to Phase B** — depends on RAG context (P9-03 / P9-04) to provide rubric grounding for evaluators. Not part of issue #18.
 
 - [ ] **P9-06**: Create Content Management UI
   - `/content` page: upload materials, view library, filter by subject/grade

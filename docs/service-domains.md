@@ -111,11 +111,13 @@ graph TB
 | **Responsibility** | Essay submission, OCR for handwritten essays, strategy-based evaluation with ENEM alignment, Foundry agent provisioning |
 | **Port** | 8083 |
 | **Data owned** | `assessment_db`: essays, essay_configs |
-| **Depends on** | Cosmos DB, Blob Storage, Azure AI Foundry, AI Document Intelligence (OCR), AI Search (RAG), config-svc (pedagogical rules) |
+| **Depends on** | Cosmos DB, Blob Storage, Azure AI Foundry, AI Document Intelligence (OCR — Phase A: SDK in service, Phase B: via tutor-lib), AI Search (RAG — Phase B), config-svc (pedagogical rules) |
 | **Called by** | Frontend (students submit essays), evaluation-svc |
 | **Scaling** | min: 0, max: 5 (token-heavy, medium latency) |
-| **Patterns** | Strategy (ENEM/Analytical/Narrative/Default), Orchestrator |
+| **Patterns** | Strategy (ENEM/Analytical/Narrative/Default — Phase B), Orchestrator |
 | **Business Need** | BN-PED-1 (AI essay correction with OCR + ENEM rubrics) |
+
+> **Phase A (issue #18, branch `feat/ocr-essay-ingestion`)**: Document Intelligence SDK wired directly into `apps/essays/src/app/file_processing.py`. Introduces `DocumentIntelligenceConfig` in `config.py`. Falls back to `pypdf`/PIL when `DOCUMENT_INTELLIGENCE_ENDPOINT` is unset (local development). ENEM strategy and RAG remain pending (Phase B).
 
 #### questions-svc
 
