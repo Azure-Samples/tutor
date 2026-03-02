@@ -12,6 +12,27 @@ if (IS_PRODUCTION && !APIM_BASE_URL) {
 
 type MaybeEnvelope<T> = ApiEnvelope<T> | T;
 
+const normalizeBaseURL = (value: string | undefined): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(trimmed)) {
+    return trimmed.replace(/\/+$/, "");
+  }
+
+  if (trimmed.startsWith("http://")) {
+    return `https://${trimmed.slice("http://".length)}`.replace(/\/+$/, "");
+  }
+
+  return trimmed.replace(/\/+$/, "");
+};
+
 const unwrapResponse = <T>(response: AxiosResponse<MaybeEnvelope<T>>) => {
   if (response && response.data) {
     response.data = unwrapContent<T>(response.data);
@@ -20,7 +41,9 @@ const unwrapResponse = <T>(response: AxiosResponse<MaybeEnvelope<T>>) => {
 };
 
 const createClient = (baseURL: string | undefined, fallback?: string): AxiosInstance => {
-  const client = axios.create({ baseURL: baseURL || fallback });
+  const client = axios.create({
+    baseURL: normalizeBaseURL(baseURL) || normalizeBaseURL(fallback),
+  });
   client.interceptors.response.use(unwrapResponse, (error) => {
     const data = error?.response?.data;
     if (data && typeof data === "object" && "detail" in data) {
@@ -37,16 +60,16 @@ const createServiceClient = (
   apimPath: string
 ): AxiosInstance => {
   if (APIM_BASE_URL) {
-    const normalizedBase = APIM_BASE_URL.replace(/\/+$/, "");
+    const normalizedBase = normalizeBaseURL(APIM_BASE_URL);
     const normalizedPath = apimPath.replace(/^\/+/, "");
-    return createClient(`${normalizedBase}/${normalizedPath}`, fallback);
+    return createClient(normalizedBase ? `${normalizedBase}/${normalizedPath}` : undefined, fallback);
   }
 
   if (IS_PRODUCTION) {
-    return createClient(directBaseURL);
+    return createClient(normalizeBaseURL(directBaseURL));
   }
 
-  return createClient(directBaseURL, fallback);
+  return createClient(normalizeBaseURL(directBaseURL), fallback);
 };
 
 export const avatarEngine = createServiceClient(process.env.NEXT_PUBLIC_AVATAR_APP_BASE_URL, "http://localhost:8084", "api/avatar");
