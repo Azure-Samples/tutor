@@ -22,6 +22,7 @@ dependencies = [
     "azure-storage-blob>=12.24.0",
     "azure-ai-projects>=1.0.0b10",
     "azure-ai-agents>=1.0.0b2",
+    "azure-ai-documentintelligence>=1.0.2",
     "agent-framework>=1.0.0rc2",
     "agent-framework-azure-ai>=1.0.0rc2",
     "pypdf>=4.0.0",
