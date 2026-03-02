@@ -20,17 +20,17 @@ jobs:
         with:
           submodules: true
           lfs: false
+      - name: Validate APIM frontend env
+        run: |
+          if [ -z "${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}" ]; then
+            echo "NEXT_PUBLIC_APIM_BASE_URL secret is required for frontend deployment."
+            exit 1
+          fi
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         env:
-          NEXT_PUBLIC_AVATAR_APP_BASE_URL: https://tutor-avatar-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
-          NEXT_PUBLIC_CONFIGURATION_APP_BASE_URL: https://tutor-configuration-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
-          NEXT_PUBLIC_ESSAYS_APP_BASE_URL: https://tutor-essays-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
-          NEXT_PUBLIC_QUESTIONS_APP_BASE_URL: https://tutor-questions-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
-          NEXT_PUBLIC_UPSKILLING_APP_BASE_URL: https://tutor-upskilling-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
-          NEXT_PUBLIC_WEB_APP_BASE_URL: https://tutor-chat-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
-          NEXT_PUBLIC_TRANSCRIPTION_APP_BASE_URL: https://tutor-questions-prod.redmeadow-1f5cfee1.eastus2.azurecontainerapps.io
+          NEXT_PUBLIC_APIM_BASE_URL: ${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_WAVE_029B18F0F }}
           repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
