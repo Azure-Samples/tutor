@@ -17,7 +17,7 @@ from azure.identity.aio import DefaultAzureCredential
 
 from app.agents.clients import AgentAttachment, FoundryAgentService
 from app.config import get_settings
-from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text
+from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text, extract_text_with_doc_intelligence
 from app.schemas import Essay, ProvisionedAgent, Resource, Swarm
 
 try:
@@ -277,7 +277,9 @@ class EssayOrchestrator:
             ):
                 try:
                     payload = base64.b64decode(resource.encoded_content)
-                    extracted = extract_pdf_text(payload)
+                    extracted = extract_text_with_doc_intelligence(payload, resource.content_type) or extract_pdf_text(
+                        payload
+                    )
                 except (binascii.Error, PdfReadError, ValueError):  # pragma: no cover - corrupted payloads are skipped
                     extracted = None
                 if extracted:

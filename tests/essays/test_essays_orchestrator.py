@@ -250,3 +250,47 @@ async def test_load_swarm_returns_agents(monkeypatch, essays_app_module_fixture)
 
     await orchestrator.invoke("assembly-present", essay, [])
     assert created[0].calls[0][0] == "agent-1"
+
+
+def test_prepare_resources_prefers_doc_intelligence(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    orchestrator = module.EssayOrchestrator()
+
+    monkeypatch.setattr(module, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: "di text")
+    monkeypatch.setattr(
+        module,
+        "extract_pdf_text",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("pypdf fallback should not be called")),
+    )
+
+    resource = module.Resource(
+        id="res-ocr",
+        essay_id="essay-ocr",
+        objective=["objective"],
+        content_type="application/pdf",
+        encoded_content="dGVzdA==",  # base64("test")
+    )
+
+    prepared = orchestrator._prepare_resources([resource])
+
+    assert prepared[0].content == "di text"
+
+
+def test_prepare_resources_falls_back_to_pdf_extraction(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    orchestrator = module.EssayOrchestrator()
+
+    monkeypatch.setattr(module, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "extract_pdf_text", lambda *_args, **_kwargs: "fallback text")
+
+    resource = module.Resource(
+        id="res-fallback",
+        essay_id="essay-fallback",
+        objective=["objective"],
+        content_type="application/pdf",
+        encoded_content="dGVzdA==",  # base64("test")
+    )
+
+    prepared = orchestrator._prepare_resources([resource])
+
+    assert prepared[0].content == "fallback text"
