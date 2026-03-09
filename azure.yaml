@@ -174,3 +174,5 @@ services:
     dist: .next
     language: js
     host: staticwebapp
+    env:
+      NEXT_PUBLIC_APIM_BASE_URL: ${NEXT_PUBLIC_APIM_BASE_URL}

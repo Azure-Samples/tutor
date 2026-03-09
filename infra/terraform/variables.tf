@@ -137,3 +137,21 @@ variable "cosmos_containers" {
     }
   }
 }
+
+variable "apim_additional_allowed_origins" {
+  description = "Additional origins allowed by APIM CORS policy. Static Web App and local origins are added automatically."
+  type        = list(string)
+  default     = []
+}
+
+variable "apim_rate_limit_calls" {
+  description = "Maximum number of API calls allowed per renewal period per client IP at APIM."
+  type        = number
+  default     = 120
+}
+
+variable "apim_rate_limit_renewal_period_seconds" {
+  description = "Renewal period in seconds for APIM rate limiting."
+  type        = number
+  default     = 60
+}

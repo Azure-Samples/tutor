@@ -10,15 +10,19 @@ locals {
     "evaluation",
     "lms-gateway",
   ]
+  apim_required_services = [
+    "avatar",
+    "configuration",
+    "essays",
+    "questions",
+    "upskilling",
+    "chat",
+    "evaluation",
+    "lms-gateway",
+  ]
   apim_service_paths = {
-    avatar        = "api/avatar"
-    configuration = "api/configuration"
-    essays        = "api/essays"
-    questions     = "api/questions"
-    upskilling    = "api/upskilling"
-    chat          = "api/chat"
-    evaluation    = "api/evaluation"
-    "lms-gateway" = "api/lms-gateway"
+    for service_name in local.apim_required_services :
+    service_name => "api/${service_name}"
   }
   apim_operation_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]
   apim_operations = {
@@ -32,6 +36,14 @@ locals {
       ]
     ]) : operation.key => operation
   }
+  apim_allowed_origins = distinct(compact(concat(
+    [
+      "https://${azurerm_static_web_app.frontend.default_host_name}",
+      "http://localhost:3000",
+      "http://localhost:5173",
+    ],
+    var.apim_additional_allowed_origins,
+  )))
   agent_role_scopes = {
     "Cosmos DB Built-in Data Contributor" = azurerm_cosmosdb_account.main.id
     "Storage Blob Data Contributor"       = azurerm_storage_account.uploads.id
@@ -251,6 +263,46 @@ resource "azurerm_api_management_api_operation" "backend_catch_all" {
   response {
     status_code = 200
   }
+}
+
+resource "azurerm_api_management_api_policy" "backend_services_hardening" {
+  for_each = azurerm_api_management_api.backend_services
+
+  resource_group_name = azurerm_resource_group.main.name
+  api_management_name = azurerm_api_management.main.name
+  api_name            = each.value.name
+
+  xml_content = <<-XML
+    <policies>
+      <inbound>
+        <base />
+        <cors allow-credentials="false">
+          <allowed-origins>
+${join("\n", [for origin in local.apim_allowed_origins : "            <origin>${origin}</origin>"])}
+          </allowed-origins>
+          <allowed-methods preflight-result-max-age="300">
+            <method>*</method>
+          </allowed-methods>
+          <allowed-headers>
+            <header>*</header>
+          </allowed-headers>
+          <expose-headers>
+            <header>*</header>
+          </expose-headers>
+        </cors>
+        <rate-limit-by-key calls="${var.apim_rate_limit_calls}" renewal-period="${var.apim_rate_limit_renewal_period_seconds}" counter-key="@(context.Request.IpAddress)" />
+      </inbound>
+      <backend>
+        <base />
+      </backend>
+      <outbound>
+        <base />
+      </outbound>
+      <on-error>
+        <base />
+      </on-error>
+    </policies>
+  XML
 }
 
 resource "azurerm_role_assignment" "container_app_acr_pull" {

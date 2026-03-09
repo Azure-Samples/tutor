@@ -39,7 +39,7 @@ jobs:
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "/frontend" # App source code path
           api_location: "" # Must be empty for Next.js apps that are not statically exported
-          output_location: ".next" # Built app content directory - optional
+          output_location: "" # For Next.js hybrid/App Router, let SWA/Oryx handle build output
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:

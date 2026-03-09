@@ -102,6 +102,14 @@ class GroupCaseAssignment(BaseModel):
     case_ids: List[str] = Field(default_factory=list)
 
 
+class ThemeInput(BaseModel):
+    id: Optional[str] = None
+    name: str
+    objective: str
+    description: str
+    criteria: List[str] = Field(default_factory=list)
+
+
 class BulkRosterSyncRequest(BaseModel):
     students: List[Student] = Field(default_factory=list)
     professors: List[Professor] = Field(default_factory=list)

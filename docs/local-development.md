@@ -261,32 +261,17 @@ Opens at [http://localhost:3000](http://localhost:3000).
 
 ### Frontend → Backend Routing
 
-The frontend supports explicit service-level routing using `NEXT_PUBLIC_*` variables.
-
-If you are running services on unique ports (§5.2), set these values in `frontend/.env.local` (or `frontend/process.env`):
-
-```env
-NEXT_PUBLIC_API_BASE_URL="http://localhost:8086"
-NEXT_PUBLIC_AVATAR_APP_BASE_URL="http://localhost:8081"
-NEXT_PUBLIC_CONFIGURATION_APP_BASE_URL="http://localhost:8082"
-NEXT_PUBLIC_ESSAYS_APP_BASE_URL="http://localhost:8083"
-NEXT_PUBLIC_QUESTIONS_APP_BASE_URL="http://localhost:8084"
-NEXT_PUBLIC_UPSKILLING_APP_BASE_URL="http://localhost:8085"
-NEXT_PUBLIC_WEB_APP_BASE_URL="http://localhost:8086"
-NEXT_PUBLIC_TRANSCRIPTION_APP_BASE_URL="http://localhost:8084"
-```
-
-> **Note:** Backward-compatible env aliases were removed. Use only the `NEXT_PUBLIC_*` variables above.
+The frontend is APIM-only. All browser traffic to backend services must flow through Azure API Management.
 
 ### APIM Gateway Routing (recommended)
 
-When running through API Management, set:
+Set:
 
 ```env
 NEXT_PUBLIC_APIM_BASE_URL="https://<your-apim-hostname>"
 ```
 
-The frontend client in `frontend/utils/api.ts` automatically routes service calls through APIM with these paths:
+The frontend client in `frontend/utils/api.ts` routes service calls through APIM with these paths:
 
 | Frontend client | APIM base path | Typical backend domain |
 |---|---|---|
@@ -295,12 +280,11 @@ The frontend client in `frontend/utils/api.ts` automatically routes service call
 | `questionsEngine` | `/api/questions` | questions |
 | `configurationApi` | `/api/configuration` | configuration |
 | `upskillingApi` | `/api/upskilling` | upskilling |
-| `webApp` / `webApi` | `/api/chat` | chat |
-| `transcriptionApi` | `/api/questions` | questions |
+| `chatApi` | `/api/chat` | chat |
+| `evaluationApi` | `/api/evaluation` | evaluation |
+| `lmsGatewayApi` | `/api/lms-gateway` | lms-gateway |
 
-In **production** builds, `NEXT_PUBLIC_APIM_BASE_URL` is required and the frontend fails fast if missing.
-
-In **local development**, if `NEXT_PUBLIC_APIM_BASE_URL` is not set, the frontend uses the service-specific `NEXT_PUBLIC_*_APP_BASE_URL` values and then localhost defaults.
+In all builds, `NEXT_PUBLIC_APIM_BASE_URL` is required and the frontend fails fast if missing.
 
 ### Production deployment sequence
 

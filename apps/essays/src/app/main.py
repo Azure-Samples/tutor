@@ -399,6 +399,16 @@ async def list_essays() -> JSONResponse:
     return _create_success_response("Essays Retrieved", "Essays fetched successfully", items)
 
 
+@app.get("/essays/{essay_id}", tags=["Essays"])
+async def get_essay(essay_id: str) -> JSONResponse:
+    crud = _crud(settings.cosmos.essay_container)
+    try:
+        item = await crud.read_item(essay_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Essay not found") from exc
+    return _create_success_response("Essay Retrieved", "Essay fetched successfully", item)
+
+
 @app.post("/essays", tags=["Essays"])
 async def create_essay(essay: Essay) -> JSONResponse:
     await _crud(settings.cosmos.essay_container).create_item(essay.model_dump())

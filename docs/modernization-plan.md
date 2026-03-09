@@ -22,6 +22,44 @@
 
 ---
 
+## Showcase Alignment Sprint (2026-03-08)
+
+> Execution track to guarantee the demo covers all `apps/` services through APIM with end-to-end frontend integration.
+
+### Objectives
+
+- [x] Frontend-to-backend traffic enforced through APIM only (`NEXT_PUBLIC_APIM_BASE_URL` required).
+- [x] Active business flows aligned to real backend contracts (chat, avatar, essays, questions, configuration).
+- [x] Missing showcase pages added for `upskilling`, `evaluation`, and `lms-gateway`.
+- [x] APIM path coverage confirmed for all deployed services in Terraform (`/api/<service>`).
+- [x] Configuration domain extended with `themes` CRUD to support configuration showcase.
+
+### Completed Changes
+
+- [x] **APIM-only client policy** implemented in `frontend/utils/api.ts`.
+- [x] **Chat flow contract fixed**: frontend sends `student_id`, `course_id`, `prompt`; backend supports `/guide` and compatibility route `/chat/guide`.
+- [x] **Case steps routing fixed**: `StepsForm` now uses avatar API where `/cases/{id}/steps` is implemented.
+- [x] **Question flow normalized**:
+  - frontend uses id-based update/delete;
+  - backend adds `GET /questions/{question_id}` and legacy topic fallback resolver.
+- [x] **Essay detail flow normalized**: backend adds `GET /essays/{essay_id}`.
+- [x] **Theme management enabled**: configuration service now exposes `GET/POST/PUT/DELETE /themes`.
+- [x] **Showcase navigation expanded**: homepage + sidebar include `upskilling`, `evaluation`, `lms-gateway`.
+
+### Verification Snapshot
+
+- [x] Frontend build succeeds with APIM env set (`NEXT_PUBLIC_APIM_BASE_URL`).
+- [x] New pages generated: `/upskilling`, `/evaluation`, `/lms-gateway`.
+- [x] APIM outputs surfaced by Terraform (`NEXT_PUBLIC_APIM_BASE_URL`, `APIM_BASE_URL`).
+
+### Remaining Actions (Post-Sprint)
+
+- [ ] Add APIM policies for auth/rate-limit and explicit backend health probes per API.
+- [ ] Add integration tests that exercise APIM routes for all `apps/` domains.
+- [ ] Implement supervision/content domain UI once those services are available in runtime topology.
+
+---
+
 ## Phase 0 — Foundation
 
 > Set up the development environment, update tooling, and establish conventions.
