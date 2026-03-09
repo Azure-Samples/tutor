@@ -42,6 +42,24 @@ const functionalities = [
     href: "/configuration",
     icon: "/images/logo/logo.webp",
   },
+  {
+    title: "Upskilling",
+    description: "Analyze learning plans and receive structured coaching feedback to improve classroom outcomes.",
+    href: "/upskilling",
+    icon: "/images/logo/logo.webp",
+  },
+  {
+    title: "Evaluation",
+    description: "Run agent quality evaluations with datasets and track execution status for showcase validation.",
+    href: "/evaluation",
+    icon: "/images/logo/logo.webp",
+  },
+  {
+    title: "LMS Gateway",
+    description: "Trigger and monitor LMS synchronization jobs through the API gateway to validate integration flows.",
+    href: "/lms-gateway",
+    icon: "/images/logo/logo.webp",
+  },
 ];
 
 const HomePage = () => {

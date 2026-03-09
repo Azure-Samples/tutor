@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { webApp } from "@/utils/api";
+import { configurationApi } from "@/utils/api";
 import { Theme } from "@/types/theme";
 
 const ThemeForm: React.FC = () => {
@@ -17,7 +17,11 @@ const ThemeForm: React.FC = () => {
     try {
       setStatus("Sending request...");
 
-      const response = await webApp.post("/create-theme", theme);
+      const payload = {
+        id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `theme-${Date.now()}`,
+        ...theme,
+      };
+      const response = await configurationApi.post("/themes", payload);
 
       if (response.status === 200 || response.status === 201) {
         setStatus("Theme created successfully!");
