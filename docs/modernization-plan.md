@@ -45,6 +45,8 @@
 - [x] **Essay detail flow normalized**: backend adds `GET /essays/{essay_id}`.
 - [x] **Theme management enabled**: configuration service now exposes `GET/POST/PUT/DELETE /themes`.
 - [x] **Showcase navigation expanded**: homepage + sidebar include `upskilling`, `evaluation`, `lms-gateway`.
+- [x] **Upskilling stateful transformation**: service upgraded from stateless evaluation to full CRUD plan management with Cosmos DB persistence (`upskilling_plans` container, PK `/professor_id`), multi-agent evaluation, 5 demo plans seeded, and updated frontend UI with plan creation/editing/evaluation display.
+- [x] **Essay evaluation fix**: `update_essay` non-destructive merge (filters `None` before overwrite), new `PATCH /essays/{essay_id}` endpoint for partial updates (`EssayPatch` model, `exclude_unset=True`), seed script `link_essays_to_assemblies()` step re-binds essays to assemblies via PATCH after seeding.
 
 ### Verification Snapshot
 

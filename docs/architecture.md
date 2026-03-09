@@ -253,7 +253,7 @@ sequenceDiagram
     end
 ```
 
-### 3.4 Upskilling Analysis Flow
+### 3.4 Upskilling Plan Management Flow
 
 ```mermaid
 sequenceDiagram
@@ -265,23 +265,38 @@ sequenceDiagram
     participant Cosmos as Cosmos DB
     participant Foundry as Azure AI Foundry
 
-    Professor->>UI: Request student performance analysis
-    UI->>APIM: GET /api/upskilling/analyze/{studentId}
+    Professor->>UI: Create teaching plan
+    UI->>APIM: POST /api/upskilling/plans
+    APIM->>Upskilling: Forward (authenticated, RBAC: professor)
+    Upskilling->>Cosmos: Persist plan (status: draft)
+    Cosmos-->>Upskilling: PlanRecord
+    Upskilling-->>APIM: 201 Created + plan
+    APIM-->>UI: Plan created
+    UI-->>Professor: Show plan in list
+
+    Professor->>UI: Request AI evaluation
+    UI->>APIM: POST /api/upskilling/plans/{id}/evaluate
     APIM->>Upskilling: Forward (authenticated)
-    Upskilling->>Cosmos: Fetch student evaluations history
-    
+    Upskilling->>Cosmos: Fetch plan by id
+
     par Visitor Pattern — parallel analysis
-        Upskilling->>Upskilling: PerformanceVisitor.visit()
-        Upskilling->>Upskilling: ContentComplexityVisitor.visit()
-        Upskilling->>Upskilling: GuidanceCoachVisitor.visit()
+        Upskilling->>Foundry: PerformanceInsightVisitor
+        Upskilling->>Foundry: ContentComplexityVisitor
+        Upskilling->>Foundry: GuidanceCoachVisitor
     end
-    
-    Upskilling->>Foundry: Generate upskilling recommendations
-    Foundry-->>Upskilling: Personalized learning path
-    Upskilling->>Cosmos: Persist analysis
-    Upskilling-->>APIM: UpskillingReport
-    APIM-->>UI: 200 OK + report
-    UI-->>Professor: Display recommendations dashboard
+
+    Foundry-->>Upskilling: Agent feedback per paragraph
+    Upskilling->>Cosmos: Update plan (evaluations, status: evaluated)
+    Upskilling-->>APIM: 200 OK + plan with evaluations
+    APIM-->>UI: Display coaching feedback
+    UI-->>Professor: Show strengths & improvements per paragraph
+
+    Professor->>UI: Revise plan paragraphs
+    UI->>APIM: PUT /api/upskilling/plans/{id}
+    APIM->>Upskilling: Forward (authenticated)
+    Upskilling->>Cosmos: Update plan (status: revised)
+    Upskilling-->>APIM: 200 OK + updated plan
+    UI-->>Professor: Plan updated, ready for re-evaluation
 ```
 
 ### 3.5 Configuration CRUD Flow
@@ -787,7 +802,7 @@ The essays service uses a **Strategy pattern** to select the evaluation approach
 
 ```mermaid
 flowchart TD
-    API["POST /grader/interaction\nPOST /essays/{id}/evaluate"]
+    API["POST /grader/interaction\nPOST /essays/{id}/evaluate\nPATCH /essays/{id}"]
     ORCH["EssayOrchestrator.invoke()"]
     RESOLVER["StrategyResolver.resolve()"]
     LOAD_SWARM["_load_swarm()\nCosmos DB → Assembly"]
@@ -829,6 +844,7 @@ flowchart TD
 - **Azure AI Foundry**: Agent execution via `AgentsClient` (threads, messages, file uploads)
 - **AI Document Intelligence** (target): OCR for handwritten essay scanning
 - **AI Search** (target): RAG grounding for rubrics and exemplars
+- **Partial updates**: `PATCH /essays/{id}` via `EssayPatch` model; `PUT` filters `None` values to prevent destructive overwrites of linked fields like `assembly_id`
 
 ---
 

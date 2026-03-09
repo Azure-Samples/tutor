@@ -14,7 +14,7 @@
 - **Conversational avatar tutoring** via Azure Speech + Azure AI Agents for voice-driven learning
 - **Pedagogical material ingestion** with OCR via Azure AI Document Intelligence and indexing via Azure AI Search for RAG grounding
 - **Supervisor insight reports** consuming Microsoft Fabric indicators (standardized assessments, attendance, task completion) and synthesizing Strava-like narrative briefings for pre-visit preparation
-- **Upskilling recommendations** through visitor-pattern performance analysis including ENEM competency alignment
+- **Stateful upskilling plan management** with persistent teaching plans, multi-agent evaluation via visitor pattern (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment), and professor-scoped plan lifecycle (draft → evaluated → revised → archived)
 - **Course/student/professor/school management** as a lightweight configuration layer with configurable pedagogical rules and feature flags
 
 The system is positioned as an **LMS enhancer**: it consumes LMS context (courses, students, assignments) and Fabric analytics (standardized assessment scores, attendance, task completion rates) to produce **agent-driven educational insights** for four personas:
@@ -38,7 +38,7 @@ The system is positioned as an **LMS enhancer**: it consumes LMS context (course
 | **Questions** | 8082 | State Machine | Question evaluation pipeline: Pending → Evaluating → Completed (objective + discursive) |
 | **Essays** | 8083 | Strategy + Orchestrator | Essay submission with OCR (Azure AI Document Intelligence — Phase A in progress, issue #18), multi-strategy ENEM-aligned evaluation (Phase B), RAG grounding (Phase B), Foundry agent provisioning |
 | **Avatar** | 8084 | Agent + Speech | Real-time avatar interaction using Azure Speech SDK + AI Agents |
-| **Upskilling** | 8085 | Visitor Pattern | Performance, content complexity, guidance-coach, and ENEM alignment analysis |
+| **Upskilling** | 8085 | Repository + Visitor | Stateful teaching plan management (CRUD), multi-agent evaluation (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment), Cosmos DB persistence with `/professor_id` partition |
 | **Content** *(target)* | 8089 | Pipeline | Pedagogical material ingestion: upload → OCR → chunk → AI Search index |
 | **Insights** *(target)* | 8090 | Strategy + Synthesis | Supervisor insight reports: Fabric indicators → narrative briefing |
 
@@ -73,6 +73,7 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 - `students`, `professors`, `courses`, `classes`, `groups` — Configuration domain
 - `cases`, `steps`, `essays` — Assessment domain
 - `questions`, `evaluations` — Question evaluation domain
+- `upskilling_plans` — Upskilling domain (teaching plans, partition key: `/professor_id`)
 - `agents`, `swarms` — Agent provisioning domain
 
 ---

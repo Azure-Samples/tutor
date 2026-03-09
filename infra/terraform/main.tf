@@ -129,6 +129,26 @@ resource "azurerm_cosmosdb_account" "main" {
   resource_group_name = azurerm_resource_group.main.name
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
+  public_network_access_enabled = var.cosmos_public_network_access_enabled
+  ip_range_filter               = toset(var.cosmos_allowed_public_ip_ranges)
+
+  lifecycle {
+    precondition {
+      condition = !(
+        var.cosmos_public_network_access_enabled == false
+        && var.aca_vnet_integration_enabled == false
+      )
+      error_message = "Blocked: Cosmos public network access cannot be disabled while ACA has no VNet/private path."
+    }
+
+    precondition {
+      condition = !(
+        var.cosmos_public_network_access_enabled == false
+        && var.cosmos_lockout_acknowledged == false
+      )
+      error_message = "Blocked: set cosmos_lockout_acknowledged=true to confirm intentional private-only Cosmos rollout."
+    }
+  }
 
   consistency_policy {
     consistency_level = "Session"

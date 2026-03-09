@@ -1,10 +1,9 @@
 """Pydantic models for the upskilling service."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -24,18 +23,18 @@ class BodyMessage(BaseModel):
     """Generic response envelope."""
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Any]
+    type: str | None
+    title: str | None
+    detail: Any | None
 
 
 @dataclass
 class SuccessMessage:
     """Payload returned on successful operations."""
 
-    title: Optional[str]
-    message: Optional[str]
-    content: Optional[Any]
+    title: str | None
+    message: str | None
+    content: Any | None
 
 
 @dataclass
@@ -43,9 +42,9 @@ class ErrorMessage:
     """Payload returned on failed operations."""
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Any]
+    type: str | None
+    title: str | None
+    detail: Any | None
 
 
 class PerformanceSnapshot(BaseModel):
@@ -54,8 +53,8 @@ class PerformanceSnapshot(BaseModel):
     period: str = Field(..., description="Time slice analysed, e.g. 'weekly' or 'semester'.")
     topic: str = Field(..., description="Subject area the performance applies to.")
     proficiency: float = Field(..., ge=0.0, le=1.0, description="Normalised performance score (0-1).")
-    highlights: Optional[List[str]] = Field(default=None, description="Strengths observed during the period.")
-    gaps: Optional[List[str]] = Field(default=None, description="Areas that need improvement.")
+    highlights: list[str] | None = Field(default=None, description="Strengths observed during the period.")
+    gaps: list[str] | None = Field(default=None, description="Areas that need improvement.")
 
 
 class PlanParagraph(BaseModel):
@@ -71,8 +70,8 @@ class PlanRequest(BaseModel):
     timeframe: str = Field(..., description="Planning horizon: week, month, semester, or year.")
     topic: str = Field(..., description="Subject for which the plan is being drafted.")
     class_id: str = Field(..., description="Identifier of the class being planned.")
-    paragraphs: List[PlanParagraph] = Field(..., min_items=1)
-    performance_history: List[PerformanceSnapshot] = Field(default_factory=list)
+    paragraphs: list[PlanParagraph] = Field(..., min_items=1)
+    performance_history: list[PerformanceSnapshot] = Field(default_factory=list)
 
 
 class AgentFeedback(BaseModel):
@@ -80,8 +79,8 @@ class AgentFeedback(BaseModel):
 
     agent: str
     verdict: str
-    strengths: List[str] = Field(default_factory=list)
-    improvements: List[str] = Field(default_factory=list)
+    strengths: list[str] = Field(default_factory=list)
+    improvements: list[str] = Field(default_factory=list)
 
 
 class ParagraphEvaluation(BaseModel):
@@ -89,7 +88,7 @@ class ParagraphEvaluation(BaseModel):
 
     paragraph_index: int
     title: str
-    feedback: List[AgentFeedback]
+    feedback: list[AgentFeedback]
 
 
 class PlanEvaluationResponse(BaseModel):
@@ -98,10 +97,32 @@ class PlanEvaluationResponse(BaseModel):
     timeframe: str
     topic: str
     class_id: str
-    evaluations: List[ParagraphEvaluation]
+    evaluations: list[ParagraphEvaluation]
 
 
-RESPONSES: Dict[int, Dict[str, Any]] = {
+class CreatePlanRequest(BaseModel):
+    """Request payload for creating a new teaching plan."""
+
+    title: str = Field(..., description="Plan title, e.g. 'Plano de Ensino — Física 3A'.")
+    timeframe: str = Field(..., description="Planning horizon: week, month, semester, or year.")
+    topic: str = Field(..., description="Subject for which the plan is being drafted.")
+    class_id: str = Field(..., description="Identifier of the class being planned.")
+    paragraphs: list[PlanParagraph] = Field(..., min_length=1)
+    performance_history: list[PerformanceSnapshot] = Field(default_factory=list)
+
+
+class UpdatePlanRequest(BaseModel):
+    """Request payload for updating an existing teaching plan."""
+
+    title: str | None = None
+    timeframe: str | None = None
+    topic: str | None = None
+    class_id: str | None = None
+    paragraphs: list[PlanParagraph] | None = None
+    performance_history: list[PerformanceSnapshot] | None = None
+
+
+RESPONSES: dict[int, dict[str, Any]] = {
     HTTP_200_OK: {"model": BodyMessage},
     HTTP_201_CREATED: {"model": BodyMessage},
     HTTP_202_ACCEPTED: {"model": BodyMessage},

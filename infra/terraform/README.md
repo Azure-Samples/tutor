@@ -102,6 +102,33 @@ agent_principal_object_ids = [
 ]
 ```
 
+## Cosmos DB network guardrails
+
+This baseline currently deploys ACA without private VNet wiring for Cosmos DB. To prevent accidental lockouts, Terraform now controls Cosmos public access explicitly:
+
+- `cosmos_public_network_access_enabled` (default: `true`)
+- `cosmos_allowed_public_ip_ranges` (default: `[]`)
+- `aca_vnet_integration_enabled` (default: `false`)
+- `cosmos_lockout_acknowledged` (default: `false`)
+
+Terraform blocks applies that would disable Cosmos public network access while `aca_vnet_integration_enabled = false`.
+
+Example safe baseline:
+
+```hcl
+aca_vnet_integration_enabled         = false
+cosmos_public_network_access_enabled = true
+cosmos_allowed_public_ip_ranges      = []
+cosmos_lockout_acknowledged          = false
+```
+
+For private-only rollout later:
+
+1. Implement ACA VNet integration and private DNS for Cosmos.
+2. Set `aca_vnet_integration_enabled = true`.
+3. Set `cosmos_public_network_access_enabled = false`.
+4. Set `cosmos_lockout_acknowledged = true` for the rollout apply.
+
 ## Notes
 
 - This is a foundation scaffold to unblock provisioning and service wiring.

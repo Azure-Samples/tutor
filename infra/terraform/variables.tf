@@ -135,6 +135,9 @@ variable "cosmos_containers" {
     avatar_case = {
       partition_key_path = "/id"
     }
+    upskilling_plans = {
+      partition_key_path = "/professor_id"
+    }
   }
 }
 
@@ -154,4 +157,28 @@ variable "apim_rate_limit_renewal_period_seconds" {
   description = "Renewal period in seconds for APIM rate limiting."
   type        = number
   default     = 60
+}
+
+variable "aca_vnet_integration_enabled" {
+  description = "Whether the ACA environment is integrated with a VNet that can privately reach Cosmos DB."
+  type        = bool
+  default     = false
+}
+
+variable "cosmos_public_network_access_enabled" {
+  description = "Controls Cosmos DB public network access. Keep true until private connectivity is in place."
+  type        = bool
+  default     = true
+}
+
+variable "cosmos_lockout_acknowledged" {
+  description = "Explicit acknowledgement required before disabling Cosmos public access."
+  type        = bool
+  default     = false
+}
+
+variable "cosmos_allowed_public_ip_ranges" {
+  description = "Optional public IPv4/CIDR allowlist for Cosmos DB when public network access is enabled."
+  type        = list(string)
+  default     = []
 }

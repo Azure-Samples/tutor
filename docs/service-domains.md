@@ -118,6 +118,8 @@ graph TB
 | **Business Need** | BN-PED-1 (AI essay correction with OCR + ENEM rubrics) |
 
 > **Phase A (issue #18, branch `feat/ocr-essay-ingestion`)**: Document Intelligence SDK wired directly into `apps/essays/src/app/file_processing.py`. Introduces `DocumentIntelligenceConfig` in `config.py`. Falls back to `pypdf`/PIL when `DOCUMENT_INTELLIGENCE_ENDPOINT` is unset (local development). ENEM strategy and RAG remain pending (Phase B).
+>
+> **Essay partial-update endpoint**: `PATCH /essays/{essay_id}` accepts partial payloads via `EssayPatch` model (`exclude_unset=True`). The `PUT` handler now filters `None` values before merging to prevent destructive overwrites of `assembly_id`. The seed script uses PATCH to link essays to assemblies after initial creation.
 
 #### questions-svc
 
@@ -170,14 +172,14 @@ graph TB
 
 | Aspect | Detail |
 |--------|--------|
-| **Responsibility** | Student performance analysis, learning path recommendations, ENEM competency alignment metrics |
+| **Responsibility** | Stateful teaching plan management with CRUD lifecycle, multi-agent evaluation via visitor pattern, professor-scoped persistence, and ENEM competency alignment |
 | **Port** | 8085 |
-| **Data owned** | `analytics_db`: analyses, competency_scores |
-| **Depends on** | Cosmos DB, Azure AI Foundry, essays-svc, questions-svc |
-| **Called by** | Frontend (professor dashboard, supervisor dashboard) |
-| **Scaling** | min: 0, max: 3 (batch, async) |
-| **Patterns** | Visitor (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment) |
-| **Business Need** | BN-PED-6 (pilot validation metrics for 3rd-year physics) |
+| **Data owned** | Cosmos DB container `upskilling_plans` (partition key: `/professor_id`, documents with `docType: "plan"`) |
+| **Depends on** | Cosmos DB, Azure AI Foundry, config-svc (pedagogical rules) |
+| **Called by** | Frontend (professor upskilling dashboard — plan creation, listing, evaluation) |
+| **Scaling** | min: 0, max: 3 (CRUD is lightweight; evaluation requests are token-heavy) |
+| **Patterns** | Repository (CosmosCRUD-backed), Visitor (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment agents), Status lifecycle (draft → evaluated → revised → archived) |
+| **Business Need** | BN-PED-6 (pilot validation metrics for 3rd-year physics), BN-PED-5 (configurable pedagogical rules) |
 
 #### evaluation-svc (NEW)
 

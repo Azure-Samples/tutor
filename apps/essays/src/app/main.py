@@ -33,6 +33,7 @@ from app.schemas import (
     AgentDefinition,
     ChatResponse,
     Essay,
+    EssayPatch,
     ErrorMessage,
     ProvisionedAgent,
     Resource,
@@ -304,8 +305,19 @@ async def _hydrate_swarm_record(raw: dict[str, Any]) -> SwarmDefinition:
 
 
 async def _get_essay_document(essay_id: str) -> dict[str, Any] | None:
+    """Fetch an essay by ``id`` using a cross-partition query.
+
+    The *essays* container is partitioned by ``/student_id``, so a
+    point-read that defaults to ``partition_key=id`` will miss documents
+    whose ``student_id`` differs from their ``id`` (e.g. template essays
+    with no ``student_id``).  A query avoids this.
+    """
     try:
-        return await _crud(settings.cosmos.essay_container).read_item(essay_id)
+        results = await _crud(settings.cosmos.essay_container).list_items(
+            query="SELECT * FROM c WHERE c.id = @id",
+            parameters=[{"name": "@id", "value": essay_id}],
+        )
+        return results[0] if results else None
     except Exception:
         return None
 
@@ -359,10 +371,7 @@ async def grader_interaction(payload: ChatResponse) -> JSONResponse:
 
 @app.post("/essays/{essay_id}/evaluate", tags=["Evaluation"])
 async def reprocess_essay_evaluation(essay_id: str) -> JSONResponse:
-    try:
-        document = await _crud(settings.cosmos.essay_container).read_item(essay_id)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Essay not found") from exc
+    document = await _require_essay_document(essay_id)
 
     assembly_id = document.get("assembly_id")
     if not assembly_id:
@@ -401,11 +410,7 @@ async def list_essays() -> JSONResponse:
 
 @app.get("/essays/{essay_id}", tags=["Essays"])
 async def get_essay(essay_id: str) -> JSONResponse:
-    crud = _crud(settings.cosmos.essay_container)
-    try:
-        item = await crud.read_item(essay_id)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Essay not found") from exc
+    item = await _require_essay_document(essay_id)
     return _create_success_response("Essay Retrieved", "Essay fetched successfully", item)
 
 
@@ -417,23 +422,27 @@ async def create_essay(essay: Essay) -> JSONResponse:
 
 @app.put("/essays/{essay_id}", tags=["Essays"])
 async def update_essay(essay_id: str, essay: Essay) -> JSONResponse:
-    crud = _crud(settings.cosmos.essay_container)
-    try:
-        existing = await crud.read_item(essay_id)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Essay not found") from exc
-    merged = {**existing, **essay.model_dump()}
-    await crud.update_item(essay_id, merged)
+    existing = await _require_essay_document(essay_id)
+    incoming = {k: v for k, v in essay.model_dump().items() if v is not None}
+    merged = {**existing, **incoming}
+    await _crud(settings.cosmos.essay_container).update_item(essay_id, merged)
     return _create_success_response("Essay Updated", "Essay modified", merged)
+
+
+@app.patch("/essays/{essay_id}", tags=["Essays"])
+async def patch_essay(essay_id: str, patch: EssayPatch) -> JSONResponse:
+    existing = await _require_essay_document(essay_id)
+    incoming = patch.model_dump(exclude_unset=True)
+    merged = {**existing, **incoming}
+    await _crud(settings.cosmos.essay_container).update_item(essay_id, merged)
+    return _create_success_response("Essay Updated", "Essay patched", merged)
 
 
 @app.delete("/essays/{essay_id}", tags=["Essays"])
 async def delete_essay(essay_id: str) -> JSONResponse:
-    crud = _crud(settings.cosmos.essay_container)
-    try:
-        await crud.delete_item(essay_id)
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Essay not found") from exc
+    document = await _require_essay_document(essay_id)
+    partition_key = document.get("student_id") or essay_id
+    await _crud(settings.cosmos.essay_container).delete_item(essay_id, partition_key=partition_key)
     return _create_success_response("Essay Deleted", "Essay removed", {"essay_id": essay_id})
 
 
