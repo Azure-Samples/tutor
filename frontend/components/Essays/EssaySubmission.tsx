@@ -46,6 +46,37 @@ const formatStrategy = (strategy: string) => {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 };
 
+const isStringArray = (value: unknown): value is string[] => {
+  return Array.isArray(value) && value.every(item => typeof item === "string");
+};
+
+const parseEvaluationFromMetadata = (metadata: unknown): EssayEvaluationResult | undefined => {
+  if (!metadata || typeof metadata !== "object") {
+    return undefined;
+  }
+  const evaluation = (metadata as Record<string, unknown>).evaluation;
+  if (!evaluation || typeof evaluation !== "object") {
+    return undefined;
+  }
+
+  const candidate = evaluation as Record<string, unknown>;
+  if (
+    typeof candidate.strategy !== "string"
+    || typeof candidate.verdict !== "string"
+    || !isStringArray(candidate.strengths)
+    || !isStringArray(candidate.improvements)
+  ) {
+    return undefined;
+  }
+
+  return {
+    strategy: candidate.strategy,
+    verdict: candidate.verdict,
+    strengths: candidate.strengths,
+    improvements: candidate.improvements,
+  };
+};
+
 const allowedFileTypes = new Set([
   "application/pdf",
   "image/jpeg",
@@ -215,7 +246,7 @@ const EssaySubmission: React.FC = () => {
             resource: parsed,
             description: (descriptionMeta || details.join(" ") || tag || "").trim(),
             submittedAt: uploadedAt,
-            evaluation: undefined,
+            evaluation: parseEvaluationFromMetadata(metadata),
           };
         });
         setHistory(mappedHistory);
@@ -347,6 +378,34 @@ const EssaySubmission: React.FC = () => {
     }
 
     if (storedResource) {
+      if (evaluationRecord) {
+        const existingMetadata =
+          storedResource.metadata && typeof storedResource.metadata === "object"
+            ? (storedResource.metadata as Record<string, unknown>)
+            : {};
+        const metadataWithEvaluation: Record<string, unknown> = {
+          ...existingMetadata,
+          evaluation: evaluationRecord,
+        };
+
+        try {
+          await essaysEngine.put(`/resources/${storedResource.id}`, {
+            id: storedResource.id,
+            essay_id: storedResource.essay_id,
+            objective: storedResource.objective,
+            content: storedResource.content,
+            url: storedResource.url,
+            file_name: storedResource.file_name,
+            content_type: storedResource.content_type,
+            encoded_content: storedResource.encoded_content,
+            metadata: metadataWithEvaluation,
+          });
+          storedResource = { ...storedResource, metadata: metadataWithEvaluation };
+        } catch (error) {
+          console.warn("Failed to persist evaluation metadata", error);
+        }
+      }
+
       const nextResources = [...(resourcesByEssay[essayIdForCase] ?? []), storedResource];
       setResourcesByEssay(previous => ({ ...previous, [essayIdForCase]: nextResources }));
       const submission: Submission = {
@@ -377,9 +436,54 @@ const EssaySubmission: React.FC = () => {
       const evaluation = unwrapContent<EssayEvaluationResult>(response.data);
       setEvaluationResult(evaluation);
       setEvaluationError(null);
+      if (targetId !== "current") {
+        const targetEntry = history.find(entry => entry.resource.id === targetId);
+        if (targetEntry) {
+          const existingMetadata =
+            targetEntry.resource.metadata && typeof targetEntry.resource.metadata === "object"
+              ? (targetEntry.resource.metadata as Record<string, unknown>)
+              : {};
+          const metadataWithEvaluation: Record<string, unknown> = {
+            ...existingMetadata,
+            evaluation,
+          };
+
+          try {
+            await essaysEngine.put(`/resources/${targetEntry.resource.id}`, {
+              id: targetEntry.resource.id,
+              essay_id: targetEntry.resource.essay_id,
+              objective: targetEntry.resource.objective,
+              content: targetEntry.resource.content,
+              url: targetEntry.resource.url,
+              file_name: targetEntry.resource.file_name,
+              content_type: targetEntry.resource.content_type,
+              encoded_content: targetEntry.resource.encoded_content,
+              metadata: metadataWithEvaluation,
+            });
+          } catch (error) {
+            console.warn("Failed to persist re-evaluation metadata", error);
+          }
+        }
+      }
       setHistory(previous =>
         previous.map(entry =>
-          entry.resource.essay_id === essayId ? { ...entry, evaluation } : entry,
+          entry.resource.essay_id === essayId
+            ? {
+              ...entry,
+              resource: targetId !== "current" && entry.resource.id === targetId
+                ? {
+                  ...entry.resource,
+                  metadata: {
+                    ...(entry.resource.metadata && typeof entry.resource.metadata === "object"
+                      ? entry.resource.metadata
+                      : {}),
+                    evaluation,
+                  },
+                }
+                : entry.resource,
+              evaluation,
+            }
+            : entry,
         ),
       );
     } catch (error) {
