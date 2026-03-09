@@ -356,17 +356,69 @@ async def _unlink_essay_from_assembly(essay_id: str, assembly_id: str) -> None:
     await _crud(settings.cosmos.essay_container).update_item(essay_id, document)
 
 
+async def _resolve_assembly_id_from_case_id(case_id: str) -> str:
+    """Resolve case_id into an assembly id.
+
+    `case_id` can be either an assembly identifier or an essay identifier.
+    """
+
+    essay_document = await _get_essay_document(case_id)
+    if essay_document is None:
+        return case_id
+
+    assembly_id = essay_document.get("assembly_id")
+    if isinstance(assembly_id, str) and assembly_id.strip():
+        return assembly_id
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            f"Essay '{case_id}' is not linked to an assembly. "
+            "Link the essay to an assembly before requesting evaluation."
+        ),
+    )
+
+
+def _fallback_evaluation_payload(case_id: str) -> dict[str, Any]:
+    """Return safe default feedback when agent orchestration fails."""
+
+    return {
+        "strategy": "default",
+        "verdict": (
+            "Automated grading is temporarily unavailable for this submission. "
+            f"A baseline review is being returned for case '{case_id}'."
+        ),
+        "strengths": ["Your response addresses the proposed theme and presents clear intent."],
+        "improvements": ["Retry the evaluation in a few moments for a full AI-assisted assessment."],
+    }
+
+
 @app.post("/grader/interaction", tags=["Evaluation"])
 async def grader_interaction(payload: ChatResponse) -> JSONResponse:
-    result = await orchestrator.invoke(payload.case_id, payload.essay, payload.resources)
-    return JSONResponse(
-        {
-            "strategy": result.strategy.value,
-            "verdict": result.verdict,
-            "strengths": result.strengths,
-            "improvements": result.improvements,
-        }
-    )
+    assembly_id = await _resolve_assembly_id_from_case_id(payload.case_id)
+    try:
+        result = await orchestrator.invoke(assembly_id, payload.essay, payload.resources)
+        return JSONResponse(
+            {
+                "strategy": result.strategy.value,
+                "verdict": result.verdict,
+                "strengths": result.strengths,
+                "improvements": result.improvements,
+            }
+        )
+    except ValueError as exc:
+        detail = str(exc)
+        if detail.startswith("Assembly not found:"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Unable to resolve assembly for case_id '{payload.case_id}'. "
+                    "Provide a valid assembly id or link the essay to an assembly."
+                ),
+            ) from exc
+        return JSONResponse(_fallback_evaluation_payload(payload.case_id))
+    except RuntimeError:
+        return JSONResponse(_fallback_evaluation_payload(payload.case_id))
 
 
 @app.post("/essays/{essay_id}/evaluate", tags=["Evaluation"])

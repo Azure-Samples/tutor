@@ -3,6 +3,7 @@
 # pylint: disable=redefined-outer-name
 
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -33,6 +34,31 @@ def essays_app_module_fixture(monkeypatch):
 
     importlib.reload(essays_app)
     return essays_app
+
+
+@pytest.fixture
+def essays_main_module_fixture(monkeypatch):
+    monkeypatch.setenv("COSMOS_ENDPOINT", "https://localhost:8081/")
+    monkeypatch.setenv("COSMOS_DATABASE", "unit-test-db")
+    monkeypatch.setenv("PROJECT_ENDPOINT", "https://fake-endpoint.azure.com/")
+    monkeypatch.setenv("MODEL_DEPLOYMENT_NAME", "gpt-4o")
+    monkeypatch.setenv("MODEL_REASONING_DEPLOYMENT", "o3-mini")
+
+    repo_root = Path(__file__).resolve().parents[2]
+    essays_src = repo_root / "apps" / "essays" / "src"
+    lib_src = repo_root / "lib" / "src"
+
+    for entry in (str(essays_src), str(lib_src)):
+        if entry not in sys.path:
+            sys.path.insert(0, entry)
+
+    for module_name in list(sys.modules):
+        if module_name == "app" or module_name.startswith("app."):
+            sys.modules.pop(module_name, None)
+
+    main_module = importlib.import_module("app.main")
+    importlib.reload(main_module)
+    return main_module
 
 
 DEFAULT_RESPONSE = "Overall verdict\n\nStrengths: Solid thesis\n\nImprovements: Tighten conclusion"
@@ -295,3 +321,99 @@ def test_prepare_resources_falls_back_to_pdf_extraction(monkeypatch, essays_app_
     prepared = orchestrator._prepare_resources([resource])
 
     assert prepared[0].content == "fallback text"
+
+
+@pytest.mark.asyncio
+async def test_grader_interaction_accepts_essay_id(monkeypatch, essays_main_module_fixture):
+    module = essays_main_module_fixture
+
+    async def _stub_get_essay_document(_essay_id: str):
+        return {"id": "essay-42", "assembly_id": "asm-42"}
+
+    class _StubOrchestrator:
+        def __init__(self):
+            self.calls = []
+
+        async def invoke(self, assembly_id, essay, resources):
+            self.calls.append((assembly_id, essay.id, len(resources)))
+            return type(
+                "Result",
+                (),
+                {
+                    "strategy": type("Strategy", (), {"value": "default"})(),
+                    "verdict": "Structured verdict",
+                    "strengths": ["Strong structure"],
+                    "improvements": ["Add evidence"],
+                },
+            )()
+
+    orchestrator = _StubOrchestrator()
+    monkeypatch.setattr(module, "_get_essay_document", _stub_get_essay_document)
+    monkeypatch.setattr(module, "orchestrator", orchestrator)
+
+    payload = module.ChatResponse(
+        case_id="essay-42",
+        essay=module.Essay(id="essay-42", topic="Topic", content="Essay text"),
+        resources=[],
+    )
+
+    response = await module.grader_interaction(payload)
+    body = json.loads(response.body)
+
+    assert response.status_code == 200
+    assert orchestrator.calls[0][0] == "asm-42"
+    assert body["strategy"] == "default"
+
+
+@pytest.mark.asyncio
+async def test_grader_interaction_returns_400_for_unresolved_case_id(monkeypatch, essays_main_module_fixture):
+    module = essays_main_module_fixture
+
+    async def _stub_get_essay_document(_essay_id: str):
+        return {"id": "essay-without-assembly", "assembly_id": None}
+
+    monkeypatch.setattr(module, "_get_essay_document", _stub_get_essay_document)
+
+    payload = module.ChatResponse(
+        case_id="essay-without-assembly",
+        essay=module.Essay(id="essay-without-assembly", topic="Topic", content="Essay text"),
+        resources=[],
+    )
+
+    with pytest.raises(module.HTTPException) as exc_info:
+        await module.grader_interaction(payload)
+
+    assert exc_info.value.status_code == 400
+    assert "not linked to an assembly" in str(exc_info.value.detail)
+
+
+@pytest.mark.asyncio
+async def test_grader_interaction_returns_fallback_when_orchestrator_fails(
+    monkeypatch, essays_main_module_fixture
+):
+    module = essays_main_module_fixture
+
+    async def _stub_get_essay_document(_essay_id: str):
+        return None
+
+    class _FailingOrchestrator:
+        async def invoke(self, _assembly_id, _essay, _resources):
+            raise RuntimeError("RunStatus.FAILED")
+
+    monkeypatch.setattr(module, "_get_essay_document", _stub_get_essay_document)
+    monkeypatch.setattr(module, "orchestrator", _FailingOrchestrator())
+
+    payload = module.ChatResponse(
+        case_id="assembly-123",
+        essay=module.Essay(id="essay-123", topic="Topic", content="Essay text"),
+        resources=[],
+    )
+
+    response = await module.grader_interaction(payload)
+    body = json.loads(response.body)
+
+    assert response.status_code == 200
+    assert body["strategy"] == "default"
+    assert body["verdict"].strip()
+    assert body["strengths"]
+    assert body["improvements"]
