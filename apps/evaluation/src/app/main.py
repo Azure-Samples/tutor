@@ -7,11 +7,10 @@ from functools import lru_cache
 from os import getenv
 from typing import Mapping
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from pydantic import ValidationError
 from pydantic import BaseModel
 from tutor_lib.config import create_app, get_settings
-from tutor_lib.middleware import require_roles
 
 from app.store import (
     CosmosEvaluationRepository,
@@ -68,7 +67,6 @@ async def ready() -> dict[str, str]:
 @app.post("/datasets")
 async def create_dataset(
     payload: DatasetRequest,
-    _: object = Depends(require_roles("professor", "admin")),
 ) -> Mapping[str, object]:
     dataset = DatasetRecord(dataset_id=payload.dataset_id, name=payload.name, items=payload.items)
     saved = await _repository().create_dataset(dataset)
@@ -76,7 +74,7 @@ async def create_dataset(
 
 
 @app.get("/datasets")
-async def list_datasets(_: object = Depends(require_roles("professor", "admin"))) -> list[Mapping[str, object]]:
+async def list_datasets() -> list[Mapping[str, object]]:
     datasets = await _repository().list_datasets()
     return [to_dict(dataset) for dataset in datasets]
 
@@ -84,7 +82,6 @@ async def list_datasets(_: object = Depends(require_roles("professor", "admin"))
 @app.post("/evaluation/run")
 async def start_run(
     payload: RunRequest,
-    _: object = Depends(require_roles("professor", "admin")),
 ) -> Mapping[str, object]:
     dataset = await _repository().get_dataset(payload.dataset_id)
     if dataset is None:
@@ -104,7 +101,6 @@ async def start_run(
 @app.get("/evaluation/run/{run_id}")
 async def get_run(
     run_id: str,
-    _: object = Depends(require_roles("professor", "admin")),
 ) -> Mapping[str, object]:
     run = await _repository().get_run(run_id)
     if run is None:

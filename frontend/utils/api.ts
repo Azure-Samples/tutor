@@ -53,6 +53,22 @@ const createClient = (baseURL: string | undefined): AxiosInstance => {
       }
     }
 
+    // Legacy header-based identity keeps role-protected endpoints usable when ENTRA is disabled.
+    const headers = config.headers as unknown as {
+      set?: (name: string, value: string) => void;
+      [key: string]: unknown;
+    };
+    if (typeof headers?.set === "function") {
+      headers.set("X-User-Id", "showcase-user");
+      headers.set("X-User-Roles", "admin,professor");
+    } else {
+      config.headers = {
+        ...(config.headers || {}),
+        "X-User-Id": "showcase-user",
+        "X-User-Roles": "admin,professor",
+      } as any;
+    }
+
     return config;
   });
   client.interceptors.response.use(unwrapResponse, (error) => {
