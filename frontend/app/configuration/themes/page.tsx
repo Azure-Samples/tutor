@@ -1,6 +1,6 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import ThemeForm from "@/components/Configuration/Theme";
+import ThemesList from "@/components/Lists/Themes";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ const ThemesPage = () => {
         pageName="Theme Configuration" 
         subtitle="Create and manage themes used in essay evaluation workflows." 
       />
-      <ThemeForm />
+      <ThemesList />
     </DefaultLayout>
   );
 };

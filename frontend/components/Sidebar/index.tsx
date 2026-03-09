@@ -4,7 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import SidebarItem from "@/components/Sidebar/SidebarItem";
 import useLocalStorage from "@/hooks/useLocalStorage";
-import { FaCog, FaFileAlt, FaQuestionCircle, FaUserGraduate, FaComments, FaChartLine, FaVial, FaSyncAlt } from "react-icons/fa";
+import { FaCog, FaFileAlt, FaQuestionCircle, FaUserGraduate, FaComments } from "react-icons/fa";
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -71,39 +71,7 @@ const menuGroups = [
         gradient: "from-orange-400 to-pink-500",
         hoverText: "text-orange-500"
       },
-      {
-        icon: (
-          <span className="sidebar-icon flex items-center justify-center w-10 h-10 rounded-full p-2 bg-gradient-to-br from-sky-400 to-cyan-500 transition-all duration-300 group-hover:bg-white">
-            <FaChartLine className="w-6 h-6 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-sky-400 group-hover:to-cyan-500 group-hover:text-transparent group-hover:bg-clip-text" />
-          </span>
-        ),
-        label: "Upskilling",
-        route: "/upskilling",
-        gradient: "from-sky-400 to-cyan-500",
-        hoverText: "text-sky-500"
-      },
-      {
-        icon: (
-          <span className="sidebar-icon flex items-center justify-center w-10 h-10 rounded-full p-2 bg-gradient-to-br from-rose-400 to-red-500 transition-all duration-300 group-hover:bg-white">
-            <FaVial className="w-6 h-6 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-rose-400 group-hover:to-red-500 group-hover:text-transparent group-hover:bg-clip-text" />
-          </span>
-        ),
-        label: "Evaluation",
-        route: "/evaluation",
-        gradient: "from-rose-400 to-red-500",
-        hoverText: "text-rose-500"
-      },
-      {
-        icon: (
-          <span className="sidebar-icon flex items-center justify-center w-10 h-10 rounded-full p-2 bg-gradient-to-br from-amber-400 to-orange-500 transition-all duration-300 group-hover:bg-white">
-            <FaSyncAlt className="w-6 h-6 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-amber-400 group-hover:to-orange-500 group-hover:text-transparent group-hover:bg-clip-text" />
-          </span>
-        ),
-        label: "LMS Gateway",
-        route: "/lms-gateway",
-        gradient: "from-amber-400 to-orange-500",
-        hoverText: "text-amber-500"
-      }
+
     ]
   }
 ];
