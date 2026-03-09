@@ -417,3 +417,99 @@ async def test_grader_interaction_returns_fallback_when_orchestrator_fails(
     assert body["verdict"].strip()
     assert body["strengths"]
     assert body["improvements"]
+
+
+@pytest.mark.asyncio
+async def test_reprocess_endpoint_returns_fallback_when_orchestrator_runtime_error(
+    monkeypatch, essays_main_module_fixture
+):
+    module = essays_main_module_fixture
+
+    async def _stub_require_essay_document(_essay_id: str):
+        return {
+            "id": "essay-123",
+            "topic": "Topic",
+            "content": "Essay text",
+            "assembly_id": "assembly-123",
+        }
+
+    async def _stub_resources_for_essay(_essay_id: str):
+        return []
+
+    class _FailingOrchestrator:
+        async def invoke(self, _assembly_id, _essay, _resources):
+            raise RuntimeError("Agent run finished with unexpected status RunStatus.FAILED.")
+
+    monkeypatch.setattr(module, "_require_essay_document", _stub_require_essay_document)
+    monkeypatch.setattr(module, "_resources_for_essay", _stub_resources_for_essay)
+    monkeypatch.setattr(module, "orchestrator", _FailingOrchestrator())
+
+    response = await module.reprocess_essay_evaluation("essay-123")
+    body = json.loads(response.body)
+    content = body["content"]
+
+    assert response.status_code == 200
+    assert body["title"] == "Essay Evaluated"
+    assert body["message"] == "Essay evaluation completed"
+    assert content["strategy"] == "default"
+    assert content["verdict"].strip()
+    assert content["strengths"]
+    assert content["improvements"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("document", "runtime_error", "expected_substring"),
+    [
+        (
+            {
+                "id": "essay-no-assembly",
+                "topic": "Topic",
+                "content": "Essay text",
+                "assembly_id": None,
+            },
+            None,
+            "not associated with an assembly",
+        ),
+        (
+            {
+                "id": "essay-unresolvable",
+                "topic": "Topic",
+                "content": "Essay text",
+                "assembly_id": "assembly-missing",
+            },
+            ValueError("Assembly not found: assembly-missing"),
+            "could not be resolved",
+        ),
+    ],
+)
+async def test_reprocess_endpoint_returns_400_when_assembly_missing_or_unresolvable(
+    monkeypatch,
+    essays_main_module_fixture,
+    document,
+    runtime_error,
+    expected_substring,
+):
+    module = essays_main_module_fixture
+
+    async def _stub_require_essay_document(_essay_id: str):
+        return document
+
+    async def _stub_resources_for_essay(_essay_id: str):
+        return []
+
+    class _Orchestrator:
+        async def invoke(self, _assembly_id, _essay, _resources):
+            if runtime_error is not None:
+                raise runtime_error
+            return None
+
+    monkeypatch.setattr(module, "_require_essay_document", _stub_require_essay_document)
+    monkeypatch.setattr(module, "_resources_for_essay", _stub_resources_for_essay)
+    monkeypatch.setattr(module, "orchestrator", _Orchestrator())
+
+    with pytest.raises(module.HTTPException) as exc_info:
+        await module.reprocess_essay_evaluation(document["id"])
+
+    assert exc_info.value.status_code == 400
+    assert expected_substring in str(exc_info.value.detail)

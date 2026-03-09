@@ -434,13 +434,28 @@ async def reprocess_essay_evaluation(essay_id: str) -> JSONResponse:
 
     essay_model = _essay_from_record(document)
     resources = await _resources_for_essay(essay_model.id)
-    result = await orchestrator.invoke(assembly_id, essay_model, resources)
-    evaluation_payload = {
-        "strategy": result.strategy.value,
-        "verdict": result.verdict,
-        "strengths": result.strengths,
-        "improvements": result.improvements,
-    }
+    try:
+        result = await orchestrator.invoke(assembly_id, essay_model, resources)
+        evaluation_payload = {
+            "strategy": result.strategy.value,
+            "verdict": result.verdict,
+            "strengths": result.strengths,
+            "improvements": result.improvements,
+        }
+    except ValueError as exc:
+        detail = str(exc)
+        if detail.startswith("Assembly not found:"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Unable to evaluate essay '{essay_id}' because its assembly could not be resolved. "
+                    "Link the essay to a valid assembly and retry."
+                ),
+            ) from exc
+        evaluation_payload = _fallback_evaluation_payload(essay_id)
+    except RuntimeError:
+        evaluation_payload = _fallback_evaluation_payload(essay_id)
+
     return _create_success_response(
         "Essay Evaluated",
         "Essay evaluation completed",
