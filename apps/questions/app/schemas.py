@@ -80,10 +80,18 @@ class ChatResponse(BaseModel):
 
 
 class Grader(BaseModel):
-    id: str = Field(..., description="Evaluator ID")
-    name: str = Field(..., description="Evaluator name", max_length=32)
+    agent_id: str = Field(..., description="Azure AI Foundry agent ID")
+    dimension: str = Field(..., description="Evaluation dimension handled by this agent")
     deployment: str = Field(..., description="Azure AI Foundry model deployment")
+
+
+class GraderDefinition(BaseModel):
+    """Payload for creating or referencing a Foundry grader agent."""
+
+    agent_id: Optional[str] = Field(None, description="Existing Foundry agent ID (omit to create new)")
+    name: str = Field(..., description="Evaluator name", max_length=32)
     instructions: str = Field(..., description="System prompt for the evaluator")
+    deployment: str = Field(..., description="Azure AI Foundry model deployment")
     dimension: str = Field(..., description="Evaluation dimension handled by this agent")
 
 
@@ -100,6 +108,14 @@ class Assembly(BaseModel):
     id: str = Field(..., description="Assembly ID")
     agents: List[Grader] = Field(..., description="Judges Assemblies")
     topic_name: str = Field(..., description="Topic to Answer")
+
+
+class AssemblyDefinition(BaseModel):
+    """Payload for creating or updating assemblies with full grader definitions."""
+
+    id: str = Field(..., description="Assembly ID")
+    topic_name: str = Field(..., description="Topic to Answer")
+    agents: List[GraderDefinition] = Field(..., description="Grader agent definitions")
 
 
 RESPONSES = {

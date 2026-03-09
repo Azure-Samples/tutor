@@ -10,10 +10,6 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[2]
 LIB_SRC = ROOT / "lib" / "src"
 CONFIG_SRC = ROOT / "apps" / "configuration" / "src"
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
-if str(CONFIG_SRC) not in sys.path:
-    sys.path.insert(0, str(CONFIG_SRC))
 
 
 @pytest.fixture(name="api_client")

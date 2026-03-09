@@ -86,12 +86,13 @@ class EssayPatch(BaseModel):
 
 
 class AgentDefinition(BaseModel):
-    """Definition of an Azure AI Foundry agent used within a swarm."""
+    """Definition used to create or reference an Azure AI Foundry agent."""
 
-    id: Optional[str] = Field(None, description="Existing Azure AI Foundry agent ID")
+    agent_id: Optional[str] = Field(None, description="Existing Azure AI Foundry agent ID (omit to create new)")
     name: str = Field(..., description="Friendly agent name")
     instructions: str = Field(..., description="System instructions for the agent")
     deployment: str = Field(..., description="Model deployment name registered in Azure AI Foundry")
+    role: str = Field(..., description="Agent role in the assembly (e.g. analytical, narrative, default)")
     temperature: Optional[float] = Field(
         default=None,
         description="Optional temperature override applied when the agent runs",
@@ -121,10 +122,12 @@ class ChatResponse(BaseModel):
     resources: list[Resource]
 
 
-class AgentRef(AgentDefinition):
-    """Reference to an agent provisioned in Azure AI Foundry."""
+class AgentRef(BaseModel):
+    """Lightweight reference to an agent registered in Azure AI Foundry."""
 
-    id: str = Field(..., description="Azure AI Foundry agent ID")
+    agent_id: str = Field(..., description="Azure AI Foundry agent ID")
+    role: str = Field(..., description="Agent role in the assembly (e.g. analytical, narrative, default)")
+    deployment: str = Field(..., description="Model deployment name")
 
 
 class Assembly(BaseModel):

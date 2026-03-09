@@ -47,7 +47,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
   const agentsById = useMemo(() => {
     const lookup = new Map<string, AgentRef>();
     for (const agent of availableAgents) {
-      lookup.set(agent.id, agent);
+      lookup.set(agent.agent_id, agent);
     }
     return lookup;
   }, [availableAgents]);
@@ -112,7 +112,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
         setExistingAssemblyId(assembly.id);
         setAssemblyId(assembly.id);
         setAssemblyTopic(assembly.topic_name);
-        setSelectedAgents(assembly.agents.map((agent) => agent.id ?? "").filter(Boolean));
+        setSelectedAgents(assembly.agents.map((agent) => agent.agent_id ?? "").filter(Boolean));
         setExistingAssemblyAgents(assembly.agents);
         setForm((prev) => ({ ...prev, assembly_id: assembly.id }));
       } catch (error) {
@@ -146,28 +146,27 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       return false;
     }
 
-    const agentDefinitions: AgentDefinition[] = selectedAgents
-      .map((agentId) => agentsById.get(agentId) ?? existingAssemblyAgents.find((agent) => agent.id === agentId))
-      .filter(Boolean)
-      .map((agent) => ({
-        id: agent!.id,
-        name: agent!.name,
-        instructions: agent!.instructions,
-        deployment: agent!.deployment,
-        temperature: agent!.temperature ?? undefined,
-      }));
+    const agentPayloads = selectedAgents
+      .map((agentId) => {
+        const ref = agentsById.get(agentId);
+        if (ref) return { agent_id: ref.agent_id, role: ref.role, deployment: ref.deployment };
+        const existing = existingAssemblyAgents.find((a) => a.agent_id === agentId);
+        if (existing) return existing;
+        return null;
+      })
+      .filter((a): a is NonNullable<typeof a> => a !== null);
 
-    if (agentDefinitions.length === 0) {
+    if (agentPayloads.length === 0) {
       setAssemblyError("Select at least one agent to build the assembly.");
       return false;
     }
 
-    const payload: AssemblyDefinition = {
+    const payload = {
       id: trimmedAssemblyId,
       topic_name: assemblyTopic.trim() || form.topic,
       essay_id: essayId,
-      agents: agentDefinitions,
-    };
+      agents: agentPayloads,
+    } as AssemblyDefinition;
 
     try {
       setAssemblyStatus("Saving assembly...");
@@ -179,7 +178,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       }
       setExistingAssemblyId(trimmedAssemblyId);
       setAssemblyId(trimmedAssemblyId);
-      setExistingAssemblyAgents(agentDefinitions);
+      setExistingAssemblyAgents(agentPayloads as AgentDefinition[]);
       setForm((prev) => ({ ...prev, assembly_id: trimmedAssemblyId }));
       setAssemblyStatus("Assembly saved!");
       return true;
@@ -359,21 +358,19 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
             <div className="grid gap-3 sm:grid-cols-2">
               {availableAgents.map((agent) => (
                 <label
-                  key={agent.id}
+                  key={agent.agent_id}
                   className="flex items-start gap-3 rounded-2xl border border-purple-200 bg-white/80 dark:bg-boxdark/80 px-4 py-3 shadow hover:shadow-lg transition-all duration-200 cursor-pointer"
                 >
                   <input
                     type="checkbox"
-                    checked={selectedAgents.includes(agent.id)}
-                    onChange={() => toggleAgentSelection(agent.id)}
+                    checked={selectedAgents.includes(agent.agent_id)}
+                    onChange={() => toggleAgentSelection(agent.agent_id)}
                     className="mt-1"
                   />
                   <div className="flex flex-col gap-1 text-sm">
-                    <span className="font-semibold text-purple-700 dark:text-purple-200">{agent.name}</span>
+                    <span className="font-semibold text-purple-700 dark:text-purple-200">{agent.role}</span>
                     <span className="text-purple-600/80 dark:text-purple-100/80">{agent.deployment}</span>
-                    {agent.instructions && (
-                      <span className="text-xs text-purple-500/80 line-clamp-2">{agent.instructions}</span>
-                    )}
+                    <span className="text-xs text-purple-500/80 font-mono">{agent.agent_id}</span>
                   </div>
                 </label>
               ))}

@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.agents.clients import FoundryAgentService
+from tutor_lib.agents import FoundryAgentService
 from app.cosmos import CosmosCRUD
 from app.file_processing import (
     ProcessedUpload,
@@ -226,36 +226,34 @@ async def _resources_for_essay(essay_id: str) -> list[Resource]:
     return resources
 
 
-def _materialize_agent(agent: Any, fallback: AgentDefinition | None = None) -> AgentRef:
-    """Build an AgentRef from Azure AI Foundry response with safe fallbacks."""
+def _materialize_agent(agent: Any, definition: AgentDefinition | None = None) -> AgentRef:
+    """Build a lightweight AgentRef from a Foundry agent response."""
 
-    name = getattr(agent, "name", None) or (fallback.name if fallback else getattr(agent, "id", "unknown-agent"))
-    instructions = getattr(agent, "instructions", None) or (fallback.instructions if fallback else "")
+    agent_id = getattr(agent, "id", None)
+    if not agent_id:
+        raise ValueError("Azure AI agent response did not include an id")
+
     deployment = (
         getattr(agent, "model", None)
         or getattr(agent, "model_id", None)
         or getattr(agent, "deployment_name", None)
-        or (fallback.deployment if fallback else "")
+        or (definition.deployment if definition else "")
     )
-    temperature = getattr(agent, "temperature", None)
-    if temperature is None and fallback is not None:
-        temperature = fallback.temperature
+    role = definition.role if definition else "default"
 
     return AgentRef(
-        id=getattr(agent, "id"),
-        name=name,
-        instructions=instructions,
+        agent_id=agent_id,
+        role=role,
         deployment=deployment,
-        temperature=temperature,
     )
 
 
 async def _ensure_provisioned_agents(definitions: list[AgentDefinition]) -> list[AgentRef]:
     provisioned: list[AgentRef] = []
     for definition in definitions:
-        if definition.id:
-            remote = await agent_service.get_agent(definition.id)
-            provisioned.append(_materialize_agent(remote, fallback=definition))
+        if definition.agent_id:
+            remote = await agent_service.get_agent(definition.agent_id)
+            provisioned.append(_materialize_agent(remote, definition=definition))
             continue
 
         created = await agent_service.create_agent(
@@ -265,12 +263,21 @@ async def _ensure_provisioned_agents(definitions: list[AgentDefinition]) -> list
             temperature=definition.temperature,
         )
         remote = await agent_service.get_agent(created.id)
-        provisioned.append(_materialize_agent(remote, fallback=definition))
+        provisioned.append(_materialize_agent(remote, definition=definition))
     return provisioned
 
 
 def _assembly_definition_from_assembly(assembly: Assembly) -> AssemblyDefinition:
-    agents = [AgentDefinition(**agent.model_dump()) for agent in assembly.agents]
+    agents = [
+        AgentDefinition(
+            agent_id=agent.agent_id,
+            name=agent.role,
+            instructions="",
+            deployment=agent.deployment,
+            role=agent.role,
+        )
+        for agent in assembly.agents
+    ]
     return AssemblyDefinition(id=assembly.id, topic_name=assembly.topic_name, essay_id=assembly.essay_id, agents=agents)
 
 
@@ -279,21 +286,21 @@ async def _hydrate_assembly_record(raw: dict[str, Any]) -> AssemblyDefinition:
     provisioned: list[AgentRef] = []
     for entry in raw_agents:
         if isinstance(entry, dict):
-            provisioned.append(AgentRef.model_validate(entry))
+            # Support both new lightweight format (agent_id) and legacy (id)
+            if "agent_id" in entry:
+                provisioned.append(AgentRef.model_validate(entry))
+            elif "id" in entry:
+                provisioned.append(AgentRef(
+                    agent_id=str(entry["id"]),
+                    role=entry.get("role", "default"),
+                    deployment=entry.get("deployment", ""),
+                ))
         elif isinstance(entry, str):
-            try:
-                remote = await agent_service.get_agent(entry)
-                provisioned.append(_materialize_agent(remote))
-            except Exception:
-                provisioned.append(
-                    AgentRef(
-                        id=entry,
-                        name=entry,
-                        instructions="",
-                        deployment="",
-                        temperature=None,
-                    )
-                )
+            provisioned.append(AgentRef(
+                agent_id=entry,
+                role="default",
+                deployment="",
+            ))
 
     assembly = Assembly(
         id=str(raw.get("id") or ""),

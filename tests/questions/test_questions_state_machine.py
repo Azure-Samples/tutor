@@ -1,5 +1,3 @@
-import types
-
 import pytest
 
 from questions.app.questions import (
@@ -21,37 +19,27 @@ def _configure_environment(monkeypatch):
     monkeypatch.setenv("COSMOS_ASSEMBLY_TABLE", "assemblies")
 
 
-class _StubAgentRegistry:
+class _StubFoundryAgentService:
+    """Stub that returns a fixed text response for any agent invocation."""
+    response_text = "Strong verdict with high confidence\nHigh confidence justification"
+
     def __init__(self, *_args, **_kwargs):
-        self.created_specs = []
+        self.calls: list[tuple[str, str]] = []
 
-    def create(self, spec):
-        self.created_specs.append(spec)
-        return types.SimpleNamespace(get_new_thread=lambda: "thread-id")
-
-
-class _StubRunContext:
-    def __init__(self, *_args, **_kwargs):
-        pass
-
-    async def run(self, *_args, **_kwargs):
-        return types.SimpleNamespace(
-            text="Strong verdict with high confidence\nHigh confidence justification"
-        )
+    async def run_agent(self, agent_id: str, prompt: str, **kwargs) -> str:
+        self.calls.append((agent_id, prompt))
+        return self.response_text
 
 
 @pytest.mark.asyncio
 async def test_evaluate_question_returns_completed(monkeypatch):
-    monkeypatch.setattr("questions.app.questions.AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr("questions.app.questions.AgentRunContext", _StubRunContext)
+    monkeypatch.setattr("questions.app.questions.FoundryAgentService", _StubFoundryAgentService)
 
     async def _fake_ensure(self):
         self.graders = [
             Grader(
-                id="grader-1",
-                name="Accuracy Grader",
+                agent_id="grader-1",
                 deployment="fake-deployment",
-                instructions="Assess accuracy",
                 dimension="accuracy",
             )
         ]
@@ -73,23 +61,19 @@ async def test_evaluate_question_returns_completed(monkeypatch):
     assert dim.notes[0] == "Strong verdict with high confidence"
 
 
-class _LowConfidenceRunContext(_StubRunContext):
-    async def run(self, *_args, **_kwargs):
-        return types.SimpleNamespace(text="Needs work\nLow confidence in assessment")
+class _LowConfidenceFoundryAgentService(_StubFoundryAgentService):
+    response_text = "Needs work\nLow confidence in assessment"
 
 
 @pytest.mark.asyncio
 async def test_confidence_inference_handles_low_confidence(monkeypatch):
-    monkeypatch.setattr("questions.app.questions.AgentRegistry", _StubAgentRegistry)
-    monkeypatch.setattr("questions.app.questions.AgentRunContext", _LowConfidenceRunContext)
+    monkeypatch.setattr("questions.app.questions.FoundryAgentService", _LowConfidenceFoundryAgentService)
 
     async def _fake_ensure(self):
         self.graders = [
             Grader(
-                id="grader-2",
-                name="Clarity Grader",
+                agent_id="grader-2",
                 deployment="fake-deployment",
-                instructions="Assess clarity",
                 dimension="clarity",
             )
         ]

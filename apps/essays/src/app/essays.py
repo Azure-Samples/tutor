@@ -15,7 +15,7 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from app.agents.clients import AgentAttachment, FoundryAgentService
+from tutor_lib.agents import AgentAttachment, FoundryAgentService
 from app.config import get_settings
 from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text, extract_text_with_doc_intelligence
 from app.schemas import Essay, AgentRef, Resource, Assembly
@@ -70,7 +70,7 @@ class EssayEvaluationStrategy:
     ) -> EssayEvaluationResult:
         prompt = self._composer.render(self.template_name, essay, resources)
         attachments = self._build_image_attachments(resources)
-        response_text = await self._agent_service.run_agent(agent.id, prompt, attachments=attachments)
+        response_text = await self._agent_service.run_agent(agent.agent_id, prompt, attachments=attachments)
         verdict, strengths, improvements = self._parse_response(response_text)
         return EssayEvaluationResult(
             strategy=self.strategy_type(),
@@ -218,48 +218,37 @@ class EssayOrchestrator:
         provisioned: list[AgentRef] = []
         for entry in items:
             if isinstance(entry, dict):
-                provisioned.append(AgentRef.model_validate(entry))
+                # Support both new lightweight format (agent_id) and legacy (id)
+                if "agent_id" in entry:
+                    provisioned.append(AgentRef.model_validate(entry))
+                elif "id" in entry:
+                    provisioned.append(AgentRef(
+                        agent_id=str(entry["id"]),
+                        role=entry.get("role", "default"),
+                        deployment=entry.get("deployment", ""),
+                    ))
                 continue
             if isinstance(entry, str):
-                remote = await self._agent_service.get_agent(entry)
-                provisioned.append(self._materialize_agent(remote))
+                provisioned.append(AgentRef(
+                    agent_id=entry,
+                    role="default",
+                    deployment="",
+                ))
                 continue
         return provisioned
-
-    def _materialize_agent(self, remote: Any) -> AgentRef:
-        agent_id = getattr(remote, "id", None)
-        if not agent_id:
-            raise ValueError("Azure AI agent response did not include an id")
-        name = getattr(remote, "name", agent_id)
-        instructions = getattr(remote, "instructions", "")
-        deployment = (
-            getattr(remote, "model", None)
-            or getattr(remote, "model_id", None)
-            or getattr(remote, "deployment_name", None)
-            or ""
-        )
-        temperature = getattr(remote, "temperature", None)
-        return AgentRef(
-            id=agent_id,
-            name=name,
-            instructions=instructions,
-            deployment=deployment,
-            temperature=temperature,
-        )
 
     def _select_agent(self, assembly: Assembly, strategy_type: EssayStrategyType) -> AgentRef:
         if not assembly.agents:
             raise ValueError(f"Assembly '{assembly.id}' does not contain agents")
 
-        keywords = {
-            EssayStrategyType.ANALYTICAL: ["analytic", "analysis", "analytical"],
-            EssayStrategyType.NARRATIVE: ["narrative", "creative", "story"],
-            EssayStrategyType.DEFAULT: ["general", "default", "review"],
+        role_map = {
+            EssayStrategyType.ANALYTICAL: "analytical",
+            EssayStrategyType.NARRATIVE: "narrative",
+            EssayStrategyType.DEFAULT: "default",
         }
-        candidates = keywords.get(strategy_type, [])
+        target_role = role_map.get(strategy_type, "default")
         for agent in assembly.agents:
-            haystack = f"{agent.name} {agent.instructions}".lower()
-            if any(keyword in haystack for keyword in candidates):
+            if agent.role == target_role:
                 return agent
         return assembly.agents[0]
 

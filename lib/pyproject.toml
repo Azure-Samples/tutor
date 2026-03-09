@@ -1,0 +1,35 @@
+[project]
+name = "tutor-lib"
+version = "0.1.0"
+description = "Shared library for Tutor backend services"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.5",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.4.0",
+    "PyJWT[crypto]>=2.10.1",
+    "azure-cosmos>=4.9.0",
+    "azure-identity>=1.20.0",
+    "agent-framework>=1.0.0rc3",
+    "agent-framework-azure-ai>=1.0.0rc3",
+    "azure-ai-projects>=2.0.0b4",
+    "jinja2>=3.1.6"
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.10",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.23.7"
+]
+
+[build-system]
+requires = ["setuptools>=70.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

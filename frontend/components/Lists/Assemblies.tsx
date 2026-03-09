@@ -13,7 +13,7 @@ type UnifiedAssembly = {
   topic_name: string;
   service: "essays" | "questions";
   essay_id?: string;
-  agents: { id?: string; name: string; instructions: string; deployment: string; temperature?: number }[];
+  agents: { agent_id?: string; name?: string; deployment: string; role?: string; temperature?: number; dimension?: string; instructions?: string }[];
 };
 
 const AssembliesList: React.FC = () => {
@@ -50,10 +50,11 @@ const AssembliesList: React.FC = () => {
               service: "essays",
               essay_id: s.essay_id,
               agents: s.agents.map((a) => ({
-                id: a.id,
+                agent_id: a.agent_id,
                 name: a.name,
                 instructions: a.instructions,
                 deployment: a.deployment,
+                role: a.role,
                 temperature: a.temperature,
               })),
             });
@@ -70,9 +71,8 @@ const AssembliesList: React.FC = () => {
               topic_name: a.topic_name ?? "",
               service: "questions",
               agents: a.agents.map((g) => ({
-                id: g.id,
-                name: g.name,
-                instructions: g.instructions,
+                agent_id: g.agent_id,
+                dimension: g.dimension,
                 deployment: g.deployment,
               })),
             });
@@ -215,13 +215,15 @@ const AssembliesList: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectedAssembly.agents.map((agent, idx) => (
-                <div key={(agent.id || agent.name) + idx} className="rounded-2xl border-2 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900 p-4 shadow">
-                  <p className="font-bold text-purple-700 dark:text-purple-200 text-lg mb-1">{agent.name}</p>
+                <div key={agent.agent_id ?? String(idx)} className="rounded-2xl border-2 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-900 p-4 shadow">
+                  <p className="font-bold text-purple-700 dark:text-purple-200 text-lg mb-1">{agent.role ?? agent.dimension ?? agent.name ?? "Agent"}</p>
                   <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">Deployment: <span className="font-semibold">{agent.deployment}</span></p>
-                  {agent.temperature !== undefined && (
-                    <p className="text-sm text-green-700 dark:text-green-300 mb-1">Temperature: <span className="font-semibold">{agent.temperature}</span></p>
+                  {agent.agent_id && (
+                    <p className="text-sm text-cyan-700 dark:text-cyan-300 mb-1">ID: <span className="font-mono text-xs">{agent.agent_id}</span></p>
                   )}
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">{agent.instructions.slice(0, 100)}{agent.instructions.length > 100 ? "…" : ""}</p>
+                  {agent.dimension && (
+                    <p className="text-sm text-green-700 dark:text-green-300 mb-1">Dimension: <span className="font-semibold">{agent.dimension}</span></p>
+                  )}
                 </div>
               ))}
             </div>

@@ -11,10 +11,6 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[2]
 UPSKILLING_APP = ROOT / "apps" / "upskilling"
 LIB_SRC = ROOT / "lib" / "src"
-if str(UPSKILLING_APP) not in sys.path:
-    sys.path.insert(0, str(UPSKILLING_APP))
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 
 def _stub_agent_framework_azure():

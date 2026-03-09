@@ -101,6 +101,7 @@ class EssayAgent:
     """Agent definition for essay assembly (no id → Foundry creates new agent)."""
     name: str
     instructions: str
+    role: str = "default"
     deployment: str = "gpt-4o"
     temperature: float | None = None
 
@@ -117,11 +118,11 @@ class EssayAssemblyDef:
 @dataclass
 class QuestionGrader:
     """Grader agent for question assembly (metadata only)."""
-    id: str
     name: str
     deployment: str
     instructions: str
     dimension: str
+    agent_id: str | None = None
 
 
 @dataclass
@@ -1070,6 +1071,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Avaliador de Escrita Fund. I",
+                role="default",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1085,6 +1087,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Avaliador de Conteúdo Fund. I",
+                role="narrative",
                 deployment="gpt-4o",
                 temperature=0.4,
                 instructions=(
@@ -1109,6 +1112,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Avaliador de Argumentação",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1124,6 +1128,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Avaliador de Linguagem Fund. II",
+                role="default",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1147,6 +1152,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Avaliador Narrativo Fund. II",
+                role="narrative",
                 deployment="gpt-4o",
                 temperature=0.4,
                 instructions=(
@@ -1162,6 +1168,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Avaliador de Estilo Fund. II",
+                role="narrative",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1185,6 +1192,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Corretor ENEM — Linguagem",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.2,
                 instructions=(
@@ -1204,6 +1212,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Corretor ENEM — Conteúdo",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.2,
                 instructions=(
@@ -1223,6 +1232,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Corretor ENEM — Proposta",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.2,
                 instructions=(
@@ -1251,6 +1261,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Corretor ENEM — Linguagem",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.2,
                 instructions=(
@@ -1264,6 +1275,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Corretor ENEM — Conteúdo",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.2,
                 instructions=(
@@ -1278,6 +1290,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Corretor ENEM — Proposta",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.2,
                 instructions=(
@@ -1300,6 +1313,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Avaliador Teórico — Macro",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1315,6 +1329,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Avaliador Empírico — Macro",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1340,6 +1355,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Avaliador de Econ. Brasileira",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1355,6 +1371,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Avaliador Acadêmico — Econ",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1378,6 +1395,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
         agents=[
             EssayAgent(
                 name="Avaliador Teoria dos Jogos",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1393,6 +1411,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             ),
             EssayAgent(
                 name="Avaliador de Bem-Estar Social",
+                role="analytical",
                 deployment="gpt-4o",
                 temperature=0.3,
                 instructions=(
@@ -1726,7 +1745,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         topic_name="Ensino Fundamental I — Avaliação Geral",
         agents=[
             QuestionGrader(
-                id="g-fund1-exatidao",
                 name="Corretor Fund. I — Exatidão",
                 deployment="gpt-4o",
                 dimension="exatidão",
@@ -1742,7 +1760,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-fund1-clareza",
                 name="Corretor Fund. I — Clareza",
                 deployment="gpt-4o",
                 dimension="clareza",
@@ -1764,7 +1781,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         topic_name="Ensino Fundamental II — Avaliação Geral",
         agents=[
             QuestionGrader(
-                id="g-fund2-exatidao",
                 name="Corretor Fund. II — Exatidão",
                 deployment="gpt-4o",
                 dimension="exatidão",
@@ -1780,7 +1796,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-fund2-raciocinio",
                 name="Corretor Fund. II — Raciocínio",
                 deployment="gpt-4o",
                 dimension="raciocínio",
@@ -1796,7 +1811,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-fund2-clareza",
                 name="Corretor Fund. II — Clareza",
                 deployment="gpt-4o",
                 dimension="clareza",
@@ -1818,7 +1832,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         topic_name="Ensino Médio — Avaliação Geral",
         agents=[
             QuestionGrader(
-                id="g-em-exatidao",
                 name="Corretor EM — Exatidão",
                 deployment="gpt-4o",
                 dimension="exatidão",
@@ -1835,7 +1848,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-em-raciocinio",
                 name="Corretor EM — Raciocínio",
                 deployment="gpt-4o",
                 dimension="raciocínio",
@@ -1851,7 +1863,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-em-profundidade",
                 name="Corretor EM — Profundidade",
                 deployment="gpt-4o",
                 dimension="profundidade",
@@ -1874,7 +1885,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         topic_name="Graduação em Ciências Econômicas — Avaliação",
         agents=[
             QuestionGrader(
-                id="g-econ-exatidao",
                 name="Avaliador Econ — Exatidão",
                 deployment="gpt-4o",
                 dimension="exatidão",
@@ -1890,7 +1900,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-econ-raciocinio",
                 name="Avaliador Econ — Raciocínio",
                 deployment="gpt-4o",
                 dimension="raciocínio",
@@ -1906,7 +1915,6 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
                 ),
             ),
             QuestionGrader(
-                id="g-econ-analise",
                 name="Avaliador Econ — Análise Crítica",
                 deployment="gpt-4o",
                 dimension="análise crítica",

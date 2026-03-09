@@ -16,6 +16,8 @@ This directory contains the Architecture Decision Records (ADRs) for **The Tutor
 | [008](./008-security-layers.md) | Security Layers and Zero-Trust | Accepted | 2026-02-24 |
 | [009](./009-supervisor-fabric-integration.md) | Supervisor Insights & Microsoft Fabric Integration | Proposed | 2025-01 |
 | [010](./010-pedagogical-content-ocr.md) | Pedagogical Content Ingestion, OCR & RAG | Accepted | 2026-03-02 |
+| [011](./011-foundry-first-agent-architecture.md) | Foundry-First Agent Architecture | Accepted | 2026-03-09 |
+| [012](./012-cosmos-foundry-agent-migration.md) | Cosmos-to-Foundry Agent Migration Implementation | Accepted | 2026-03-16 |
 
 ## ADR Format
 

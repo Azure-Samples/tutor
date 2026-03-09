@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { essaysEngine, questionsEngine } from "@/utils/api";
-import { FaRobot, FaTag, FaBook, FaListOl, FaPlus, FaTimes, FaPen } from "react-icons/fa";
+import { FaRobot, FaTag, FaBook, FaListOl, FaPlus, FaTimes, FaPen, FaUserTag } from "react-icons/fa";
 
 type AgentField = {
-  id?: string;
+  agent_id?: string;
   name: string;
   instructions: string;
   deployment: string;
+  role?: string;
   temperature?: number;
+  dimension?: string;
 };
 
 type UnifiedAssembly = {
@@ -19,6 +21,7 @@ type UnifiedAssembly = {
 };
 
 const DEPLOYMENT_OPTIONS = ["gpt-4o", "gpt-4o-mini", "o3-mini"];
+const ROLE_OPTIONS = ["default", "analytical", "narrative"] as const;
 
 const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () => void }> = ({ assemblyData, onSuccess }) => {
   const [form, setForm] = useState<UnifiedAssembly>(
@@ -33,7 +36,10 @@ const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () =>
   };
 
   const addAgent = () => {
-    setForm({ ...form, agents: [...form.agents, { name: "", instructions: "", deployment: "gpt-4o", temperature: 0.7 }] });
+    const newAgent: AgentField = form.service === "essays"
+      ? { name: "", instructions: "", deployment: "gpt-4o", role: "default", temperature: 0.7 }
+      : { name: "", instructions: "", deployment: "gpt-4o", dimension: "" };
+    setForm({ ...form, agents: [...form.agents, newAgent] });
   };
 
   const removeAgent = (index: number) => {
@@ -46,11 +52,13 @@ const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () =>
     try {
       const assemblyId = form.id?.trim() || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `asm-${Date.now()}`);
       const agents = form.agents.map((a) => ({
-        ...(a.id ? { id: a.id } : {}),
+        ...(a.agent_id ? { agent_id: a.agent_id } : {}),
         name: a.name,
         instructions: a.instructions,
         deployment: a.deployment,
-        temperature: a.temperature,
+        ...(form.service === "essays"
+          ? { role: a.role ?? "default", temperature: a.temperature }
+          : { dimension: a.dimension ?? "" }),
       }));
 
       let res;
@@ -165,6 +173,25 @@ const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () =>
             className="w-full rounded-2xl border-2 border-purple-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 px-4 py-2 text-base transition-all duration-200 bg-white dark:bg-boxdark placeholder:text-purple-400"
             placeholder="Temperature (0-2)"
           />
+          {form.service === "essays" ? (
+            <select
+              value={agent.role ?? "default"}
+              onChange={(e) => handleAgentChange(index, "role", e.target.value)}
+              className="w-full rounded-2xl border-2 border-purple-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 px-4 py-2 text-base transition-all duration-200 bg-white dark:bg-boxdark"
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={agent.dimension ?? ""}
+              onChange={(e) => handleAgentChange(index, "dimension", e.target.value)}
+              className="w-full rounded-2xl border-2 border-purple-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 px-4 py-2 text-base transition-all duration-200 bg-white dark:bg-boxdark placeholder:text-purple-400"
+              placeholder="Grading dimension"
+            />
+          )}
           <textarea
             value={agent.instructions}
             onChange={(e) => handleAgentChange(index, "instructions", e.target.value)}

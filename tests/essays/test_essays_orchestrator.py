@@ -20,11 +20,18 @@ def essays_app_module_fixture(monkeypatch):
 
     repo_root = Path(__file__).resolve().parents[2]
     essays_root = repo_root / "apps" / "essays"
-    if str(essays_root) not in sys.path:
-        sys.path.insert(0, str(essays_root))
     essays_src = essays_root / "src"
-    if str(essays_src) not in sys.path:
-        sys.path.insert(0, str(essays_src))
+    lib_src = repo_root / "lib" / "src"
+
+    for entry in (str(essays_root), str(essays_src), str(lib_src)):
+        if entry in sys.path:
+            sys.path.remove(entry)
+        sys.path.insert(0, entry)
+
+    # Clear cached app.* modules to avoid cross-service contamination
+    for mod_name in list(sys.modules):
+        if mod_name == "app" or mod_name.startswith("app."):
+            del sys.modules[mod_name]
 
     from app.config import get_settings  # pylint: disable=import-error
 
@@ -49,8 +56,9 @@ def essays_main_module_fixture(monkeypatch):
     lib_src = repo_root / "lib" / "src"
 
     for entry in (str(essays_src), str(lib_src)):
-        if entry not in sys.path:
-            sys.path.insert(0, entry)
+        if entry in sys.path:
+            sys.path.remove(entry)
+        sys.path.insert(0, entry)
 
     for module_name in list(sys.modules):
         if module_name == "app" or module_name.startswith("app."):
@@ -87,9 +95,8 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
     provisioned = module.AgentRef(
-        id="agent-default",
-        name="General Reviewer",
-        instructions="Provide general feedback",
+        agent_id="agent-default",
+        role="default",
         deployment="gpt-4o",
     )
 
@@ -118,15 +125,13 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
     narrative_agent = module.AgentRef(
-        id="agent-narrative",
-        name="Narrative Coach",
-        instructions="Support creative storytelling",
+        agent_id="agent-narrative",
+        role="narrative",
         deployment="gpt-4o",
     )
     default_agent = module.AgentRef(
-        id="agent-default",
-        name="General Reviewer",
-        instructions="Provide general feedback",
+        agent_id="agent-default",
+        role="default",
         deployment="gpt-4o",
     )
 
@@ -161,9 +166,8 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
     analytical_agent = module.AgentRef(
-        id="agent-analytical",
-        name="Analytical Reviewer",
-        instructions="Analyse evidence",
+        agent_id="agent-analytical",
+        role="analytical",
         deployment="o3-mini",
     )
 
@@ -195,11 +199,9 @@ class _StubContainer:
             "essay_id": "essay-stub",
             "agents": [
                 {
-                    "id": "agent-1",
-                    "name": "General Reviewer",
-                    "instructions": "Review essays",
+                    "agent_id": "agent-1",
+                    "role": "default",
                     "deployment": "gpt-4o",
-                    "temperature": 0.2,
                 }
             ],
         }
