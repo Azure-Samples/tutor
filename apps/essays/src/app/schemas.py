@@ -121,28 +121,28 @@ class ChatResponse(BaseModel):
     resources: list[Resource]
 
 
-class ProvisionedAgent(AgentDefinition):
-    """Representation of an agent persisted in Azure AI Foundry."""
+class AgentRef(AgentDefinition):
+    """Reference to an agent provisioned in Azure AI Foundry."""
 
     id: str = Field(..., description="Azure AI Foundry agent ID")
 
 
-class Swarm(BaseModel):
-    """Represents a swarm stored in Cosmos DB with its provisioned agents."""
+class Assembly(BaseModel):
+    """Represents an assembly stored in Cosmos DB with its agent references."""
 
     id: str = Field(..., description="Assembly ID")
     topic_name: str = Field(..., description="Topic to Answer")
-    agents: List[ProvisionedAgent] = Field(..., description="Provisioned agent definitions")
+    agents: List[AgentRef] = Field(..., description="Agent references provisioned in Foundry")
     essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
 
 
-class SwarmDefinition(BaseModel):
-    """Payload used to create or update a swarm along with its agent definitions."""
+class AssemblyDefinition(BaseModel):
+    """Payload used to create or update an assembly along with its agent definitions."""
 
     id: str = Field(..., description="Assembly ID")
     topic_name: str = Field(..., description="Topic to Answer")
     essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
-    agents: List[AgentDefinition] = Field(..., description="Agent definitions provisioning Azure AI Foundry agents")
+    agents: List[AgentDefinition] = Field(..., description="Agent definitions for Azure AI Foundry agents")
 
 
 RESPONSES = {

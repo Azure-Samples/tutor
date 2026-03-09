@@ -5,7 +5,7 @@ import { unwrapContent } from "@/types/api";
 import FormsModal from "@/components/common/Modals";
 import { FaTrash, FaPlus, FaEye } from "react-icons/fa";
 import AssemblyForm from "@/components/Forms/Assemblies";
-import type { SwarmDefinition } from "@/types/essays";
+import type { AssemblyDefinition } from "@/types/essays";
 import type { Assembly as QAssembly } from "@/types/assembly";
 
 type UnifiedAssembly = {
@@ -41,7 +41,7 @@ const AssembliesList: React.FC = () => {
       const unified: UnifiedAssembly[] = [];
 
       if (essayRes.status === "fulfilled") {
-        const essayData = unwrapContent<SwarmDefinition[]>(essayRes.value.data);
+        const essayData = unwrapContent<AssemblyDefinition[]>(essayRes.value.data);
         if (Array.isArray(essayData)) {
           for (const s of essayData) {
             unified.push({

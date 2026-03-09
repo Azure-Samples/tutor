@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import importlib
 import logging
 import os
 import time
@@ -14,23 +13,8 @@ from typing import Any, Optional, Union
 
 import requests
 from PIL import Image
-import agent_framework as agent_framework_module
-
-try:
-    agent_framework_azure = importlib.import_module("agent_framework.azure")
-    AgentToolkit = getattr(agent_framework_azure, "AgentToolkit")
-except (ImportError, AttributeError):  # pragma: no cover - compatibility fallback when symbol is unavailable
-    @dataclass(slots=True)
-    class AgentToolkit:
-        tools: list[Any]
-
-
-_agent_decorator = getattr(agent_framework_module, "tool", None) or getattr(agent_framework_module, "ai_function", None)
-if _agent_decorator is None:  # pragma: no cover - very defensive fallback
-    def ai_function(*_: Any, **__: Any):
-        return lambda callback: callback
-else:
-    ai_function = _agent_decorator
+from agent_framework import ai_function
+from agent_framework_azure_ai import AgentToolkit
 from azure.ai.vision.imageanalysis import ImageAnalysisClient, VisualFeatures
 from azure.core.credentials import AzureKeyCredential
 from azure.cosmos.aio import CosmosClient

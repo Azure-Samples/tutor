@@ -15,6 +15,7 @@ from azure.identity.aio import DefaultAzureCredential
 from tutor_lib.agents import AgentRegistry, AgentRunContext, AgentSpec
 from tutor_lib.config import get_settings
 
+from app.interfaces import DimensionEvaluation, QuestionEvaluationResult, QuestionEvaluationStatus
 from app.schemas import Answer, Assembly, Grader, Question
 
 
@@ -56,10 +57,11 @@ class EvaluatingState:
                 instructions=grader.instructions,
                 deployment=grader.deployment,
                 max_tokens=600,
+                temperature=0.1,
             )
         )
         run_context = AgentRunContext(agent)
-        response = await run_context.run(prompt, temperature=0.1)
+        response = await run_context.run(prompt)
         raw_text = getattr(response, "text", "") or ""
         notes = [line.strip() for line in raw_text.split("\n") if line.strip()]
         verdict = notes[0] if notes else "No verdict returned"

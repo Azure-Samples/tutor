@@ -43,8 +43,11 @@ graph TB
             subgraph AI
                 OPENAI["Azure OpenAI\n(gpt-4o)"]
                 SPEECH["Speech Services"]
-                FOUNDRY["AI Foundry\nProject"]
                 DOCINTEL["AI Document\nIntelligence"]
+            end
+
+            subgraph AI_Foundry["AI Foundry (westus3, public endpoint)"]
+                FOUNDRY["AI Foundry\nProject"]
             end
 
             subgraph External
@@ -163,6 +166,8 @@ All Terraform modules use AVM from the [Azure Verified Modules registry](https:/
 | **Cognitive Services (OpenAI)** | `avm/res/cognitive-services/account` | `Azure/avm-res-cognitiveservices-account/azurerm` |
 | **Cognitive Services (Speech)** | `avm/res/cognitive-services/account` | `Azure/avm-res-cognitiveservices-account/azurerm` |
 | **Cognitive Services (Document Intelligence)** | `avm/res/cognitive-services/account` | `Azure/avm-res-cognitiveservices-account/azurerm` |
+| **AI Foundry Hub** | `avm/res/machine-learning-services/workspace` | `Azure/avm-res-machinelearningservices-workspace/azurerm` |
+| **AI Foundry Project** | `avm/res/machine-learning-services/workspace` | `Azure/avm-res-machinelearningservices-workspace/azurerm` |
 | **AI Search** | `avm/res/search/search-service` | `Azure/avm-res-search-searchservice/azurerm` |
 | **Static Web App** | `avm/res/web/static-site` | `Azure/avm-res-web-staticsite/azurerm` |
 | **Managed Identity** | `avm/res/managed-identity/user-assigned-identity` | `Azure/avm-res-managedidentity-userassignedidentity/azurerm` |
@@ -228,6 +233,8 @@ module "ai" {
   openai_capacity     = var.openai_capacity
   enable_document_intelligence = true
   enable_ai_search             = true
+  foundry_location    = "westus3"
+  managed_identity_ids = module.security.managed_identity_ids
 }
 
 module "compute" {
@@ -357,6 +364,88 @@ module "cosmos_db" {
   }
 }
 ```
+
+### 4.4 AI Module — Foundry (ADR-011)
+
+Azure AI Foundry is deployed **outside the VNet** in **westus3** with a public endpoint (see [ADR-011](adr/011-foundry-first-agent-architecture.md)). The AI Hub + AI Project pattern uses the `avm/res/machine-learning-services/workspace` AVM module.
+
+```hcl
+# infra/terraform/modules/ai/foundry.tf
+
+# AI Services account (backing resource for Foundry agents)
+module "ai_services" {
+  source  = "Azure/avm-res-cognitiveservices-account/azurerm"
+  version = "~> 0.6"
+
+  name                = "tutor-ai-svc-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = "westus3"
+  kind                = "AIServices"
+  sku_name            = "S0"
+
+  # Public endpoint — not inside VNet
+  public_network_access_enabled = true
+
+  tags = {
+    project     = "tutor"
+    environment = var.environment
+  }
+}
+
+# AI Hub (workspace of kind "Hub")
+module "ai_hub" {
+  source  = "Azure/avm-res-machinelearningservices-workspace/azurerm"
+  version = "~> 0.5"
+
+  name                = "tutor-ai-hub-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = "westus3"
+  kind                = "Hub"
+
+  storage_account_id    = var.storage_account_id
+  key_vault_id          = var.key_vault_id
+  application_insights_id = var.app_insights_id
+
+  # Public endpoint — not inside VNet
+  public_network_access = "Enabled"
+
+  tags = {
+    project     = "tutor"
+    environment = var.environment
+  }
+}
+
+# AI Project (workspace of kind "Project" linked to Hub)
+module "ai_project" {
+  source  = "Azure/avm-res-machinelearningservices-workspace/azurerm"
+  version = "~> 0.5"
+
+  name                = "tutor-ai-project-${var.environment}"
+  resource_group_name = var.resource_group_name
+  location            = "westus3"
+  kind                = "Project"
+
+  hub_resource_id = module.ai_hub.resource_id
+
+  tags = {
+    project     = "tutor"
+    environment = var.environment
+  }
+}
+
+# RBAC: Cognitive Services User for all container app managed identities
+resource "azurerm_role_assignment" "foundry_agent_user" {
+  for_each             = var.managed_identity_ids
+  scope                = module.ai_services.resource_id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = each.value
+}
+```
+
+**Key design decisions:**
+- **westus3, public endpoint** — avoids VNet complexity; agents are accessed via managed identity + RBAC
+- **AVM pattern** — consistent with all other infrastructure modules (ADR-004)
+- **Outputs**: `ai_project.resource_id` → `PROJECT_ENDPOINT` environment variable for all agentic services
 
 ---
 
@@ -595,11 +684,12 @@ variable "services" {
 |----------|--------|----------|
 | `AZURE_CLIENT_ID` | Terraform output (per-service MI) | All |
 | `COSMOS_ENDPOINT` | Terraform output | All |
+| `PROJECT_ENDPOINT` | Terraform output (AI Foundry project) | Assessment, Interaction, Analytics |
+| `MODEL_DEPLOYMENT_NAME` | Terraform variable | Assessment, Interaction, Analytics |
 | `OPENAI_ENDPOINT` | Terraform output | Assessment, Interaction |
 | `SPEECH_ENDPOINT` | Terraform output | Avatar |
 | `BLOB_ENDPOINT` | Terraform output | Essays |
 | `KEY_VAULT_URL` | Terraform output | All |
-| `AI_PROJECT_CONN` | Key Vault reference | Assessment, Analytics |
 | `APP_ENV` | Terraform variable | All |
 | `LOG_LEVEL` | Terraform variable | All |
 

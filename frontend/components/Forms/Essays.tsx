@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FaPen, FaFileAlt, FaListAlt, FaBell, FaHashtag, FaUsersCog, FaLink } from "react-icons/fa";
 
-import type { AgentDefinition, Essay, ProvisionedAgent, SwarmDefinition } from "@/types/essays";
+import type { AgentDefinition, Essay, AgentRef, AssemblyDefinition } from "@/types/essays";
 import { unwrapContent } from "@/types/api";
 import { essaysEngine } from "@/utils/api";
 
@@ -30,7 +30,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
   const [status, setStatus] = useState<string>("");
   const isEdit = Boolean(essayData);
 
-  const [availableAgents, setAvailableAgents] = useState<ProvisionedAgent[]>([]);
+  const [availableAgents, setAvailableAgents] = useState<AgentRef[]>([]);
   const [loadingAgents, setLoadingAgents] = useState<boolean>(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
 
@@ -45,7 +45,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
   const [existingAssemblyAgents, setExistingAssemblyAgents] = useState<AgentDefinition[]>([]);
 
   const agentsById = useMemo(() => {
-    const lookup = new Map<string, ProvisionedAgent>();
+    const lookup = new Map<string, AgentRef>();
     for (const agent of availableAgents) {
       lookup.set(agent.id, agent);
     }
@@ -78,7 +78,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       setAgentsError(null);
       try {
         const res = await essaysEngine.get("/agents");
-        const items = unwrapContent<ProvisionedAgent[]>(res.data) || [];
+        const items = unwrapContent<AgentRef[]>(res.data) || [];
         setAvailableAgents(items);
       } catch (error) {
         console.error("Failed to load agents", error);
@@ -100,7 +100,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       setAssemblyError(null);
       try {
         const res = await essaysEngine.get("/assemblies", { params: { essay_id: essayId } });
-        const assemblies = unwrapContent<SwarmDefinition[]>(res.data) || [];
+        const assemblies = unwrapContent<AssemblyDefinition[]>(res.data) || [];
         if (assemblies.length === 0) {
           setExistingAssemblyId(null);
           setSelectedAgents([]);
@@ -162,7 +162,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       return false;
     }
 
-    const payload: SwarmDefinition = {
+    const payload: AssemblyDefinition = {
       id: trimmedAssemblyId,
       topic_name: assemblyTopic.trim() || form.topic,
       essay_id: essayId,

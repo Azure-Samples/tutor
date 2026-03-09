@@ -10,22 +10,10 @@ from typing import Iterable
 
 from fastapi import HTTPException, status
 
-try:
-    from pypdf import PdfReader
-except ImportError:  # pragma: no cover - optional runtime fallback
-    PdfReader = None  # type: ignore[assignment]
-
-try:
-    from azure.ai.documentintelligence import DocumentIntelligenceClient
-    from azure.core.credentials import AzureKeyCredential
-except ImportError:  # pragma: no cover - optional during local development
-    DocumentIntelligenceClient = None  # type: ignore[assignment]
-    AzureKeyCredential = None  # type: ignore[assignment]
-
-try:
-    from PIL import Image
-except ImportError:  # pragma: no cover - pillow is an optional runtime dependency
-    Image = None  # type: ignore[assignment]
+from pypdf import PdfReader
+from azure.ai.documentintelligence import DocumentIntelligenceClient
+from azure.core.credentials import AzureKeyCredential
+from PIL import Image
 
 
 ALLOWED_IMAGE_TYPES: set[str] = {
@@ -95,9 +83,6 @@ def read_upload_bytes(data: bytes | bytearray | memoryview) -> bytes:
 def extract_pdf_text(payload: bytes) -> str:
     """Extract plain text from a PDF payload."""
 
-    if PdfReader is None:
-        return ""
-
     reader = PdfReader(BytesIO(payload))
     buffer: list[str] = []
     for page in reader.pages:
@@ -111,7 +96,7 @@ def extract_text_with_doc_intelligence(payload: bytes, content_type: str) -> str
     """Extract text using Azure AI Document Intelligence when configured."""
 
     endpoint = os.environ.get("DOCUMENT_INTELLIGENCE_ENDPOINT", "").strip()
-    if not endpoint or DocumentIntelligenceClient is None:
+    if not endpoint:
         return None
 
     model = os.environ.get("DOCUMENT_INTELLIGENCE_MODEL", DEFAULT_DOCUMENT_INTELLIGENCE_MODEL).strip()
@@ -119,7 +104,7 @@ def extract_text_with_doc_intelligence(payload: bytes, content_type: str) -> str
         model = DEFAULT_DOCUMENT_INTELLIGENCE_MODEL
 
     key = os.environ.get("DOCUMENT_INTELLIGENCE_KEY", "").strip()
-    if not key or AzureKeyCredential is None:
+    if not key:
         return None
 
     try:
@@ -175,13 +160,12 @@ def process_image(payload: bytes, file_name: str, content_type: str) -> Processe
     width: str | None = None
     height: str | None = None
     image_format: str | None = None
-    if Image is not None:
-        try:
-            with Image.open(BytesIO(payload)) as img:
-                width, height = str(img.width), str(img.height)
-                image_format = str(img.format or "")
-        except Exception:  # pragma: no cover - best effort metadata only
-            width = height = image_format = None
+    try:
+        with Image.open(BytesIO(payload)) as img:
+            width, height = str(img.width), str(img.height)
+            image_format = str(img.format or "")
+    except Exception:  # pragma: no cover - best effort metadata only
+        width = height = image_format = None
     if width and height:
         metadata["dimensions"] = f"{width}x{height}"
     if image_format:
@@ -238,12 +222,6 @@ def process_upload(payload: bytes, file_name: str, content_type: str) -> Process
 
 def _optimise_image_payload(payload: bytes) -> tuple[bytes, dict[str, str]]:
     """Attempt to downscale or compress large images to fit within Cosmos limits."""
-
-    if Image is None:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Image exceeds 1 MB and cannot be resized on the server. Please upload a smaller image.",
-        )
 
     try:
         with Image.open(BytesIO(payload)) as img:

@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { FaRobot, FaInfoCircle, FaTerminal, FaTemperatureLow } from "react-icons/fa";
 
 import { essaysEngine } from "@/utils/api";
-import type { AgentDefinition, ProvisionedAgent } from "@/types/essays";
+import type { AgentDefinition, AgentRef } from "@/types/essays";
 
 interface AgentFormProps {
-  onSuccess?: (agent: ProvisionedAgent) => void;
+  onSuccess?: (agent: AgentRef) => void;
 }
 
 const defaultAgent: AgentDefinition = {
@@ -38,7 +38,7 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
     setStatus(null);
     setError(null);
     try {
-      const response = await essaysEngine.post<ProvisionedAgent>("/agents", form);
+      const response = await essaysEngine.post<AgentRef>("/agents", form);
       setStatus(`Agent provisioned with id ${response.data.id}`);
       if (onSuccess) {
         onSuccess(response.data);

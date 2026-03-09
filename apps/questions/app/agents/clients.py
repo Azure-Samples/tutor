@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any, Callable, Iterable
 
-import agent_framework.azure as agent_framework_azure
-from azure.identity import DefaultAzureCredential
+from agent_framework import ChatAgent
+from agent_framework_azure_ai import AzureAIAgentClient
+from azure.identity.aio import DefaultAzureCredential
 
 from .tooling import ToolBuilder
 
@@ -25,32 +25,25 @@ class AgentSpec:
 
 
 class AgentRegistry:
-    """Factory responsible for provisioning `ChatAgent` instances consistently."""
+    """Factory responsible for provisioning ChatAgent instances consistently."""
 
-    def __init__(self, endpoint: str, credential_factory: Callable[[], Any] | None = None) -> None:
-        self._endpoint = endpoint
+    def __init__(self, project_endpoint: str, credential_factory: Callable[[], Any] | None = None) -> None:
+        self._project_endpoint = project_endpoint
         self._credential_factory = credential_factory or DefaultAzureCredential
         self._tool_builder = ToolBuilder()
 
-    @lru_cache(maxsize=32)
-    def _client(self, deployment: str) -> Any:
-        """Create or reuse a client for the provided deployment."""
-
-        return agent_framework_azure.AzureAIAgentClient(  # type: ignore[attr-defined]
-            endpoint=self._endpoint,
-            credential=self._credential_factory(),
-            deployment=deployment,
-        )
-
-    def create(self, spec: AgentSpec) -> Any:
+    def create(self, spec: AgentSpec) -> ChatAgent:
         """Instantiate a ready-to-run agent respecting the supplied spec."""
-
-        client = self._client(spec.deployment)
+        client = AzureAIAgentClient(
+            project_endpoint=self._project_endpoint,
+            model_deployment_name=spec.deployment,
+            async_credential=self._credential_factory(),
+            agent_name=spec.name,
+        )
         configured_tools = self._tool_builder.from_callbacks(spec.tools)
-        return client.create_agent(
+        return ChatAgent(
+            client=client,
             name=spec.name,
             instructions=spec.instructions,
-            tools=configured_tools,
-            temperature=spec.temperature,
-            max_output_tokens=spec.max_tokens,
+            tools=configured_tools or None,
         )

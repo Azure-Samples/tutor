@@ -86,7 +86,7 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
     _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    provisioned = module.ProvisionedAgent(
+    provisioned = module.AgentRef(
         id="agent-default",
         name="General Reviewer",
         instructions="Provide general feedback",
@@ -94,9 +94,9 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):
-        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-1", agents=[provisioned])
+        return module.Assembly(id=assembly_id, topic_name="Topic", essay_id="essay-1", agents=[provisioned])
 
-    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
 
     orchestrator = module.EssayOrchestrator()
 
@@ -117,13 +117,13 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
     )
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    narrative_agent = module.ProvisionedAgent(
+    narrative_agent = module.AgentRef(
         id="agent-narrative",
         name="Narrative Coach",
         instructions="Support creative storytelling",
         deployment="gpt-4o",
     )
-    default_agent = module.ProvisionedAgent(
+    default_agent = module.AgentRef(
         id="agent-default",
         name="General Reviewer",
         instructions="Provide general feedback",
@@ -131,9 +131,9 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):  # pragma: no cover - monkeypatched helper
-        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-2", agents=[default_agent, narrative_agent])
+        return module.Assembly(id=assembly_id, topic_name="Topic", essay_id="essay-2", agents=[default_agent, narrative_agent])
 
-    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
 
     orchestrator = module.EssayOrchestrator()
 
@@ -160,7 +160,7 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
     )
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    analytical_agent = module.ProvisionedAgent(
+    analytical_agent = module.AgentRef(
         id="agent-analytical",
         name="Analytical Reviewer",
         instructions="Analyse evidence",
@@ -168,9 +168,9 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):
-        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-3", agents=[analytical_agent])
+        return module.Assembly(id=assembly_id, topic_name="Topic", essay_id="essay-3", agents=[analytical_agent])
 
-    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
 
     orchestrator = module.EssayOrchestrator()
 
@@ -232,7 +232,7 @@ class _StubCosmosClient:
 
 
 @pytest.mark.asyncio
-async def test_load_swarm_raises_for_missing_assembly(monkeypatch, essays_app_module_fixture):
+async def test_load_assembly_raises_for_missing_assembly(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
@@ -252,7 +252,7 @@ async def test_load_swarm_raises_for_missing_assembly(monkeypatch, essays_app_mo
 
 
 @pytest.mark.asyncio
-async def test_load_swarm_returns_agents(monkeypatch, essays_app_module_fixture):
+async def test_load_assembly_returns_agents(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 

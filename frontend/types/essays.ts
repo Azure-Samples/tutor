@@ -37,11 +37,11 @@ export type AgentDefinition = {
   temperature?: number;
 };
 
-export type ProvisionedAgent = AgentDefinition & {
+export type AgentRef = AgentDefinition & {
   id: string;
 };
 
-export type SwarmDefinition = {
+export type AssemblyDefinition = {
   id: string;
   topic_name: string;
   essay_id: string;
@@ -52,5 +52,5 @@ export type Assembly = {
   id: string;
   topic_name: string;
   essay_id: string;
-  agents: ProvisionedAgent[];
+  agents: AgentRef[];
 };

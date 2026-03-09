@@ -5,7 +5,7 @@ import FormsModal from "@/components/common/Modals";
 import { FaTrash, FaPlus, FaRobot, FaSync } from "react-icons/fa";
 import EssayForm from "@/components/Forms/Essays";
 import AgentForm from "@/components/Forms/Agent";
-import type { Essay, EssayEvaluationResult, ProvisionedAgent } from "@/types/essays";
+import type { Essay, EssayEvaluationResult, AgentRef } from "@/types/essays";
 import { unwrapContent } from "@/types/api";
 
 const EssaysList: React.FC = () => {
@@ -17,7 +17,7 @@ const EssaysList: React.FC = () => {
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [latestAgent, setLatestAgent] = useState<ProvisionedAgent | null>(null);
+  const [latestAgent, setLatestAgent] = useState<AgentRef | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [reprocessError, setReprocessError] = useState<string | null>(null);
   const [latestEvaluation, setLatestEvaluation] = useState<{

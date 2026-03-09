@@ -8,12 +8,12 @@ import logging
 from io import BytesIO
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from functools import lru_cache
 from typing import Any, AsyncIterator, Callable, Iterable, Sequence, cast
 
-import agent_framework.azure as agent_framework_azure
-from azure.ai.agents.aio import AgentsClient
+from agent_framework import ChatAgent
+from agent_framework_azure_ai import AzureAIAgentClient
 from azure.ai.agents.models import Agent, ListSortOrder, RunStatus
+from azure.ai.projects.aio import AIProjectClient
 from azure.core.credentials_async import AsyncTokenCredential
 from azure.core.exceptions import AzureError
 from azure.identity import DefaultAzureCredential
@@ -56,27 +56,25 @@ class AgentRegistry:
         self._credential_factory = credential_factory or DefaultAzureCredential
         self._tool_builder = ToolBuilder()
 
-    @lru_cache(maxsize=32)
-    def _client(self, deployment: str) -> Any:
-        """Create or reuse a client for the provided deployment."""
+    def _client(self, deployment: str) -> AzureAIAgentClient:
+        """Create a client for the provided deployment."""
 
-        return agent_framework_azure.AzureAIAgentClient(  # type: ignore[attr-defined]
-            endpoint=self._endpoint,
-            credential=self._credential_factory(),
-            deployment=deployment,
+        return AzureAIAgentClient(
+            project_endpoint=self._endpoint,
+            model_deployment_name=deployment,
+            async_credential=self._credential_factory(),
         )
 
-    def create(self, spec: AgentSpec) -> Any:
+    def create(self, spec: AgentSpec) -> ChatAgent:
         """Instantiate a ready-to-run agent respecting the supplied spec."""
 
         client = self._client(spec.deployment)
         configured_tools = self._tool_builder.from_callbacks(spec.tools)
-        return client.create_agent(
+        return ChatAgent(
+            client=client,
             name=spec.name,
             instructions=spec.instructions,
             tools=configured_tools,
-            temperature=spec.temperature,
-            max_output_tokens=spec.max_tokens,
         )
 
 
@@ -114,14 +112,14 @@ class FoundryAgentService:
                         await result
 
     @asynccontextmanager
-    async def _client(self) -> AsyncIterator[AgentsClient]:
+    async def _client(self) -> AsyncIterator[Any]:
         async with self._credential() as credential:
-            client = AgentsClient(endpoint=self._endpoint, credential=credential)
-            await client.__aenter__()
+            project_client = AIProjectClient(endpoint=self._endpoint, credential=credential)
+            await project_client.__aenter__()
             try:
-                yield client
+                yield project_client.agents
             finally:
-                await client.__aexit__(None, None, None)
+                await project_client.__aexit__(None, None, None)
 
     async def create_agent(
         self,
