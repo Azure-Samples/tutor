@@ -74,6 +74,16 @@ class Essay(BaseModel):
     )
 
 
+class EssayPatch(BaseModel):
+    """Partial update model — only explicitly provided fields are applied."""
+    topic: Optional[str] = None
+    content: Optional[str] = None
+    explanation: Optional[str] = None
+    content_file_location: Optional[str] = None
+    theme: Optional[str] = None
+    file_url: Optional[str] = None
+    assembly_id: Optional[str] = None
+
 
 class AgentDefinition(BaseModel):
     """Definition of an Azure AI Foundry agent used within a swarm."""

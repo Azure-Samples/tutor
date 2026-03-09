@@ -1,13 +1,14 @@
 "use client";
 import { useState } from "react";
-import { webApp } from "@/utils/api";
+import { questionsEngine } from "@/utils/api";
 import { Question } from "@/types/question";
 
 const QuestionForm: React.FC = () => {
   const [question, setQuestion] = useState<Question>({
+    id: "",
     topic: "",
     question: "",
-    answer: "",
+    explanation: "",
   });
 
   const [status, setStatus] = useState<string>("");
@@ -16,7 +17,13 @@ const QuestionForm: React.FC = () => {
     try {
       setStatus("Sending request...");
 
-      const response = await webApp.post("/create-question", question);
+      const payload = {
+        ...question,
+        id: question.id || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `q-${Date.now()}`),
+        explanation: question.explanation ?? "",
+      };
+
+      const response = await questionsEngine.post("/questions", payload);
 
       if (response.status === 200 || response.status === 201) {
         setStatus("Question created successfully!");
@@ -61,13 +68,13 @@ const QuestionForm: React.FC = () => {
           </div>
           <div>
             <label className="text-sm font-medium text-black dark:text-white mb-2 block">
-              Answer
+              Explanation
             </label>
             <textarea
-              value={question.answer ?? ""}
-              onChange={(e) => setQuestion({ ...question, answer: e.target.value })}
+              value={question.explanation ?? ""}
+              onChange={(e) => setQuestion({ ...question, explanation: e.target.value })}
               className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-primary"
-              placeholder="Type the answer"
+              placeholder="Type the explanation"
             />
           </div>
         </div>

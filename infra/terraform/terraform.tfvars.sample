@@ -2,3 +2,11 @@ name_prefix  = "tutor"
 environment  = "dev"
 location     = "eastus"
 cosmos_db_name = "tutor"
+
+# Guardrails: keep public access enabled until ACA private/VNet connectivity is implemented.
+aca_vnet_integration_enabled        = false
+cosmos_public_network_access_enabled = true
+cosmos_lockout_acknowledged          = false
+
+# Optional allowlist for known egress IPs/CIDRs.
+cosmos_allowed_public_ip_ranges = []

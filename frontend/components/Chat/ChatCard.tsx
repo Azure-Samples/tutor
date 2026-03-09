@@ -1,38 +1,46 @@
 "use client"
 import React, { useState, useRef } from "react";
 import { Message } from "@/types/message";
-import api from "@/utils/api";  // Supondo que o controle de API esteja em `utils/api.ts`
+import { chatApi } from "@/utils/api";
 
 
 const ChatCard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [studentId, setStudentId] = useState("showcase-student");
+  const [courseId, setCourseId] = useState("showcase-course");
   const chatMessageStreamEnd = useRef<HTMLDivElement | null>(null);
-
-  let messageId = 1;
+  const nextMessageId = useRef(1);
 
   const sendMessage = async () => {
     if (input.trim() === '') return;
-    const userMessage: Message = { id: messageId, sender: 'user', content: input };
+    const userMessage: Message = { id: nextMessageId.current, sender: 'user', content: input };
     setMessages([...messages, userMessage]);
     setInput('');
-    messageId += 1;
+    nextMessageId.current += 1;
 
     try {
-      const response = await api.post('/chat', { question: input });
+      const response = await chatApi.post('/guide', {
+        student_id: studentId,
+        course_id: courseId,
+        prompt: input,
+      });
+      const guidance = typeof response.data?.guidance === "string"
+        ? response.data.guidance
+        : "No guidance was returned.";
 
       setMessages(prevMessages => [
         ...prevMessages,
-        { id: messageId, sender: 'bot', content: response.data }
+        { id: nextMessageId.current, sender: 'bot', content: guidance }
       ]);
     } catch (error) {
       console.error('Error streaming from API:', error);
       setMessages(prevMessages => [
         ...prevMessages,
-        { id: messageId, sender: 'bot', content: 'Ocorreu um erro. Tente novamente mais tarde.' }
+        { id: nextMessageId.current, sender: 'bot', content: 'Ocorreu um erro. Tente novamente mais tarde.' }
       ]);
     } finally {
-      messageId += 1;
+      nextMessageId.current += 1;
       chatMessageStreamEnd.current?.scrollIntoView({ behavior: "smooth" });
     }
   };
@@ -66,6 +74,22 @@ const ChatCard = () => {
       </div>
       <div className="flex flex-col mt-10 bg-white w-full">
         <div className="fixed bottom-0 right-0 w-203 mb-2 mr-4 p-2 border rounded-full border-gray-100 bg-white">
+          <div className="mb-2 flex gap-2 px-2">
+            <input
+              type="text"
+              className="w-1/2 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              placeholder="student_id"
+            />
+            <input
+              type="text"
+              className="w-1/2 rounded-lg border border-gray-200 px-2 py-1 text-xs"
+              value={courseId}
+              onChange={(e) => setCourseId(e.target.value)}
+              placeholder="course_id"
+            />
+          </div>
           <div className="flex items-center">
             <input
               type="text"

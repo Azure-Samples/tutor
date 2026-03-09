@@ -14,7 +14,7 @@
 - **Conversational avatar tutoring** via Azure Speech + Azure AI Agents for voice-driven learning
 - **Pedagogical material ingestion** with OCR via Azure AI Document Intelligence and indexing via Azure AI Search for RAG grounding
 - **Supervisor insight reports** consuming Microsoft Fabric indicators (standardized assessments, attendance, task completion) and synthesizing Strava-like narrative briefings for pre-visit preparation
-- **Upskilling recommendations** through visitor-pattern performance analysis including ENEM competency alignment
+- **Stateful upskilling plan management** with persistent teaching plans, multi-agent evaluation via visitor pattern (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment), and professor-scoped plan lifecycle (draft → evaluated → revised → archived)
 - **Course/student/professor/school management** as a lightweight configuration layer with configurable pedagogical rules and feature flags
 
 The system is positioned as an **LMS enhancer**: it consumes LMS context (courses, students, assignments) and Fabric analytics (standardized assessment scores, attendance, task completion rates) to produce **agent-driven educational insights** for four personas:
@@ -36,9 +36,9 @@ The system is positioned as an **LMS enhancer**: it consumes LMS context (course
 |---------|------|---------|---------------|
 | **Configuration** | 8081 | CRUD + Repository | Students, professors, courses, classes, groups, pedagogical rules, feature flags |
 | **Questions** | 8082 | State Machine | Question evaluation pipeline: Pending → Evaluating → Completed (objective + discursive) |
-| **Essays** | 8083 | Strategy + Orchestrator | Essay submission with OCR, multi-strategy ENEM-aligned evaluation, RAG grounding, Foundry agent provisioning |
+| **Essays** | 8083 | Strategy + Orchestrator | Essay submission with OCR (Azure AI Document Intelligence — Phase A in progress, issue #18), multi-strategy ENEM-aligned evaluation (Phase B), RAG grounding (Phase B), Foundry agent provisioning |
 | **Avatar** | 8084 | Agent + Speech | Real-time avatar interaction using Azure Speech SDK + AI Agents |
-| **Upskilling** | 8085 | Visitor Pattern | Performance, content complexity, guidance-coach, and ENEM alignment analysis |
+| **Upskilling** | 8085 | Repository + Visitor | Stateful teaching plan management (CRUD), multi-agent evaluation (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment), Cosmos DB persistence with `/professor_id` partition |
 | **Content** *(target)* | 8089 | Pipeline | Pedagogical material ingestion: upload → OCR → chunk → AI Search index |
 | **Insights** *(target)* | 8090 | Strategy + Synthesis | Supervisor insight reports: Fabric indicators → narrative briefing |
 
@@ -62,8 +62,8 @@ The system is positioned as an **LMS enhancer**: it consumes LMS context (course
 | Azure OpenAI (gpt-4o) | `aoai.bicep` | LLM inference with private endpoints |
 | Azure Speech Services | `speech.bicep` | TTS/STT for avatar |
 | Azure Static Web App | `staticwapp.bicep` | Frontend hosting |
-| Azure AI Document Intelligence | `docintel.bicep` *(target)* | OCR for handwritten essays and pedagogical materials |
-| Azure AI Search | `search.bicep` *(target)* | Vector + keyword index for RAG grounding |
+| Azure AI Document Intelligence | `docintel.bicep` *(target — Phase B infra; SDK wired in essays-svc in Phase A)* | OCR for handwritten essays and pedagogical materials |
+| Azure AI Search | `search.bicep` *(target — Phase B)* | Vector + keyword index for RAG grounding |
 | Microsoft Fabric | *(external)* | Read-only semantic model for standardized assessments, attendance, task completion indicators |
 
 ### 2.4 Data Store
@@ -73,6 +73,7 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 - `students`, `professors`, `courses`, `classes`, `groups` — Configuration domain
 - `cases`, `steps`, `essays` — Assessment domain
 - `questions`, `evaluations` — Question evaluation domain
+- `upskilling_plans` — Upskilling domain (teaching plans, partition key: `/professor_id`)
 - `agents`, `swarms` — Agent provisioning domain
 
 ---

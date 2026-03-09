@@ -1,24 +1,23 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import EssaysList from "@/components/Lists/Essays";
+import ThemesList from "@/components/Lists/Themes";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Essay Evaluation | Tutor",
-  description:
-    "Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights.",
+  title: "Theme Configuration | Tutor",
+  description: "Manage essay themes and rubric criteria for the showcase scenarios.",
 };
 
-const EssaysPage = () => {
+const ThemesPage = () => {
   return (
     <DefaultLayout>
       <Breadcrumb 
-        pageName="Essay Evaluation" 
-        subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights." 
+        pageName="Theme Configuration" 
+        subtitle="Create and manage themes used in essay evaluation workflows." 
       />
-      <EssaysList />
+      <ThemesList />
     </DefaultLayout>
   );
 };
 
-export default EssaysPage;
+export default ThemesPage;

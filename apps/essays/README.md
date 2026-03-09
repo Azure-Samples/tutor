@@ -19,6 +19,7 @@ This service provides the essay submission and evaluation engine for The Tutor p
 - FastAPI
 - Cosmos DB (Azure)
 - Azure OpenAI (for evaluation)
+- Azure AI Document Intelligence (OCR for handwritten/image/PDF extraction)
 
 ## Running Locally
 
@@ -33,6 +34,16 @@ This service provides the essay submission and evaluation engine for The Tutor p
    ```pwsh
    uvicorn app.main:app --reload
    ```
+
+## OCR Configuration (Phase A)
+
+Set these variables to enable OCR via Azure AI Document Intelligence:
+
+- `DOCUMENT_INTELLIGENCE_ENDPOINT`
+- `DOCUMENT_INTELLIGENCE_KEY`
+- `DOCUMENT_INTELLIGENCE_MODEL` (default: `prebuilt-read`)
+
+When `DOCUMENT_INTELLIGENCE_ENDPOINT` is not set, the service falls back to local extraction (`pypdf` for PDFs and metadata-only handling for images).
 
 ## Deploying to Azure
 

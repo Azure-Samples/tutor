@@ -2,10 +2,11 @@
 
 | Metadata | Value |
 |----------|-------|
-| **Status** | Proposed |
-| **Date** | 2025-01 |
+| **Status** | Accepted |
+| **Date** | 2026-03-02 |
 | **Decision Makers** | Architecture Team |
 | **Business Needs** | BN-PED-1, BN-PED-2, BN-PED-3, BN-PED-5 |
+| **Tracking** | [Issue #18](https://github.com/Azure-Samples/tutor/issues/18), [Issue #19](https://github.com/Azure-Samples/tutor/issues/19) |
 
 ---
 
@@ -26,6 +27,39 @@ The current architecture lacks:
 
 ---
 
+## Implementation Scope
+
+This ADR is implemented in **two sequential phases** to reduce risk and deliver incremental value.
+
+### Phase A — OCR Ingestion in essays-svc (Issue #18, branch `feat/ocr-essay-ingestion`)
+
+**Goal**: Replace the current `pypdf` + PIL client-side extraction in `file_processing.py` with Azure AI Document Intelligence for reliable handwritten and scanned essay extraction. Everything stays within the existing `essays-svc` boundary — no new services.
+
+**In scope:**
+- Add `azure-ai-documentintelligence` SDK to `apps/essays/pyproject.toml`
+- Add `DocumentIntelligenceConfig` settings group to `apps/essays/src/app/config.py`
+- Implement `extract_text_with_doc_intelligence(payload, content_type)` in `file_processing.py`
+- Route PDFs and images through Document Intelligence (prebuilt-read model) when the DI endpoint is configured; fall back to `pypdf`/PIL when running locally without credentials
+- Update `process_pdf()` and `process_image()` to call the new extractor via the `ProcessedUpload.extracted_text` field
+- Unit tests with mock responses against the DI client
+
+**Out of scope for this phase:** content-svc, AI Search, RAG grounding, ENEM strategy, chunking/embedding.
+
+### Phase B — Content Service, RAG & ENEM Strategy (Issue #19 + future issues, Modernization Plan P9-01 → P9-07)
+
+**Goal**: Build the full content ingestion pipeline (`content-svc`), wire RAG into assessment and interaction services, and implement the ENEM evaluation strategy.
+
+**In scope:**
+- `apps/content/` — new content-svc (port 8089)
+- Azure AI Search index: hybrid vector + keyword, `text-embedding-3-large`
+- RAG context retrieval in essays-svc, questions-svc, chat-svc
+- `ENEMStrategy` in essays-svc (Competencies I–V, scores 0–1000)
+- Pedagogical rules + feature flags CRUD in config-svc (P9-07)
+- Content management UI page in frontend (P9-06)
+- Terraform modules: `docintel.bicep` → `infra/terraform/modules/docintel.tf`, `search.bicep` → `infra/terraform/modules/search.tf`
+
+---
+
 ## Decision
 
 ### Add Azure AI Document Intelligence for OCR
@@ -34,6 +68,20 @@ All handwritten essay scanning and pedagogical material text extraction use **Az
 
 - **Handwritten essays** → students photograph/scan handwritten essays → Document Intelligence extracts text → essays-svc evaluates the extracted text
 - **Pedagogical materials** → administrators upload PDFs, images, DOCX → content-svc extracts text via Document Intelligence → text is chunked and indexed
+
+**Phase A integration point (essays-svc)**: The `process_upload()` function in `file_processing.py` is the single entry point for all file ingestion. Document Intelligence wraps the call before the result reaches the evaluation agent. Environment variable `DOCUMENT_INTELLIGENCE_ENDPOINT` gates whether DI or the local fallback (`pypdf`/PIL) is used — enabling both cloud and local development without service mocking.
+
+```
+                  process_upload()
+                       │
+          ┌────────────┴────────────────┐
+          │ DOCUMENT_INTELLIGENCE_ENDPOINT set?        │
+         YES                                     NO
+          │                                       │
+          ▼                                       ▼
+  DI prebuilt-read                     pypdf (PDF) / PIL (image)
+  → extracted_text                     → extracted_text / encoded_content
+```
 
 ### Add Azure AI Search for RAG
 
@@ -99,12 +147,14 @@ These rules are consumed by:
 - ENEM alignment makes the platform directly useful for Brazil's national examination preparation
 - Configurable rules give professors and administrators control over AI behavior
 - Feature flags enable controlled pilot rollout (BN-PED-6: 3rd-year physics)
+- **Phase A delivers immediate value** (handwritten essay OCR) with a single SDK addition and no new infrastructure beyond reusing the existing Document Intelligence resource
 
 ### Negative
 
 - Two new Azure services (Document Intelligence + AI Search) increase infrastructure cost
 - Content ingestion pipeline adds latency between upload and availability in RAG
 - ENEM strategy requires careful prompt engineering and ongoing rubric validation
+- Phase A fallback logic (DI vs. pypdf) adds a conditional path that must be covered in tests
 
 ### Cost Considerations
 

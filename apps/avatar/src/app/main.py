@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from app.avatar import AvatarChat, build_avatar_chat
 from app.config import get_settings
 from app.cosmos import CosmosCRUD
+from app.speech import SpeechTokenBroker
 from app.schemas import BodyMessage, Case, ChatResponse, ErrorMessage, RESPONSES, SuccessMessage
 from tutor_lib.middleware import configure_entra_auth
 
@@ -71,6 +72,15 @@ def _avatar() -> AvatarChat:
     return build_avatar_chat(settings, _case_repository())
 
 
+@lru_cache(maxsize=1)
+def _speech_broker() -> SpeechTokenBroker:
+    speech_settings = settings.model_dump().get("speech", {})
+    return SpeechTokenBroker(
+        resource_id=str(speech_settings.get("resource_id", "")),
+        region=str(speech_settings.get("region", "")),
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
     body = BodyMessage(
@@ -100,6 +110,22 @@ async def avatar_profile() -> JSONResponse:
     if not cases:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No cases available")
     return JSONResponse({"result": random.choice(cases)})
+
+
+@app.get("/speech/session-token", tags=["Avatar"])
+async def speech_session_token() -> JSONResponse:
+    try:
+        session = await _speech_broker().create_session()
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Speech token broker unavailable: {exc}") from exc
+
+    payload = {
+        "authorizationToken": session.authorization_token,
+        "region": session.region,
+        "expiresOn": session.expires_on,
+        "relay": session.relay,
+    }
+    return _success("Speech Session Token Retrieved", "Speech session token fetched", payload)
 
 
 @app.post("/create-case", tags=["Configuration"])

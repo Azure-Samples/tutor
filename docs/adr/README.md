@@ -15,7 +15,7 @@ This directory contains the Architecture Decision Records (ADRs) for **The Tutor
 | [007](./007-frontend-modernization.md) | Frontend Modernization (Next.js 15 + React 19) | Accepted | 2026-02-24 |
 | [008](./008-security-layers.md) | Security Layers and Zero-Trust | Accepted | 2026-02-24 |
 | [009](./009-supervisor-fabric-integration.md) | Supervisor Insights & Microsoft Fabric Integration | Proposed | 2025-01 |
-| [010](./010-pedagogical-content-ocr.md) | Pedagogical Content Ingestion, OCR & RAG | Proposed | 2025-01 |
+| [010](./010-pedagogical-content-ocr.md) | Pedagogical Content Ingestion, OCR & RAG | Accepted | 2026-03-02 |
 
 ## ADR Format
 

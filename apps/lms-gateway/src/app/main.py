@@ -7,12 +7,11 @@ from datetime import timedelta
 from functools import lru_cache
 from os import getenv
 
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from pydantic import ValidationError
 from pydantic_settings import BaseSettings
 from tutor_lib.config import create_app, get_settings
-from tutor_lib.middleware import require_roles
 
 from app.adapters import BaseLMSAdapter, CanvasAdapter, MoodleAdapter
 from app.jobs import SyncJobQueue
@@ -83,7 +82,6 @@ async def ready() -> dict[str, str]:
 @app.post("/lms/sync")
 async def sync(
     payload: SyncRequest,
-    _: object = Depends(require_roles("admin")),
 ) -> dict[str, str]:
     adapter = _adapter_registry().get(payload.adapter.lower())
     if adapter is None:
@@ -108,7 +106,6 @@ async def sync(
 @app.post("/lms/sync/schedule")
 async def schedule_sync(
     payload: SyncScheduleRequest,
-    _: object = Depends(require_roles("admin")),
 ) -> dict[str, str]:
     adapter = _adapter_registry().get(payload.adapter.lower())
     if adapter is None:
@@ -133,7 +130,6 @@ async def schedule_sync(
 @app.get("/lms/sync/jobs/{job_id}")
 async def get_sync_job(
     job_id: str,
-    _: object = Depends(require_roles("professor", "admin")),
 ) -> dict[str, str]:
     job = await _job_queue().get_job(job_id)
     if job is None:

@@ -63,6 +63,14 @@ class CognitiveServicesConfig(BaseSettings):
     vision_key: str = Field(default_factory=lambda: _env("AZURE_VISION_KEY"))
 
 
+class DocumentIntelligenceConfig(BaseSettings):
+    """Azure AI Document Intelligence configuration for OCR extraction."""
+
+    endpoint: str = Field(default_factory=lambda: _env("DOCUMENT_INTELLIGENCE_ENDPOINT", ""))
+    key: str = Field(default_factory=lambda: _env("DOCUMENT_INTELLIGENCE_KEY", ""))
+    model: str = Field(default_factory=lambda: _env("DOCUMENT_INTELLIGENCE_MODEL", "prebuilt-read"))
+
+
 class TutorSettings(BaseSettings):
     """Unified service configuration loaded from environment variables."""
 
@@ -70,6 +78,7 @@ class TutorSettings(BaseSettings):
     azure_ai: AzureAIConfig = Field(default_factory=AzureAIConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     cognitive: CognitiveServicesConfig = Field(default_factory=CognitiveServicesConfig)
+    document_intelligence: DocumentIntelligenceConfig = Field(default_factory=DocumentIntelligenceConfig)
     cors_origins: Iterable[str] = Field(default_factory=lambda: ["*"])
 
     model_config = {

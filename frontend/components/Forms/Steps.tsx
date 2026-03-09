@@ -1,6 +1,6 @@
 import { CaseStep } from "@/types/steps";
 import { useState } from "react";
-import { configurationApi } from "@/utils/api";
+import { avatarEngine } from "@/utils/api";
 
 interface StepsFormProps {
   steps: CaseStep[];
@@ -23,7 +23,7 @@ const StepsForm: React.FC<StepsFormProps> = ({ steps, onChange, readOnly, caseId
     if (caseId) {
       try {
         setStatus("Saving...");
-        await configurationApi.patch(`/cases/${caseId}/steps`, updated);
+        await avatarEngine.patch(`/cases/${caseId}/steps`, updated);
         setStatus("Saved");
       } catch (e) {
         setStatus("Error saving");

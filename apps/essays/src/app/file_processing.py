@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import base64
+import os
 from dataclasses import dataclass
 from io import BytesIO
 from typing import Iterable
 
 from fastapi import HTTPException, status
-from pypdf import PdfReader
+
+try:
+    from pypdf import PdfReader
+except ImportError:  # pragma: no cover - optional runtime fallback
+    PdfReader = None  # type: ignore[assignment]
+
+try:
+    from azure.ai.documentintelligence import DocumentIntelligenceClient
+    from azure.core.credentials import AzureKeyCredential
+except ImportError:  # pragma: no cover - optional during local development
+    DocumentIntelligenceClient = None  # type: ignore[assignment]
+    AzureKeyCredential = None  # type: ignore[assignment]
 
 try:
     from PIL import Image
@@ -26,6 +38,7 @@ ALLOWED_PDF_TYPES: set[str] = {"application/pdf"}
 MAX_IMAGE_BYTES = 1_000_000  # ~1 MB raw payload to comfortably fit Cosmos' 2 MB item cap
 MAX_IMAGE_BASE64_LENGTH = 1_500_000  # guardrail after base64 expansion
 MAX_IMAGE_DIMENSION = 1600  # px
+DEFAULT_DOCUMENT_INTELLIGENCE_MODEL = "prebuilt-read"
 
 
 def ensure_supported_file(content_type: str | None) -> None:
@@ -82,6 +95,9 @@ def read_upload_bytes(data: bytes | bytearray | memoryview) -> bytes:
 def extract_pdf_text(payload: bytes) -> str:
     """Extract plain text from a PDF payload."""
 
+    if PdfReader is None:
+        return ""
+
     reader = PdfReader(BytesIO(payload))
     buffer: list[str] = []
     for page in reader.pages:
@@ -89,6 +105,46 @@ def extract_pdf_text(payload: bytes) -> str:
         if text:
             buffer.append(text)
     return "\n".join(buffer).strip()
+
+
+def extract_text_with_doc_intelligence(payload: bytes, content_type: str) -> str | None:
+    """Extract text using Azure AI Document Intelligence when configured."""
+
+    endpoint = os.environ.get("DOCUMENT_INTELLIGENCE_ENDPOINT", "").strip()
+    if not endpoint or DocumentIntelligenceClient is None:
+        return None
+
+    model = os.environ.get("DOCUMENT_INTELLIGENCE_MODEL", DEFAULT_DOCUMENT_INTELLIGENCE_MODEL).strip()
+    if not model:
+        model = DEFAULT_DOCUMENT_INTELLIGENCE_MODEL
+
+    key = os.environ.get("DOCUMENT_INTELLIGENCE_KEY", "").strip()
+    if not key or AzureKeyCredential is None:
+        return None
+
+    try:
+        client = DocumentIntelligenceClient(endpoint=endpoint, credential=AzureKeyCredential(key))
+        poller = client.begin_analyze_document(
+            model_id=model,
+            body=payload,
+            content_type=content_type,
+        )
+        result = poller.result()
+    except Exception:  # pragma: no cover - network/service failures fallback to local extraction
+        return None
+
+    content = (getattr(result, "content", "") or "").strip()
+    if content:
+        return content
+
+    lines: list[str] = []
+    for page in getattr(result, "pages", []) or []:
+        for line in getattr(page, "lines", []) or []:
+            text = (getattr(line, "content", "") or "").strip()
+            if text:
+                lines.append(text)
+    joined = "\n".join(lines).strip()
+    return joined or None
 
 
 def encode_base64(payload: bytes) -> str:
@@ -131,11 +187,16 @@ def process_image(payload: bytes, file_name: str, content_type: str) -> Processe
     if image_format:
         metadata["format"] = image_format
 
+    extracted_text = extract_text_with_doc_intelligence(payload, content_type)
+    if extracted_text:
+        metadata["hint"] = "Text extracted from image via Document Intelligence."
+        metadata["ocr_source"] = "document_intelligence"
+
     return ProcessedUpload(
         content_type=content_type,
         file_name=file_name,
         encoded_content=encoded,
-        extracted_text=None,
+        extracted_text=extracted_text,
         metadata=metadata,
         binary=payload,
     )
@@ -144,11 +205,17 @@ def process_image(payload: bytes, file_name: str, content_type: str) -> Processe
 def process_pdf(payload: bytes, file_name: str, content_type: str) -> ProcessedUpload:
     """Extract text content from a PDF payload and return metadata."""
 
-    text = extract_pdf_text(payload)
+    extracted_by = "pypdf"
+    text = extract_text_with_doc_intelligence(payload, content_type)
+    if text:
+        extracted_by = "document_intelligence"
+    else:
+        text = extract_pdf_text(payload)
     metadata = {
         "file_name": file_name,
         "content_type": content_type,
         "hint": "Text extracted from PDF.",
+        "ocr_source": extracted_by,
     }
     return ProcessedUpload(
         content_type=content_type,

@@ -54,9 +54,9 @@ const QuestionsList: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!selectedQuestion) return;
-    await questionsEngine.delete(`/questions/${selectedQuestion.topic}`);
-    setQuestions(questions.filter((q) => q.topic !== selectedQuestion.topic));
+    if (!selectedQuestion?.id) return;
+    await questionsEngine.delete(`/questions/${selectedQuestion.id}`);
+    setQuestions(questions.filter((q) => q.id !== selectedQuestion.id));
     closeAllModals();
     setSelectedQuestion(null);
   };
@@ -86,16 +86,16 @@ const QuestionsList: React.FC = () => {
                 <tr className="text-cyan-700 dark:text-cyan-200 text-lg border-b border-cyan-100 dark:border-cyan-900">
                   <th className="py-4">Topic</th>
                   <th className="py-4">Question</th>
-                  <th className="py-4">Answer</th>
+                  <th className="py-4">Explanation</th>
                   <th className="py-4">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {questions.map((q, idx) => (
-                  <tr key={q.topic + idx} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
+                  <tr key={(q.id || q.topic) + idx} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
                     <td className="py-4 px-2 text-center font-bold text-blue-700 dark:text-cyan-200">{q.topic}</td>
                     <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">{q.question}</td>
-                    <td className="py-4 px-2 text-center text-gray-700 dark:text-gray-200">{q.answer}</td>
+                    <td className="py-4 px-2 text-center text-gray-700 dark:text-gray-200">{q.explanation}</td>
                     <td className="py-4 px-2 text-center">
                       <div className="flex gap-2 justify-center items-center">
                         <button onClick={() => handleDeleteClick(q)} className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Delete"><FaTrash /></button>

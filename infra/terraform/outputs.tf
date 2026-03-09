@@ -129,6 +129,26 @@ output "COSMOS_GROUP_TABLE" {
   value       = "groups"
 }
 
+output "COSMOS_PUBLIC_NETWORK_ACCESS_ENABLED" {
+  description = "Current Cosmos DB public network access configuration from Terraform."
+  value       = tostring(var.cosmos_public_network_access_enabled)
+}
+
+output "COSMOS_ALLOWED_PUBLIC_IP_RANGES" {
+  description = "Configured Cosmos DB public IP/CIDR allowlist."
+  value       = join(",", var.cosmos_allowed_public_ip_ranges)
+}
+
+output "COSMOS_LOCKOUT_RISK" {
+  description = "True when Cosmos is configured private-only but ACA VNet integration is disabled."
+  value       = tostring(var.cosmos_public_network_access_enabled == false && var.aca_vnet_integration_enabled == false)
+}
+
+output "COSMOS_BREAK_GLASS_COMMAND" {
+  description = "Emergency command to re-enable Cosmos public access."
+  value       = "az cosmosdb update -g ${azurerm_resource_group.main.name} -n ${azurerm_cosmosdb_account.main.name} --public-network-access Enabled"
+}
+
 output "COSMOS_AVATAR_CASE_TABLE" {
   description = "Cosmos DB container name for avatar case records."
   value       = "avatar_case"

@@ -70,7 +70,8 @@ const menuGroups = [
         route: "/chat",
         gradient: "from-orange-400 to-pink-500",
         hoverText: "text-orange-500"
-      }
+      },
+
     ]
   }
 ];

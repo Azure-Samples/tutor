@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from typing import Any
+from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
@@ -24,6 +25,7 @@ from app.schemas import (
     Professor,
     Student,
     SuccessMessage,
+    ThemeInput,
 )
 from tutor_lib.config import get_settings
 from tutor_lib.middleware import configure_entra_auth, require_roles
@@ -41,6 +43,7 @@ app = FastAPI(
         {"name": "Courses", "description": "Course catalog"},
         {"name": "Classes", "description": "Class sections"},
         {"name": "Groups", "description": "Study group and case assignment"},
+        {"name": "Themes", "description": "Essay theme and rubric configuration"},
     ],
     openapi_url="/api/v1/openapi.json",
     responses=RESPONSES,  # type: ignore[arg-type]
@@ -100,6 +103,7 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 require_professor = require_roles("professor", "admin")
+THEME_KIND = "theme"
 
 
 async def _bulk_create(container: str, items: list[dict[str, Any]]) -> int:
@@ -107,6 +111,17 @@ async def _bulk_create(container: str, items: list[dict[str, Any]]) -> int:
     for item in items:
         await crud.create_item(item)
     return len(items)
+
+
+def _theme_document(payload: ThemeInput, theme_id: str) -> dict[str, Any]:
+    return {
+        "id": theme_id,
+        "kind": THEME_KIND,
+        "name": payload.name,
+        "objective": payload.objective,
+        "description": payload.description,
+        "criteria": payload.criteria,
+    }
 
 
 @app.post("/students", tags=["Students"])
@@ -167,6 +182,65 @@ async def create_group(group: Group, _: str = Depends(require_professor)) -> JSO
 async def list_groups(_: str = Depends(require_professor)) -> JSONResponse:
     items = await _crud(settings.cosmos.group_container).list_items()
     return _success("Groups Retrieved", "Groups fetched", items)
+
+
+@app.get("/themes", tags=["Themes"])
+async def list_themes(_: str = Depends(require_professor)) -> JSONResponse:
+    items = await _crud(settings.cosmos.configuration_container).list_items()
+    themes = [item for item in items if item.get("kind") == THEME_KIND]
+    return _success("Themes Retrieved", "Themes fetched", themes)
+
+
+@app.post("/themes", tags=["Themes"])
+async def create_theme(theme: ThemeInput, _: str = Depends(require_professor)) -> JSONResponse:
+    theme_id = theme.id or str(uuid4())
+    payload = _theme_document(theme, theme_id)
+    await _crud(settings.cosmos.configuration_container).create_item(payload)
+    return _success("Theme Created", "Theme stored", payload)
+
+
+@app.get("/themes/{theme_id}", tags=["Themes"])
+async def get_theme(theme_id: str, _: str = Depends(require_professor)) -> JSONResponse:
+    try:
+        item = await _crud(settings.cosmos.configuration_container).read_item(theme_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found") from exc
+
+    if item.get("kind") != THEME_KIND:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found")
+
+    return _success("Theme Retrieved", "Theme fetched", item)
+
+
+@app.put("/themes/{theme_id}", tags=["Themes"])
+async def update_theme(theme_id: str, theme: ThemeInput, _: str = Depends(require_professor)) -> JSONResponse:
+    crud = _crud(settings.cosmos.configuration_container)
+    try:
+        existing = await crud.read_item(theme_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found") from exc
+
+    if existing.get("kind") != THEME_KIND:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found")
+
+    payload = {**existing, **_theme_document(theme, theme_id)}
+    await crud.update_item(theme_id, payload)
+    return _success("Theme Updated", "Theme modified", payload)
+
+
+@app.delete("/themes/{theme_id}", tags=["Themes"])
+async def delete_theme(theme_id: str, _: str = Depends(require_professor)) -> JSONResponse:
+    crud = _crud(settings.cosmos.configuration_container)
+    try:
+        existing = await crud.read_item(theme_id)
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found") from exc
+
+    if existing.get("kind") != THEME_KIND:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found")
+
+    await crud.delete_item(theme_id)
+    return _success("Theme Deleted", "Theme removed", {"theme_id": theme_id})
 
 
 @app.post("/groups/{group_id}/assign-cases", tags=["Groups"])

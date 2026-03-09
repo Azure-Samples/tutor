@@ -44,7 +44,7 @@ class _StubFoundryAgentService:
     def __init__(self, *_args, **_kwargs):
         self.calls: list[tuple[str, str]] = []
 
-    async def run_agent(self, agent_id: str, prompt: str) -> str:
+    async def run_agent(self, agent_id: str, prompt: str, **kwargs) -> str:
         self.calls.append((agent_id, prompt))
         return self.response_text
 
@@ -67,8 +67,8 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
         deployment="gpt-4o",
     )
 
-    async def _stub_load(_self, assembly_id):
-        return module.Swarm(id=assembly_id, topic_name="Topic", agents=[provisioned])
+    async def _stub_load(_self, assembly_id, **kwargs):
+        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-1", agents=[provisioned])
 
     monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
 
@@ -104,8 +104,8 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
         deployment="gpt-4o",
     )
 
-    async def _stub_load(_self, assembly_id):  # pragma: no cover - monkeypatched helper
-        return module.Swarm(id=assembly_id, topic_name="Topic", agents=[default_agent, narrative_agent])
+    async def _stub_load(_self, assembly_id, **kwargs):  # pragma: no cover - monkeypatched helper
+        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-2", agents=[default_agent, narrative_agent])
 
     monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
 
@@ -141,8 +141,8 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
         deployment="o3-mini",
     )
 
-    async def _stub_load(_self, assembly_id):
-        return module.Swarm(id=assembly_id, topic_name="Topic", agents=[analytical_agent])
+    async def _stub_load(_self, assembly_id, **kwargs):
+        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-3", agents=[analytical_agent])
 
     monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
 
@@ -166,6 +166,7 @@ class _StubContainer:
         return {
             "id": item,
             "topic_name": "Topic",
+            "essay_id": "essay-stub",
             "agents": [
                 {
                     "id": "agent-1",
@@ -250,3 +251,47 @@ async def test_load_swarm_returns_agents(monkeypatch, essays_app_module_fixture)
 
     await orchestrator.invoke("assembly-present", essay, [])
     assert created[0].calls[0][0] == "agent-1"
+
+
+def test_prepare_resources_prefers_doc_intelligence(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    orchestrator = module.EssayOrchestrator()
+
+    monkeypatch.setattr(module, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: "di text")
+    monkeypatch.setattr(
+        module,
+        "extract_pdf_text",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("pypdf fallback should not be called")),
+    )
+
+    resource = module.Resource(
+        id="res-ocr",
+        essay_id="essay-ocr",
+        objective=["objective"],
+        content_type="application/pdf",
+        encoded_content="dGVzdA==",  # base64("test")
+    )
+
+    prepared = orchestrator._prepare_resources([resource])
+
+    assert prepared[0].content == "di text"
+
+
+def test_prepare_resources_falls_back_to_pdf_extraction(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+    orchestrator = module.EssayOrchestrator()
+
+    monkeypatch.setattr(module, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "extract_pdf_text", lambda *_args, **_kwargs: "fallback text")
+
+    resource = module.Resource(
+        id="res-fallback",
+        essay_id="essay-fallback",
+        objective=["objective"],
+        content_type="application/pdf",
+        encoded_content="dGVzdA==",  # base64("test")
+    )
+
+    prepared = orchestrator._prepare_resources([resource])
+
+    assert prepared[0].content == "fallback text"

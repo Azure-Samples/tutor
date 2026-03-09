@@ -79,6 +79,20 @@ def _success(title: str, message: str, content: Any) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(body))
 
 
+async def _resolve_question_id(crud: CosmosCRUD, key: str) -> str:
+    """Resolve a question identifier with temporary topic fallback for legacy callers."""
+
+    try:
+        await crud.read_item(key)
+        return key
+    except Exception as exc:
+        items = await crud.list_items()
+        match = next((item for item in items if item.get("topic") == key and item.get("id")), None)
+        if not match:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found") from exc
+        return str(match["id"])
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
     body = BodyMessage(
@@ -114,6 +128,14 @@ async def list_questions() -> JSONResponse:
     return _success("Questions Retrieved", "Questions fetched successfully", items)
 
 
+@app.get("/questions/{question_id}", tags=["Questions"])
+async def get_question(question_id: str) -> JSONResponse:
+    crud = _crud(settings.cosmos.question_container)
+    resolved_id = await _resolve_question_id(crud, question_id)
+    item = await crud.read_item(resolved_id)
+    return _success("Question Retrieved", "Question fetched", item)
+
+
 @app.post("/questions", tags=["Questions"])
 async def create_question(question: Question) -> JSONResponse:
     created = await _crud(settings.cosmos.question_container).create_item(question.model_dump())
@@ -123,24 +145,30 @@ async def create_question(question: Question) -> JSONResponse:
 @app.put("/questions/{question_id}", tags=["Questions"])
 async def update_question(question_id: str, question: Question) -> JSONResponse:
     crud = _crud(settings.cosmos.question_container)
+    resolved_id = await _resolve_question_id(crud, question_id)
+
+    if question.id and question.id != resolved_id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Path id must match body id")
+
     try:
-        existing = await crud.read_item(question_id)
+        existing = await crud.read_item(resolved_id)
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error("Error reading question %s", question_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found") from exc
-    merged = {**existing, **question.model_dump()}
-    await crud.update_item(question_id, merged)
+    merged = {**existing, **question.model_dump(), "id": resolved_id}
+    await crud.update_item(resolved_id, merged)
     return _success("Question Updated", "Question modified", merged)
 
 
 @app.delete("/questions/{question_id}", tags=["Questions"])
 async def delete_question(question_id: str) -> JSONResponse:
+    resolved_id = await _resolve_question_id(_crud(settings.cosmos.question_container), question_id)
     try:
-        await _crud(settings.cosmos.question_container).delete_item(question_id)
+        await _crud(settings.cosmos.question_container).delete_item(resolved_id)
     except Exception as exc:  # pragma: no cover
         logger.error("Error deleting question %s", question_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found") from exc
-    return _success("Question Deleted", "Question removed", {"question_id": question_id})
+    return _success("Question Deleted", "Question removed", {"question_id": resolved_id})
 
 
 @app.get("/answers", tags=["Answers"])

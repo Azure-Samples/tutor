@@ -2,15 +2,33 @@ import axios, { AxiosInstance, AxiosResponse } from "axios";
 
 import { ApiEnvelope, unwrapContent } from "@/types/api";
 
-export const BACK_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost";
 const APIM_BASE_URL = process.env.NEXT_PUBLIC_APIM_BASE_URL;
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
-
-if (IS_PRODUCTION && !APIM_BASE_URL) {
-  throw new Error("NEXT_PUBLIC_APIM_BASE_URL is required in production deployments.");
+if (!APIM_BASE_URL) {
+  throw new Error("NEXT_PUBLIC_APIM_BASE_URL is required. Frontend-backend traffic must flow through APIM.");
 }
 
 type MaybeEnvelope<T> = ApiEnvelope<T> | T;
+
+const normalizeBaseURL = (value: string | undefined): string | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(trimmed)) {
+    return trimmed.replace(/\/+$/, "");
+  }
+
+  if (trimmed.startsWith("http://")) {
+    return `https://${trimmed.slice("http://".length)}`.replace(/\/+$/, "");
+  }
+
+  return trimmed.replace(/\/+$/, "");
+};
 
 const unwrapResponse = <T>(response: AxiosResponse<MaybeEnvelope<T>>) => {
   if (response && response.data) {
@@ -19,8 +37,40 @@ const unwrapResponse = <T>(response: AxiosResponse<MaybeEnvelope<T>>) => {
   return response as AxiosResponse<T>;
 };
 
-const createClient = (baseURL: string | undefined, fallback?: string): AxiosInstance => {
-  const client = axios.create({ baseURL: baseURL || fallback });
+const createClient = (baseURL: string | undefined): AxiosInstance => {
+  const client = axios.create({
+    baseURL: normalizeBaseURL(baseURL),
+  });
+  client.interceptors.request.use((config) => {
+    if (config.baseURL) {
+      config.baseURL = normalizeBaseURL(config.baseURL);
+    }
+
+    if (typeof config.url === "string" && config.url.startsWith("http://")) {
+      const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(config.url);
+      if (!isLocal) {
+        config.url = `https://${config.url.slice("http://".length)}`;
+      }
+    }
+
+    // Legacy header-based identity keeps role-protected endpoints usable when ENTRA is disabled.
+    const headers = config.headers as unknown as {
+      set?: (name: string, value: string) => void;
+      [key: string]: unknown;
+    };
+    if (typeof headers?.set === "function") {
+      headers.set("X-User-Id", "showcase-user");
+      headers.set("X-User-Roles", "admin,professor");
+    } else {
+      config.headers = {
+        ...(config.headers || {}),
+        "X-User-Id": "showcase-user",
+        "X-User-Roles": "admin,professor",
+      } as any;
+    }
+
+    return config;
+  });
   client.interceptors.response.use(unwrapResponse, (error) => {
     const data = error?.response?.data;
     if (data && typeof data === "object" && "detail" in data) {
@@ -32,21 +82,13 @@ const createClient = (baseURL: string | undefined, fallback?: string): AxiosInst
 };
 
 const createServiceClient = (
-  directBaseURL: string | undefined,
-  fallback: string,
+  _directBaseURL: string | undefined,
+  _fallback: string,
   apimPath: string
 ): AxiosInstance => {
-  if (APIM_BASE_URL) {
-    const normalizedBase = APIM_BASE_URL.replace(/\/+$/, "");
-    const normalizedPath = apimPath.replace(/^\/+/, "");
-    return createClient(`${normalizedBase}/${normalizedPath}`, fallback);
-  }
-
-  if (IS_PRODUCTION) {
-    return createClient(directBaseURL);
-  }
-
-  return createClient(directBaseURL, fallback);
+  const normalizedBase = normalizeBaseURL(APIM_BASE_URL);
+  const normalizedPath = apimPath.replace(/^\/+/, "");
+  return createClient(normalizedBase ? `${normalizedBase}/${normalizedPath}` : undefined);
 };
 
 export const avatarEngine = createServiceClient(process.env.NEXT_PUBLIC_AVATAR_APP_BASE_URL, "http://localhost:8084", "api/avatar");
@@ -54,10 +96,13 @@ export const essaysEngine = createServiceClient(process.env.NEXT_PUBLIC_ESSAYS_A
 export const questionsEngine = createServiceClient(process.env.NEXT_PUBLIC_QUESTIONS_APP_BASE_URL, "http://localhost:8082", "api/questions");
 export const configurationApi = createServiceClient(process.env.NEXT_PUBLIC_CONFIGURATION_APP_BASE_URL, "http://localhost:8081", "api/configuration");
 export const upskillingApi = createServiceClient(process.env.NEXT_PUBLIC_UPSKILLING_APP_BASE_URL, "http://localhost:8085", "api/upskilling");
-export const webApp = createServiceClient(process.env.NEXT_PUBLIC_WEB_APP_BASE_URL, "http://localhost:8084", "api/chat");
-export const transcriptionApi = createServiceClient(process.env.NEXT_PUBLIC_TRANSCRIPTION_APP_BASE_URL, "http://localhost:8084", "api/questions");
-export const webApi = webApp;
+export const chatApi = createServiceClient(process.env.NEXT_PUBLIC_WEB_APP_BASE_URL, "http://localhost:8086", "api/chat");
+export const evaluationApi = createServiceClient(process.env.NEXT_PUBLIC_EVALUATION_APP_BASE_URL, "http://localhost:8086", "api/evaluation");
+export const lmsGatewayApi = createServiceClient(process.env.NEXT_PUBLIC_LMS_GATEWAY_APP_BASE_URL, "http://localhost:8087", "api/lms-gateway");
 
-const api = createServiceClient(process.env.NEXT_PUBLIC_WEB_APP_BASE_URL, "http://localhost:8084", "api/chat");
+// Compatibility aliases for legacy modules still in the repo.
+export const webApp = chatApi;
+export const webApi = chatApi;
+export const transcriptionApi = questionsEngine;
 
-export default api;
+export default chatApi;

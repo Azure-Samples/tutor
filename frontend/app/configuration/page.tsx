@@ -29,6 +29,30 @@ const configOptions = [
     href: "/configuration/questions",
     icon: "/images/logo/logo.webp",
   },
+  {
+    title: "Agents",
+    description: "Create and manage AI agent assemblies that power essay and question evaluation workflows. Configure deployments, temperature, and instructions.",
+    href: "/configuration/agents",
+    icon: "/images/logo/logo.webp",
+  },
+  {
+    title: "Upskilling",
+    description: "Evaluate teaching plans with agentic coaching feedback. Analyze paragraph structure and pedagogical effectiveness.",
+    href: "/configuration/upskilling",
+    icon: "/images/logo/logo.webp",
+  },
+  {
+    title: "Evaluation",
+    description: "Run agent quality checks by creating datasets and executing evaluation runs against deployed agents.",
+    href: "/configuration/evaluation",
+    icon: "/images/logo/logo.webp",
+  },
+  {
+    title: "LMS Gateway",
+    description: "Trigger and inspect LMS synchronization jobs. Connect to Moodle or Canvas and schedule recurring syncs.",
+    href: "/configuration/lms-gateway",
+    icon: "/images/logo/logo.webp",
+  },
 ];
 
 const ConfigurationPage = () => {
