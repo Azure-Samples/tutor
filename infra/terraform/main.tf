@@ -311,11 +311,7 @@ resource "azurerm_container_app" "backend_services" {
 
   # Runtime app revisions are owned by application deploys, not foundation provisioning.
   lifecycle {
-    ignore_changes = [
-      template,
-      ingress,
-      registry,
-    ]
+    ignore_changes = all
   }
 }
 
