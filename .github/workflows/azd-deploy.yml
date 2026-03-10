@@ -171,6 +171,7 @@ jobs:
           storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
           container_name       = "$TFSTATE_CONTAINER"
           key                  = "$TFSTATE_KEY"
+          use_azuread_auth     = true
           EOF
 
       - name: Validate Terraform configuration with remote backend
