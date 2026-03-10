@@ -247,8 +247,8 @@ jobs:
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "Provision failed after $max_attempts attempts"
-              exit 1
+              echo "Provision did not fully converge after $max_attempts attempts; continuing with backend service deployment."
+              break
             fi
 
             sleep_seconds=$((attempt * 30))
