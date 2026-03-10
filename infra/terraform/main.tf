@@ -157,6 +157,12 @@ resource "azurerm_container_app_environment" "main" {
   tags = {
     "azd-env-name" = var.environment
   }
+
+  lifecycle {
+    # Existing production environments can hold active apps; replacing the environment
+    # causes deletion conflicts and broad outages. Migrate subnet integration separately.
+    ignore_changes = [infrastructure_subnet_id]
+  }
 }
 
 resource "azurerm_container_registry" "main" {
@@ -330,7 +336,7 @@ resource "azurerm_api_management" "main" {
 }
 
 resource "azurerm_api_management_api" "backend_services" {
-  for_each = local.apim_service_paths
+  for_each = var.manage_apim_service_edge_in_foundation ? local.apim_service_paths : {}
 
   name                  = "${each.key}-api"
   resource_group_name   = azurerm_resource_group.main.name
@@ -344,7 +350,7 @@ resource "azurerm_api_management_api" "backend_services" {
 }
 
 resource "azurerm_api_management_api_operation" "backend_catch_all" {
-  for_each = local.apim_operations
+  for_each = var.manage_apim_service_edge_in_foundation ? local.apim_operations : {}
 
   operation_id        = replace(each.key, "-", "")
   api_name            = azurerm_api_management_api.backend_services[each.value.service_name].name
@@ -366,7 +372,7 @@ resource "azurerm_api_management_api_operation" "backend_catch_all" {
 }
 
 resource "azurerm_api_management_api_policy" "backend_services_hardening" {
-  for_each = local.apim_service_paths
+  for_each = var.manage_apim_service_edge_in_foundation ? local.apim_service_paths : {}
 
   resource_group_name = azurerm_resource_group.main.name
   api_management_name = azurerm_api_management.main.name

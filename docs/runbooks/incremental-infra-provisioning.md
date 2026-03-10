@@ -1,104 +1,126 @@
 # Incremental Infrastructure Provisioning Runbook
 
 ## Goal
-Enable infrastructure provisioning to run only for changed domains/apps while keeping production stable.
+
+Run provisioning only for stacks affected by a change set, without `terraform -target`, and keep deployment execution in GitHub Actions.
 
 ## Current State
-- CI deploys backend app images selectively per changed service.
-- Infrastructure provisioning uses one Terraform root/state, so `azd provision` applies the full graph.
-- UI changes are deployed via the Static Web Apps workflow and generally do not require infra apply.
 
-## Why full-graph apply happens today
-A single state contains shared resources plus app resources:
-- Shared foundation (RG, networking, APIM, Cosmos, ACR, Foundry, etc.)
-- Per-service resources (Container Apps, APIM API artifacts, identities, role assignments)
+- Backend image deployments are already selective by changed service.
+- `azd provision` still applies the full Terraform graph from one root (`infra/terraform`).
+- Frontend code deploy is handled by the SWA workflow.
 
-With this model, safe changed-only infra provisioning is not guaranteed, because dependency edges cross service boundaries.
+## Recommended Stack Boundaries
 
-## Feasibility Summary
-- Backend image-only change: fully feasible today (already selective).
-- UI-only change: fully feasible today (SWA workflow handles it).
-- Infra changed-only for one app: not safely feasible with current single state.
-- Infra changed-only per app: feasible after stack/state decomposition.
+Use explicit stack boundaries aligned to microservice ownership (microservices.io: Database per Service and API Gateway patterns) while keeping platform primitives in a shared foundation.
 
-## Target Architecture
-Split infrastructure into multiple Terraform stacks/states:
+1. Foundation stack: `infra/terraform` (current root)
 
-1) Foundation stack (shared)
-- Resource group, VNet/subnets, Log Analytics, Application Insights
-- APIM service (instance only), Cosmos account/database (shared decisions), ACR
-- Shared identities/policies that are not app-specific
+- Resource group, Log Analytics, Application Insights
+- Container Apps environment, ACR, storage, Cosmos account/database/containers
+- APIM service instance (not service-specific APIs)
+- AI Foundry shared resources
 
-2) Service stack per backend app
-- Container App for that service
-- Service-specific managed identity role assignments
-- APIM API, operations, and policy for only that service
+1. Service-edge stacks (Phase 1): `infra/terraform/stacks/services/<service>/`
 
-3) Frontend stack (optional)
-- Only if frontend infra changes are needed (custom domains, auth providers, app settings)
-- Keep normal UI code deploy in SWA workflow
+- APIM API artifact(s) for one service only
+- APIM operations and policy for one service only
 
-## Migration Phases
+1. Service-runtime stacks (Phase 2): `infra/terraform/stacks/runtime/<service>/`
 
-### Phase 0: Stabilize current pipeline
-- Keep `provision` gated to infra/shared changes only.
-- Keep selective backend image deploy matrix.
+- Container App for one service only
+- Service-specific RBAC and role assignments
 
-Exit criteria:
-- App-only backend pushes do not run infra provision.
+1. Frontend infra stack (optional): `infra/terraform/stacks/frontend/`
 
-### Phase 1: Extract APIM per-service resources
-- Move APIM API resources into service-specific Terraform modules.
-- Keep APIM service itself in foundation stack.
+- SWA infra-only changes (custom domain/auth/app settings) if needed
+- Frontend UI code remains in SWA workflow
 
-Exit criteria:
-- A change in one service APIM policy/API does not require touching other service APIM resources.
+## Workflow Routing by Changed Paths
 
-### Phase 2: Extract service runtime resources
-- Move each `azurerm_container_app` + app-specific RBAC to per-service stacks.
-- Keep shared ACR and networking in foundation.
+### Backend workflow (`.github/workflows/azd-deploy.yml`)
 
-Exit criteria:
-- Service infra can be planned/applied independently with no cross-service drift.
+- `azure.yaml`, `infra/terraform/*` (excluding `infra/terraform/stacks/**`), `.github/workflows/azd-deploy.yml`:
+  - `provision_required=true`
+  - deploy backend image matrix for all services
+- `apps/<service>/**`:
+  - deploy backend image for that service only
+  - no foundation provision
+- `lib/**`:
+  - deploy backend image matrix for all services
+  - no foundation provision
+- `infra/terraform/stacks/services/<service>/**`:
+  - flag service infra change for that service (`service_infra_json`)
+  - foundation provision remains off unless shared infra also changed
+- `infra/terraform/stacks/frontend/**`:
+  - flag frontend infra change (`changed_frontend_infra=true`)
+  - foundation provision remains off unless shared infra also changed
+- `frontend/**`:
+  - tracked as `changed_frontend_ui=true` for observability only
+  - no backend deploy/provision action
 
-### Phase 3: CI orchestration for stack routing
-- Detect changed paths and map to stack(s):
-  - `infra/foundation/**` -> foundation plan/apply
-  - `infra/services/<service>/**` -> only that service stack
-  - `frontend/**` -> SWA build/deploy workflow; run frontend infra stack only if frontend infra paths changed
-- Add apply ordering when multiple stacks changed:
-  - foundation first, then service stacks in parallel.
+### Frontend workflow (`.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`)
 
-Exit criteria:
-- Provisioning scope matches changed stack scope.
+- Triggers on:
+  - `frontend/**`
+  - `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`
 
-### Phase 4: Hardening
-- Add drift detection jobs per stack (plan-only on schedule).
-- Add stack-level lock and retry strategy.
-- Add change windows for foundation stack.
+This avoids unnecessary UI pipeline runs on backend-only merges.
 
-Exit criteria:
-- Predictable, low-latency CI for app-level infra changes.
+## Phase Plan and Minimal File Edits
 
-## CI Design Notes
-- Continue path-based detection in `detect-changes`.
-- Introduce outputs:
-  - `changed_foundation`
-  - `changed_services_json`
-  - `changed_frontend_infra`
-- Use matrix job over changed service stacks for infra apply.
-- Keep production deployment policy: deployments happen via GitHub workflows only.
+### Phase 1 (implemented now)
 
-## Safety Controls
-- No `-target` in production applies (use separated stacks instead).
-- Require successful plan for each stack before apply.
-- Require foundation apply success before dependent service applies.
-- Keep state backend and RBAC checks in every stack job.
+Changed files:
 
-## Recommended Next Increment
-Implement Phase 1 first:
-- Extract APIM API/operation/policy for each service into per-service modules.
-- Keep outputs/contracts from foundation for APIM service id/name.
-- Update workflow to run per-service APIM module apply based on changed service paths.
+- `.github/workflows/azd-deploy.yml`
+- `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`
 
-This gives immediate value with lower blast radius and minimal disruption.
+What is implemented:
+
+- Stack-aware path detection outputs (`service_infra_json`, frontend change flags).
+- Foundation `azd provision` runs only for shared infra/root changes.
+- Frontend workflow is path-scoped to frontend changes.
+
+What remains to activate Phase 1 end-to-end:
+
+- Add concrete Terraform roots under `infra/terraform/stacks/services/<service>/` for APIM service-edge resources.
+- Add matrix apply job in backend workflow for `service_infra_json` once stack roots are merged.
+
+### Phase 2 (prepared, not yet activated)
+
+Planned file additions:
+
+- `infra/terraform/stacks/runtime/<service>/*.tf` per service
+
+Planned workflow extension:
+
+- Add runtime-stack matrix apply job gated by `infra/terraform/stacks/runtime/<service>/**` changes.
+- Keep execution order: foundation first, then runtime stacks in parallel.
+
+## Safety and Governance Controls
+
+- No `terraform -target`.
+- Keep one stack per state key to avoid cross-stack drift.
+- Maintain plan-before-apply in every stack job.
+- Keep deployment policy intact: GitHub workflows are the only production deployment path.
+
+## Risks
+
+1. Split-brain ownership during migration if a resource is managed by both foundation and a new stack.
+2. State migration mistakes when moving APIM or Container App resources to new stack state keys.
+3. Path routing false negatives if new directories are added without updating patterns.
+
+## Rollback Strategy
+
+1. Disable stack-specific routing by reverting `.github/workflows/azd-deploy.yml` to previous detect logic.
+2. Keep foundation-only provisioning path (`azd provision`) as authoritative fallback.
+3. Re-run backend deployment matrix from workflow_dispatch after rollback to restore app revisions.
+4. If frontend trigger scoping causes missed deploys, revert path filters in `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`.
+
+## Validation Checklist
+
+1. Push app-only change under `apps/essays/**`: only essays deploy job runs.
+2. Push `frontend/**` change: only SWA workflow runs.
+3. Push shared infra change under `infra/terraform/main.tf`: foundation provision runs.
+4. Push file under `infra/terraform/stacks/services/avatar/**`: `service_infra_json` includes avatar.

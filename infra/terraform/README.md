@@ -134,3 +134,15 @@ For private-only rollout later:
 - This is a foundation scaffold to unblock provisioning and service wiring.
 - Existing Bicep assets in `infra/` remain available for reference during migration.
 - `backend.hcl` is intentionally untracked; keep per-environment backend files local or in secure CI variables.
+
+## Stack Decomposition Status
+
+To support changed-only infrastructure provisioning in GitHub Actions without `terraform -target`, this repository is moving to stack-based Terraform ownership.
+
+- Current authoritative stack: `infra/terraform` (foundation)
+- Planned stacks:
+  - `infra/terraform/stacks/services/<service>/` (Phase 1: APIM service-edge)
+  - `infra/terraform/stacks/runtime/<service>/` (Phase 2: service runtime)
+  - `infra/terraform/stacks/frontend/` (optional frontend infra)
+
+Routing is already path-aware in `.github/workflows/azd-deploy.yml` so stack changes can be isolated as these roots are introduced.

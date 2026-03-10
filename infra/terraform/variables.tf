@@ -159,6 +159,12 @@ variable "apim_rate_limit_renewal_period_seconds" {
   default     = 60
 }
 
+variable "manage_apim_service_edge_in_foundation" {
+  description = "Whether APIM API/operations/policies for backend services are managed by the foundation stack."
+  type        = bool
+  default     = false
+}
+
 variable "aca_vnet_integration_enabled" {
   description = "Whether the ACA environment is integrated with a VNet that can privately reach Cosmos DB."
   type        = bool

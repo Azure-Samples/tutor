@@ -9,7 +9,6 @@ on:
       - "azure.yaml"
       - "infra/terraform/**"
       - "apps/**"
-      - "frontend/**"
       - "lib/**"
       - ".github/workflows/azd-deploy.yml"
 
@@ -24,6 +23,10 @@ jobs:
       services_json: ${{ steps.detect.outputs.services_json }}
       service_count: ${{ steps.detect.outputs.service_count }}
       provision_required: ${{ steps.detect.outputs.provision_required }}
+      changed_frontend_ui: ${{ steps.detect.outputs.changed_frontend_ui }}
+      changed_frontend_infra: ${{ steps.detect.outputs.changed_frontend_infra }}
+      service_infra_json: ${{ steps.detect.outputs.service_infra_json }}
+      service_infra_count: ${{ steps.detect.outputs.service_infra_count }}
 
     steps:
       - name: Checkout
@@ -42,7 +45,10 @@ jobs:
 
           all_services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
           selected_services=()
+          selected_service_infra=()
           provision_required=false
+          changed_frontend_ui=false
+          changed_frontend_infra=false
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             selected_services=("${all_services[@]}")
@@ -55,16 +61,36 @@ jobs:
 
             changed_files="$(git diff --name-only "$before" "$CURRENT_SHA")"
 
-            if echo "$changed_files" | grep -Eq '^(azure\.yaml|infra/terraform/|lib/|\.github/workflows/azd-deploy\.yml)'; then
-              selected_services=("${all_services[@]}")
-              provision_required=true
-            else
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+
+              case "$file" in
+                frontend/*)
+                  changed_frontend_ui=true
+                  ;;
+                infra/terraform/stacks/frontend/*)
+                  changed_frontend_infra=true
+                  ;;
+                azure.yaml|infra/terraform/*|.github/workflows/azd-deploy.yml)
+                  if [[ "$file" != infra/terraform/stacks/* ]]; then
+                    provision_required=true
+                    selected_services=("${all_services[@]}")
+                  fi
+                  ;;
+                lib/*)
+                  selected_services=("${all_services[@]}")
+                  ;;
+              esac
+
               for service in "${all_services[@]}"; do
-                if echo "$changed_files" | grep -Eq "^apps/${service}/"; then
+                if [[ "$file" == apps/${service}/* ]]; then
                   selected_services+=("$service")
                 fi
+                if [[ "$file" == infra/terraform/stacks/services/${service}/* ]]; then
+                  selected_service_infra+=("$service")
+                fi
               done
-            fi
+            done <<< "$changed_files"
           fi
 
           if [ "${#selected_services[@]}" -eq 0 ]; then
@@ -73,17 +99,35 @@ jobs:
             services_json="$(printf '%s\n' "${selected_services[@]}" | sort -u | jq -R . | jq -s 'map({service:.})')"
           fi
 
+          if [ "${#selected_service_infra[@]}" -eq 0 ]; then
+            service_infra_json='[]'
+          else
+            service_infra_json="$(printf '%s\n' "${selected_service_infra[@]}" | sort -u | jq -R . | jq -s 'map({service:.})')"
+          fi
+
           service_count="$(echo "$services_json" | jq 'length')"
+          service_infra_count="$(echo "$service_infra_json" | jq 'length')"
 
           {
             echo "services_json<<GHEOF"
             echo "$services_json"
             echo "GHEOF"
           } >> "$GITHUB_OUTPUT"
+          {
+            echo "service_infra_json<<GHEOF"
+            echo "$service_infra_json"
+            echo "GHEOF"
+          } >> "$GITHUB_OUTPUT"
           echo "service_count=$service_count" >> "$GITHUB_OUTPUT"
+          echo "service_infra_count=$service_infra_count" >> "$GITHUB_OUTPUT"
           echo "provision_required=$provision_required" >> "$GITHUB_OUTPUT"
+          echo "changed_frontend_ui=$changed_frontend_ui" >> "$GITHUB_OUTPUT"
+          echo "changed_frontend_infra=$changed_frontend_infra" >> "$GITHUB_OUTPUT"
           echo "Selected services matrix: $services_json"
+          echo "Selected service-infra matrix: $service_infra_json"
           echo "Provision required: $provision_required"
+          echo "Frontend UI changed: $changed_frontend_ui"
+          echo "Frontend infra changed: $changed_frontend_infra"
 
   provision:
     runs-on: ubuntu-latest
@@ -347,14 +391,31 @@ jobs:
           terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim" || true
           terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
 
-          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
-          for service in "${services[@]}"; do
-            api_name="${service}-api"
-            api_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name};rev=1"
-            policy_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name}"
+      - name: Detach APIM service-edge resources from foundation state
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          set -euo pipefail
 
-            terraform import "azurerm_api_management_api.backend_services[\"${service}\"]" "$api_resource_id" || true
-            terraform import "azurerm_api_management_api_policy.backend_services_hardening[\"${service}\"]" "$policy_resource_id" || true
+          cd infra/terraform
+          if ! terraform init -reconfigure -backend-config=backend.hcl; then
+            echo "WARNING: Terraform init failed while detaching APIM service-edge resources from foundation state."
+            exit 0
+          fi
+
+          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          methods=(get post put patch delete options head)
+
+          for service in "${services[@]}"; do
+            terraform state rm "azurerm_api_management_api.backend_services[\"${service}\"]" || true
+            terraform state rm "azurerm_api_management_api_policy.backend_services_hardening[\"${service}\"]" || true
+
+            for method in "${methods[@]}"; do
+              terraform state rm "azurerm_api_management_api_operation.backend_catch_all[\"${service}-${method}\"]" || true
+            done
           done
 
       - name: Provision infrastructure
@@ -404,12 +465,166 @@ jobs:
           echo "Frontend SWA is deployed by .github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
           echo "azd-deploy.yml intentionally deploys infrastructure and backend services only."
 
+  stack-routing-summary:
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - provision
+    if: always()
+    steps:
+      - name: Print stack routing summary
+        run: |
+          echo "provision_required=${{ needs.detect-changes.outputs.provision_required }}"
+          echo "services_json=${{ needs.detect-changes.outputs.services_json }}"
+          echo "service_infra_json=${{ needs.detect-changes.outputs.service_infra_json }}"
+          echo "changed_frontend_ui=${{ needs.detect-changes.outputs.changed_frontend_ui }}"
+          echo "changed_frontend_infra=${{ needs.detect-changes.outputs.changed_frontend_infra }}"
+
+      - name: Service stack migration notice
+        if: needs.detect-changes.outputs.service_infra_count != '0'
+        run: |
+          echo "Service infra path changes detected."
+          echo "Per-service stack apply jobs are enabled and will run for changed service stack roots."
+
+      - name: Frontend infra ownership notice
+        if: needs.detect-changes.outputs.changed_frontend_infra == 'true'
+        run: |
+          echo "Frontend infra change detected under infra/terraform/stacks/frontend/."
+          echo "Frontend infra stack apply job is enabled."
+
+  provision-service-infra:
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - provision
+    if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success')
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.detect-changes.outputs.service_infra_json) }}
+
+    env:
+      AZURE_ENV_NAME: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Apply changed service-edge stack
+        env:
+          SERVICE: ${{ matrix.service }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+        run: |
+          set -euo pipefail
+
+          STACK_DIR="infra/terraform/stacks/services/${SERVICE}"
+          if [ ! -d "$STACK_DIR" ]; then
+            echo "Missing stack directory: $STACK_DIR"
+            exit 1
+          fi
+
+          cat > "$STACK_DIR/backend.hcl" <<EOF
+          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
+          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
+          container_name       = "$TFSTATE_CONTAINER"
+          key                  = "tutor-${AZURE_ENV_NAME}-service-edge-${SERVICE}.tfstate"
+          use_azuread_auth     = true
+          use_oidc             = true
+          EOF
+
+          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
+
+          API_ID="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/tutor-${AZURE_ENV_NAME}/providers/Microsoft.ApiManagement/service/tutor-${AZURE_ENV_NAME}-apim/apis/${SERVICE}-api;rev=1"
+          POLICY_ID="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/tutor-${AZURE_ENV_NAME}/providers/Microsoft.ApiManagement/service/tutor-${AZURE_ENV_NAME}-apim/apis/${SERVICE}-api"
+
+          terraform -chdir="$STACK_DIR" import module.service_edge.azurerm_api_management_api.service "$API_ID" || true
+          terraform -chdir="$STACK_DIR" import module.service_edge.azurerm_api_management_api_policy.service "$POLICY_ID" || true
+
+          methods=(get post put patch delete options head)
+          for method in "${methods[@]}"; do
+            operation_id="${SERVICE}-${method}"
+            operation_id="${operation_id//-/}"
+            operation_resource_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/tutor-${AZURE_ENV_NAME}/providers/Microsoft.ApiManagement/service/tutor-${AZURE_ENV_NAME}-apim/apis/${SERVICE}-api/operations/${operation_id}"
+            terraform -chdir="$STACK_DIR" import "module.service_edge.azurerm_api_management_api_operation.catch_all[\"${method}\"]" "$operation_resource_id" || true
+          done
+
+          terraform -chdir="$STACK_DIR" apply -auto-approve
+
+  provision-frontend-infra:
+    runs-on: ubuntu-latest
+    needs:
+      - detect-changes
+      - provision
+    if: always() && needs.detect-changes.outputs.changed_frontend_infra == 'true' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success')
+
+    env:
+      AZURE_ENV_NAME: prod
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Apply frontend infra stack
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+        run: |
+          set -euo pipefail
+
+          STACK_DIR="infra/terraform/stacks/frontend"
+
+          cat > "$STACK_DIR/backend.hcl" <<EOF
+          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
+          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
+          container_name       = "$TFSTATE_CONTAINER"
+          key                  = "tutor-${AZURE_ENV_NAME}-frontend-infra.tfstate"
+          use_azuread_auth     = true
+          use_oidc             = true
+          EOF
+
+          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
+          terraform -chdir="$STACK_DIR" apply -auto-approve
+
   deploy-backend-services:
     runs-on: ubuntu-latest
     needs:
       - detect-changes
       - provision
-    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success')
+      - provision-service-infra
+    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success') && (needs.provision-service-infra.result == 'success' || needs.provision-service-infra.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
