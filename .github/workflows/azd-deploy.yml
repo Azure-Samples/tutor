@@ -707,6 +707,57 @@ jobs:
 
           APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
 
+          wait_for_container_app_ready() {
+            local max_attempts=40
+            local attempt=1
+            local state=""
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              state="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+
+              if [ -z "$state" ] || [ "$state" = "Succeeded" ] || [ "$state" = "Failed" ]; then
+                echo "Container app '$APP_NAME' provisioning state: ${state:-unknown}."
+                return 0
+              fi
+
+              echo "Container app '$APP_NAME' is busy (state: $state). Waiting for completion (attempt $attempt/$max_attempts)..."
+              sleep 15
+              attempt=$((attempt + 1))
+            done
+
+            echo "Timed out waiting for container app '$APP_NAME' to finish active provisioning operations."
+            return 1
+          }
+
+          wait_for_target_image_rollout() {
+            local max_attempts=60
+            local attempt=1
+            local state=""
+            local current_image=""
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              state="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+              current_image="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
+
+              if [ "$current_image" = "$IMAGE" ] && { [ -z "$state" ] || [ "$state" = "Succeeded" ]; }; then
+                echo "Container app '$APP_NAME' is now serving image '$IMAGE'."
+                return 0
+              fi
+
+              if [ "$state" = "Failed" ]; then
+                echo "Container app '$APP_NAME' provisioning reached Failed state while waiting for image rollout."
+                return 1
+              fi
+
+              echo "Waiting for '$APP_NAME' rollout (state: ${state:-unknown}, image: ${current_image:-unknown}) attempt $attempt/$max_attempts..."
+              sleep 15
+              attempt=$((attempt + 1))
+            done
+
+            echo "Timed out waiting for '$APP_NAME' to roll out image '$IMAGE'."
+            return 1
+          }
+
           RG="$(az resource list --resource-type Microsoft.App/containerApps --name "$APP_NAME" --query 'sort_by(@, &id)[0].resourceGroup' -o tsv 2>/dev/null || true)"
           if [ -z "$RG" ]; then
             echo "Unable to discover resource group for container app '$APP_NAME'"
@@ -750,8 +801,48 @@ jobs:
           docker build -f "$DOCKERFILE" -t "$IMAGE" .
           docker push "$IMAGE"
 
-          az containerapp update \
-            --resource-group "$RG" \
-            --name "tutor-${SERVICE}-${AZURE_ENV_NAME}" \
-            --image "$IMAGE" \
-            --output none
+          wait_for_container_app_ready
+
+          max_update_attempts=6
+          update_attempt=1
+          while [ "$update_attempt" -le "$max_update_attempts" ]; do
+            set +e
+            update_output="$(az containerapp update \
+              --resource-group "$RG" \
+              --name "$APP_NAME" \
+              --image "$IMAGE" \
+              --no-wait \
+              --output none 2>&1)"
+            update_exit=$?
+            set -e
+
+            if [ "$update_exit" -eq 0 ]; then
+              if wait_for_target_image_rollout; then
+                echo "Container app '$APP_NAME' updated successfully on attempt $update_attempt/$max_update_attempts."
+                break
+              fi
+
+              echo "Container app '$APP_NAME' update accepted but rollout not confirmed on attempt $update_attempt/$max_update_attempts."
+              wait_for_container_app_ready
+              sleep $((update_attempt * 10))
+              update_attempt=$((update_attempt + 1))
+              continue
+            fi
+
+            if echo "$update_output" | grep -Eq 'ContainerAppOperationInProgress|Operation expired'; then
+              echo "Transient container app update conflict for '$APP_NAME' on attempt $update_attempt/$max_update_attempts."
+              echo "$update_output"
+              wait_for_container_app_ready
+              sleep $((update_attempt * 10))
+              update_attempt=$((update_attempt + 1))
+              continue
+            fi
+
+            echo "$update_output"
+            exit "$update_exit"
+          done
+
+          if [ "$update_attempt" -gt "$max_update_attempts" ]; then
+            echo "Container app '$APP_NAME' update did not succeed after $max_update_attempts attempts."
+            exit 1
+          fi
