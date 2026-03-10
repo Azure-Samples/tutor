@@ -177,6 +177,7 @@ jobs:
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
         run: |
           set -euo pipefail
 
@@ -221,6 +222,31 @@ jobs:
             echo "Grant role on scope: $STORAGE_SCOPE"
             exit 1
           fi
+
+          # Role assignment visibility does not guarantee immediate data-plane access.
+          # Probe the blob API with AAD auth and wait for RBAC propagation.
+          max_attempts=20
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            if az storage blob list \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --container-name "$TFSTATE_CONTAINER" \
+              --auth-mode login \
+              --num-results 1 \
+              --only-show-errors >/dev/null 2>&1; then
+              echo "Terraform state data-plane access is ready."
+              break
+            fi
+
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "OIDC principal still cannot access state container data-plane after RBAC propagation wait."
+              exit 1
+            fi
+
+            echo "Waiting for storage RBAC propagation (attempt $attempt/$max_attempts)..."
+            sleep 15
+            attempt=$((attempt + 1))
+          done
 
       - name: Build Terraform backend config
         env:
