@@ -172,24 +172,51 @@ jobs:
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
 
-      - name: Resolve Terraform state access key
+      - name: Ensure Terraform state RBAC for OIDC principal
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
         run: |
           set -euo pipefail
-          TFSTATE_ACCESS_KEY="$(az storage account keys list \
-            --resource-group "$TFSTATE_RESOURCE_GROUP" \
-            --account-name "$TFSTATE_STORAGE_ACCOUNT" \
-            --query '[0].value' -o tsv)"
 
-          if [ -z "$TFSTATE_ACCESS_KEY" ]; then
-            echo "Unable to resolve Terraform state storage account key."
+          STORAGE_SCOPE="$(az storage account show \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --query id -o tsv)"
+
+          ACCESS_TOKEN="$(az account get-access-token \
+            --resource https://management.azure.com/ \
+            --query accessToken -o tsv)"
+
+          PRINCIPAL_OBJECT_ID="$(python - <<'PY'
+import base64
+import json
+import os
+
+token = os.environ.get("ACCESS_TOKEN", "")
+parts = token.split('.')
+if len(parts) < 2:
+    print("")
+    raise SystemExit(0)
+
+payload = parts[1]
+payload += "=" * (-len(payload) % 4)
+data = json.loads(base64.urlsafe_b64decode(payload.encode("utf-8")).decode("utf-8"))
+print(data.get("oid", ""))
+PY
+          )"
+
+          if [ -z "$PRINCIPAL_OBJECT_ID" ]; then
+            echo "Unable to resolve OIDC principal object id from access token."
             exit 1
           fi
 
-          echo "TFSTATE_ACCESS_KEY=$TFSTATE_ACCESS_KEY" >> "$GITHUB_ENV"
-          azd env set RS_ACCESS_KEY "$TFSTATE_ACCESS_KEY"
+          az role assignment create \
+            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+            --assignee-principal-type ServicePrincipal \
+            --role "Storage Blob Data Contributor" \
+            --scope "$STORAGE_SCOPE" \
+            --only-show-errors >/dev/null || true
 
       - name: Build Terraform backend config
         env:
@@ -197,12 +224,10 @@ jobs:
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
-          TFSTATE_ACCESS_KEY: ${{ env.TFSTATE_ACCESS_KEY }}
         run: |
           : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
-          : "${TFSTATE_ACCESS_KEY:?Missing state storage access key}"
           if [ -z "$TFSTATE_KEY" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
@@ -211,7 +236,8 @@ jobs:
           storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
           container_name       = "$TFSTATE_CONTAINER"
           key                  = "$TFSTATE_KEY"
-          access_key           = "$TFSTATE_ACCESS_KEY"
+          use_azuread_auth     = true
+          use_oidc             = true
           EOF
 
       - name: Validate Terraform configuration with remote backend
@@ -283,14 +309,12 @@ jobs:
           RS_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           RS_CONTAINER_NAME: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           RS_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
-          RS_ACCESS_KEY: ${{ env.TFSTATE_ACCESS_KEY }}
         run: |
           set -euo pipefail
 
           : "${RS_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${RS_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${RS_CONTAINER_NAME:?Missing secret TERRAFORM_STATE_CONTAINER}"
-          : "${RS_ACCESS_KEY:?Missing resolved state storage access key}"
           if [ -z "${RS_KEY:-}" ]; then
             RS_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
