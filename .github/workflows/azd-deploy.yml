@@ -206,6 +206,19 @@ jobs:
           terraform state pull >/dev/null
           terraform validate
 
+      - name: Adopt pre-existing resources into state
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          cd infra/terraform
+          terraform init -reconfigure -backend-config=backend.hcl
+          terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim" || true
+          terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
+
       - name: Provision infrastructure
         run: azd provision --no-prompt --debug
 
