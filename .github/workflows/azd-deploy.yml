@@ -464,12 +464,20 @@ jobs:
           fi
           export RS_KEY
 
-          max_attempts=3
+          max_attempts=6
           attempt=1
 
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "Provision attempt $attempt/$max_attempts"
-            if azd provision --no-prompt --debug; then
+
+            set +e
+            provision_output="$(azd provision --no-prompt --debug 2>&1)"
+            provision_exit=$?
+            set -e
+
+            echo "$provision_output"
+
+            if [ "$provision_exit" -eq 0 ]; then
               echo "Provision succeeded on attempt $attempt"
               break
             fi
@@ -479,8 +487,13 @@ jobs:
               exit 1
             fi
 
-            sleep_seconds=$((attempt * 30))
-            echo "Provision failed due to transient dependency conflict. Retrying in ${sleep_seconds}s..."
+            if ! echo "$provision_output" | grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired'; then
+              echo "Provision failed with a non-transient error; not retrying further."
+              exit "$provision_exit"
+            fi
+
+            sleep_seconds=$((attempt * 90))
+            echo "Provision failed due to transient control-plane conflict. Retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
             attempt=$((attempt + 1))
           done
