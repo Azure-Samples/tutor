@@ -342,7 +342,7 @@ jobs:
 
           services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
           for service in "${services[@]}"; do
-            api_name="${service//-/}-api"
+            api_name="${service}-api"
             api_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name};rev=1"
             policy_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name}"
 

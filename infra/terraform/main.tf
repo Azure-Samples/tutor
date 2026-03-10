@@ -332,7 +332,7 @@ resource "azurerm_api_management" "main" {
 resource "azurerm_api_management_api" "backend_services" {
   for_each = local.apim_service_paths
 
-  name                  = "${replace(each.key, "-", "")}-api"
+  name                  = "${each.key}-api"
   resource_group_name   = azurerm_resource_group.main.name
   api_management_name   = azurerm_api_management.main.name
   revision              = "1"
@@ -370,27 +370,12 @@ resource "azurerm_api_management_api_policy" "backend_services_hardening" {
 
   resource_group_name = azurerm_resource_group.main.name
   api_management_name = azurerm_api_management.main.name
-  api_name            = "${replace(each.key, "-", "")}-api"
+  api_name            = "${each.key}-api"
 
   xml_content = <<-XML
     <policies>
       <inbound>
         <base />
-        <cors allow-credentials="false">
-          <allowed-origins>
-${join("\n", [for origin in local.apim_allowed_origins : "            <origin>${origin}</origin>"])}
-          </allowed-origins>
-          <allowed-methods preflight-result-max-age="300">
-            <method>*</method>
-          </allowed-methods>
-          <allowed-headers>
-            <header>*</header>
-          </allowed-headers>
-          <expose-headers>
-            <header>*</header>
-          </expose-headers>
-        </cors>
-        <rate-limit-by-key calls="${var.apim_rate_limit_calls}" renewal-period="${var.apim_rate_limit_renewal_period_seconds}" counter-key="@(context.Request.IpAddress)" />
       </inbound>
       <backend>
         <base />
