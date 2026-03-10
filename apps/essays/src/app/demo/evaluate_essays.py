@@ -14,7 +14,7 @@ from semantic_kernel.agents import GroupChatManager, BooleanResult, MessageResul
 from semantic_kernel.contents import ChatMessageContent, ChatHistory, AuthorRole
 
 from app.essays import EssayOrchestrator  # pylint: disable=import-error
-from app.schemas import Essay, Resource, Evaluator, Swarm  # pylint: disable=import-error
+from app.schemas import Essay, Resource, Evaluator, Assembly  # pylint: disable=import-error
 
 import pandas as pd
 
@@ -262,7 +262,7 @@ async def main():
         }),
         description="Consolida apenas observações sobre a forma gráfica e a fidelidade da transcrição."
     )
-    swarm = Swarm(
+    assembly = Assembly(
         id="local_sistema",
         agents=[transcription_agent, spelling_agent, syntax_agent, consolidation_agent],
         topic_name="Análise de Redação"
@@ -293,7 +293,7 @@ async def main():
         try:
             async with orchestrator:
                 raw_evaluation = await orchestrator.invoke(
-                    swarm,
+                    assembly,
                     essay_obj,
                     resources,
                     strategy="group",

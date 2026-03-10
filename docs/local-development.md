@@ -388,7 +388,7 @@ Every FastAPI service auto-generates Swagger UI. Open `http://localhost:<port>/d
 ### 10.3 — Chat Service Sample Call
 
 ```pwsh
-curl -X POST http://localhost:8086/chat/guide `
+curl -X POST http://localhost:8086/guide `
   -H "Content-Type: application/json" `
   -d '{
     "student_id": "test-student-001",

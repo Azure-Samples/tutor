@@ -29,19 +29,22 @@ export type EssayResource = {
   submittedAt?: string;
 };
 
+export type AgentRef = {
+  agent_id: string;
+  role: string;
+  deployment: string;
+};
+
 export type AgentDefinition = {
-  id?: string;
+  agent_id?: string;
   name: string;
   instructions: string;
   deployment: string;
+  role: string;
   temperature?: number;
 };
 
-export type ProvisionedAgent = AgentDefinition & {
-  id: string;
-};
-
-export type SwarmDefinition = {
+export type AssemblyDefinition = {
   id: string;
   topic_name: string;
   essay_id: string;
@@ -52,5 +55,5 @@ export type Assembly = {
   id: string;
   topic_name: string;
   essay_id: string;
-  agents: ProvisionedAgent[];
+  agents: AgentRef[];
 };

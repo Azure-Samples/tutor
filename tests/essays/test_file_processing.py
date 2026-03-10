@@ -6,15 +6,25 @@ import importlib
 import sys
 from pathlib import Path
 
-repo_root = Path(__file__).resolve().parents[2]
-essays_root = repo_root / "apps" / "essays"
-if str(essays_root) not in sys.path:
-    sys.path.insert(0, str(essays_root))
-essays_src = essays_root / "src"
-if str(essays_src) not in sys.path:
-    sys.path.insert(0, str(essays_src))
+import pytest
 
-file_processing = importlib.import_module("app.file_processing")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_ESSAYS_ROOT = _REPO_ROOT / "apps" / "essays"
+_ESSAYS_SRC = _ESSAYS_ROOT / "src"
+_LIB_SRC = _REPO_ROOT / "lib" / "src"
+
+
+@pytest.fixture
+def file_processing():
+    """Import the file_processing module with isolated essays paths."""
+    for entry in (str(_ESSAYS_ROOT), str(_ESSAYS_SRC), str(_LIB_SRC)):
+        if entry in sys.path:
+            sys.path.remove(entry)
+        sys.path.insert(0, entry)
+    for mod_name in list(sys.modules):
+        if mod_name == "app" or mod_name.startswith("app."):
+            del sys.modules[mod_name]
+    return importlib.import_module("app.file_processing")
 
 
 class _FakePoller:
@@ -56,14 +66,14 @@ class _FakeDocIntelClient:
         return _FakePoller(_FakeResult("extracted from document intelligence"))
 
 
-def test_extract_text_with_doc_intelligence_returns_none_without_endpoint(monkeypatch):
+def test_extract_text_with_doc_intelligence_returns_none_without_endpoint(monkeypatch, file_processing):
     monkeypatch.delenv("DOCUMENT_INTELLIGENCE_ENDPOINT", raising=False)
     monkeypatch.setenv("DOCUMENT_INTELLIGENCE_KEY", "test-key")
     result = file_processing.extract_text_with_doc_intelligence(b"bytes", "application/pdf")
     assert result is None
 
 
-def test_extract_text_with_doc_intelligence_uses_client(monkeypatch):
+def test_extract_text_with_doc_intelligence_uses_client(monkeypatch, file_processing):
     _FakeDocIntelClient.calls.clear()
     monkeypatch.setenv("DOCUMENT_INTELLIGENCE_ENDPOINT", "https://example.cognitiveservices.azure.com")
     monkeypatch.setenv("DOCUMENT_INTELLIGENCE_KEY", "test-key")
@@ -82,7 +92,7 @@ def test_extract_text_with_doc_intelligence_uses_client(monkeypatch):
     assert recorded["content_type"] == "application/pdf"
 
 
-def test_process_pdf_prefers_document_intelligence(monkeypatch):
+def test_process_pdf_prefers_document_intelligence(monkeypatch, file_processing):
     monkeypatch.setattr(file_processing, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: "ocr-text")
     monkeypatch.setattr(
         file_processing,
@@ -96,7 +106,7 @@ def test_process_pdf_prefers_document_intelligence(monkeypatch):
     assert processed.metadata["ocr_source"] == "document_intelligence"
 
 
-def test_process_pdf_falls_back_to_pypdf(monkeypatch):
+def test_process_pdf_falls_back_to_pypdf(monkeypatch, file_processing):
     monkeypatch.setattr(file_processing, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(file_processing, "extract_pdf_text", lambda *_args, **_kwargs: "fallback-text")
 
@@ -106,7 +116,7 @@ def test_process_pdf_falls_back_to_pypdf(monkeypatch):
     assert processed.metadata["ocr_source"] == "pypdf"
 
 
-def test_process_image_captures_doc_intelligence_text(monkeypatch):
+def test_process_image_captures_doc_intelligence_text(monkeypatch, file_processing):
     monkeypatch.setattr(file_processing, "extract_text_with_doc_intelligence", lambda *_args, **_kwargs: "image-ocr")
 
     processed = file_processing.process_image(b"small-image-bytes", "image.png", "image/png")

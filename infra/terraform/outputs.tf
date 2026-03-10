@@ -166,8 +166,13 @@ output "BLOB_CONTAINER_NAME" {
 }
 
 output "PROJECT_ENDPOINT" {
-  description = "Azure AI Foundry project endpoint."
-  value       = var.project_endpoint
+  description = "Azure AI Foundry project endpoint (Terraform-managed, ADR-011)."
+  value       = azurerm_machine_learning_workspace.ai_project.discovery_url
+}
+
+output "AI_SERVICES_ENDPOINT" {
+  description = "Azure AI Services endpoint for Foundry agents."
+  value       = azurerm_cognitive_account.ai_services.endpoint
 }
 
 output "MODEL_DEPLOYMENT_NAME" {

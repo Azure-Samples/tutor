@@ -12,9 +12,10 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from tutor_lib.agents import AgentRegistry, AgentRunContext, AgentSpec
+from tutor_lib.agents import FoundryAgentService
 from tutor_lib.config import get_settings
 
+from app.interfaces import DimensionEvaluation, QuestionEvaluationResult, QuestionEvaluationStatus
 from app.schemas import Answer, Assembly, Grader, Question
 
 
@@ -50,17 +51,7 @@ class EvaluatingState:
             answer=context.answer,
             dimension=grader.dimension,
         )
-        agent = context.registry.create(
-            AgentSpec(
-                name=f"question-{grader.dimension}",
-                instructions=grader.instructions,
-                deployment=grader.deployment,
-                max_tokens=600,
-            )
-        )
-        run_context = AgentRunContext(agent)
-        response = await run_context.run(prompt, temperature=0.1)
-        raw_text = getattr(response, "text", "") or ""
+        raw_text = await context.agent_service.run_agent(grader.agent_id, prompt)
         notes = [line.strip() for line in raw_text.split("\n") if line.strip()]
         verdict = notes[0] if notes else "No verdict returned"
         confidence = self._infer_confidence(notes)
@@ -109,7 +100,7 @@ class QuestionStateMachine:
         self._assembly_id = assembly_id
         self.question = question
         self.answer = answer
-        self.registry = AgentRegistry(settings.azure_ai.project_endpoint)
+        self.agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
         self.prompt_composer = PromptComposer(Path(__file__).parent / "prompts")
         self.graders: list[Grader] = []
         self._result: QuestionEvaluationResult | None = None
@@ -136,11 +127,21 @@ class QuestionStateMachine:
                     item = await container.read_item(item=self._assembly_id, partition_key=self._assembly_id)
                 except exceptions.CosmosResourceNotFoundError as exc:  # pragma: no cover
                     raise ValueError(f"Assembly not found: {self._assembly_id}") from exc
-                payload = {**item, "agents": item.get("agents") or item.get("avatars", [])}
-                if "topic_name" not in payload and "topic" in item:
-                    payload["topic_name"] = item["topic"]
-                assembly = Assembly(**payload)
-                self.graders = assembly.agents
+                raw_agents = item.get("agents") or item.get("avatars", [])
+                graders: list[Grader] = []
+                for entry in raw_agents:
+                    if isinstance(entry, dict):
+                        if "agent_id" in entry:
+                            graders.append(Grader.model_validate(entry))
+                        elif "id" in entry:
+                            graders.append(Grader(
+                                agent_id=str(entry["id"]),
+                                dimension=entry.get("dimension", ""),
+                                deployment=entry.get("deployment", ""),
+                            ))
+                if not graders:
+                    raise ValueError(f"Assembly '{self._assembly_id}' has no graders")
+                self.graders = graders
 
 
 async def evaluate_question(assembly_id: str, question: Question, answer: Answer) -> QuestionEvaluationResult:

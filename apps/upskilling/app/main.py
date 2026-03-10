@@ -258,32 +258,4 @@ async def evaluate_persisted_plan(
     return _success("Plan Evaluated", "Generated guidance for each paragraph.", plan_to_dict(saved))
 
 
-@app.post("/plan/evaluate", tags=["Planning"])
-async def evaluate_plan(payload: PlanRequest) -> JSONResponse:
-    try:
-        orchestrator = build_orchestrator()
-        evaluations = await orchestrator.evaluate(payload)
-    except Exception:
-        evaluations = [
-            ParagraphEvaluation(
-                paragraph_index=index,
-                title=paragraph.title,
-                feedback=[
-                    AgentFeedback(
-                        agent="coaching-fallback",
-                        verdict="Needs refinement",
-                        strengths=["Clear topic framing"],
-                        improvements=["Add one measurable learning outcome and one formative check"],
-                    )
-                ],
-            )
-            for index, paragraph in enumerate(payload.paragraphs)
-        ]
 
-    response = PlanEvaluationResponse(
-        timeframe=payload.timeframe,
-        topic=payload.topic,
-        class_id=payload.class_id,
-        evaluations=evaluations,
-    )
-    return _success("Plan Evaluated", "Generated guidance for each paragraph.", response.model_dump())

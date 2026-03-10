@@ -17,7 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.agents.clients import FoundryAgentService
+from tutor_lib.agents import FoundryAgentService
 from app.cosmos import CosmosCRUD
 from app.file_processing import (
     ProcessedUpload,
@@ -35,11 +35,11 @@ from app.schemas import (
     Essay,
     EssayPatch,
     ErrorMessage,
-    ProvisionedAgent,
+    AgentRef,
     Resource,
     SuccessMessage,
-    Swarm,
-    SwarmDefinition,
+    Assembly,
+    AssemblyDefinition,
 )
 from app.config import get_settings
 from tutor_lib.middleware import configure_entra_auth
@@ -226,36 +226,34 @@ async def _resources_for_essay(essay_id: str) -> list[Resource]:
     return resources
 
 
-def _materialize_agent(agent: Any, fallback: AgentDefinition | None = None) -> ProvisionedAgent:
-    """Build a ProvisionedAgent from Azure AI Foundry response with safe fallbacks."""
+def _materialize_agent(agent: Any, definition: AgentDefinition | None = None) -> AgentRef:
+    """Build a lightweight AgentRef from a Foundry agent response."""
 
-    name = getattr(agent, "name", None) or (fallback.name if fallback else getattr(agent, "id", "unknown-agent"))
-    instructions = getattr(agent, "instructions", None) or (fallback.instructions if fallback else "")
+    agent_id = getattr(agent, "id", None)
+    if not agent_id:
+        raise ValueError("Azure AI agent response did not include an id")
+
     deployment = (
         getattr(agent, "model", None)
         or getattr(agent, "model_id", None)
         or getattr(agent, "deployment_name", None)
-        or (fallback.deployment if fallback else "")
+        or (definition.deployment if definition else "")
     )
-    temperature = getattr(agent, "temperature", None)
-    if temperature is None and fallback is not None:
-        temperature = fallback.temperature
+    role = definition.role if definition else "default"
 
-    return ProvisionedAgent(
-        id=getattr(agent, "id"),
-        name=name,
-        instructions=instructions,
+    return AgentRef(
+        agent_id=agent_id,
+        role=role,
         deployment=deployment,
-        temperature=temperature,
     )
 
 
-async def _ensure_provisioned_agents(definitions: list[AgentDefinition]) -> list[ProvisionedAgent]:
-    provisioned: list[ProvisionedAgent] = []
+async def _ensure_provisioned_agents(definitions: list[AgentDefinition]) -> list[AgentRef]:
+    provisioned: list[AgentRef] = []
     for definition in definitions:
-        if definition.id:
-            remote = await agent_service.get_agent(definition.id)
-            provisioned.append(_materialize_agent(remote, fallback=definition))
+        if definition.agent_id:
+            remote = await agent_service.get_agent(definition.agent_id)
+            provisioned.append(_materialize_agent(remote, definition=definition))
             continue
 
         created = await agent_service.create_agent(
@@ -265,43 +263,52 @@ async def _ensure_provisioned_agents(definitions: list[AgentDefinition]) -> list
             temperature=definition.temperature,
         )
         remote = await agent_service.get_agent(created.id)
-        provisioned.append(_materialize_agent(remote, fallback=definition))
+        provisioned.append(_materialize_agent(remote, definition=definition))
     return provisioned
 
 
-def _swarm_definition_from_swarm(swarm: Swarm) -> SwarmDefinition:
-    agents = [AgentDefinition(**agent.model_dump()) for agent in swarm.agents]
-    return SwarmDefinition(id=swarm.id, topic_name=swarm.topic_name, essay_id=swarm.essay_id, agents=agents)
+def _assembly_definition_from_assembly(assembly: Assembly) -> AssemblyDefinition:
+    agents = [
+        AgentDefinition(
+            agent_id=agent.agent_id,
+            name=agent.role,
+            instructions="",
+            deployment=agent.deployment,
+            role=agent.role,
+        )
+        for agent in assembly.agents
+    ]
+    return AssemblyDefinition(id=assembly.id, topic_name=assembly.topic_name, essay_id=assembly.essay_id, agents=agents)
 
 
-async def _hydrate_swarm_record(raw: dict[str, Any]) -> SwarmDefinition:
+async def _hydrate_assembly_record(raw: dict[str, Any]) -> AssemblyDefinition:
     raw_agents = raw.get("agents", []) or []
-    provisioned: list[ProvisionedAgent] = []
+    provisioned: list[AgentRef] = []
     for entry in raw_agents:
         if isinstance(entry, dict):
-            provisioned.append(ProvisionedAgent.model_validate(entry))
+            # Support both new lightweight format (agent_id) and legacy (id)
+            if "agent_id" in entry:
+                provisioned.append(AgentRef.model_validate(entry))
+            elif "id" in entry:
+                provisioned.append(AgentRef(
+                    agent_id=str(entry["id"]),
+                    role=entry.get("role", "default"),
+                    deployment=entry.get("deployment", ""),
+                ))
         elif isinstance(entry, str):
-            try:
-                remote = await agent_service.get_agent(entry)
-                provisioned.append(_materialize_agent(remote))
-            except Exception:
-                provisioned.append(
-                    ProvisionedAgent(
-                        id=entry,
-                        name=entry,
-                        instructions="",
-                        deployment="",
-                        temperature=None,
-                    )
-                )
+            provisioned.append(AgentRef(
+                agent_id=entry,
+                role="default",
+                deployment="",
+            ))
 
-    swarm = Swarm(
+    assembly = Assembly(
         id=str(raw.get("id") or ""),
         topic_name=raw.get("topic_name") or raw.get("topicName", ""),
         agents=provisioned,
         essay_id=str(raw.get("essay_id") or raw.get("essayId") or ""),
     )
-    return _swarm_definition_from_swarm(swarm)
+    return _assembly_definition_from_assembly(assembly)
 
 
 async def _get_essay_document(essay_id: str) -> dict[str, Any] | None:
@@ -717,16 +724,16 @@ async def list_assemblies(essay_id: str | None = None) -> JSONResponse:
         records = await _assemblies_for_essay(essay_id)
     else:
         records = await _crud(settings.cosmos.assembly_container).list_items()
-    hydrated = [await _hydrate_swarm_record(record) for record in records]
+    hydrated = [await _hydrate_assembly_record(record) for record in records]
     return _create_success_response(
         "Assemblies Retrieved",
         "Assemblies fetched",
-        [swarm.model_dump() for swarm in hydrated],
+        [entry.model_dump() for entry in hydrated],
     )
 
 
 @app.post("/assemblies", tags=["Assemblies"])
-async def create_assembly(assembly: SwarmDefinition) -> JSONResponse:
+async def create_assembly(assembly: AssemblyDefinition) -> JSONResponse:
     essay_document = await _require_essay_document(assembly.essay_id)
 
     existing_for_essay = await _assemblies_for_essay(assembly.essay_id)
@@ -740,7 +747,7 @@ async def create_assembly(assembly: SwarmDefinition) -> JSONResponse:
         provisioned = await _ensure_provisioned_agents(assembly.agents)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to provision agents") from exc
-    stored = Swarm(
+    stored = Assembly(
         id=assembly.id,
         topic_name=assembly.topic_name,
         essay_id=assembly.essay_id,
@@ -748,12 +755,12 @@ async def create_assembly(assembly: SwarmDefinition) -> JSONResponse:
     )
     await _crud(settings.cosmos.assembly_container).create_item(stored.model_dump())
     await _link_essay_to_assembly(essay_document, stored.id)
-    response = _swarm_definition_from_swarm(stored)
+    response = _assembly_definition_from_assembly(stored)
     return _create_success_response("Assembly Created", "Assembly stored", response.model_dump())
 
 
 @app.put("/assemblies/{assembly_id}", tags=["Assemblies"])
-async def update_assembly(assembly_id: str, assembly: SwarmDefinition) -> JSONResponse:
+async def update_assembly(assembly_id: str, assembly: AssemblyDefinition) -> JSONResponse:
     crud = _crud(settings.cosmos.assembly_container)
     try:
         existing = await crud.read_item(assembly_id)
@@ -772,7 +779,7 @@ async def update_assembly(assembly_id: str, assembly: SwarmDefinition) -> JSONRe
         provisioned = await _ensure_provisioned_agents(assembly.agents)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to provision agents") from exc
-    stored = Swarm(
+    stored = Assembly(
         id=assembly_id,
         topic_name=assembly.topic_name,
         essay_id=essay_document["id"],
@@ -780,7 +787,7 @@ async def update_assembly(assembly_id: str, assembly: SwarmDefinition) -> JSONRe
     )
     await crud.update_item(assembly_id, stored.model_dump())
     await _link_essay_to_assembly(essay_document, stored.id)
-    response = _swarm_definition_from_swarm(stored)
+    response = _assembly_definition_from_assembly(stored)
     return _create_success_response("Assembly Updated", "Assembly modified", response.model_dump())
 
 

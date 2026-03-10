@@ -20,11 +20,18 @@ def essays_app_module_fixture(monkeypatch):
 
     repo_root = Path(__file__).resolve().parents[2]
     essays_root = repo_root / "apps" / "essays"
-    if str(essays_root) not in sys.path:
-        sys.path.insert(0, str(essays_root))
     essays_src = essays_root / "src"
-    if str(essays_src) not in sys.path:
-        sys.path.insert(0, str(essays_src))
+    lib_src = repo_root / "lib" / "src"
+
+    for entry in (str(essays_root), str(essays_src), str(lib_src)):
+        if entry in sys.path:
+            sys.path.remove(entry)
+        sys.path.insert(0, entry)
+
+    # Clear cached app.* modules to avoid cross-service contamination
+    for mod_name in list(sys.modules):
+        if mod_name == "app" or mod_name.startswith("app."):
+            del sys.modules[mod_name]
 
     from app.config import get_settings  # pylint: disable=import-error
 
@@ -49,8 +56,9 @@ def essays_main_module_fixture(monkeypatch):
     lib_src = repo_root / "lib" / "src"
 
     for entry in (str(essays_src), str(lib_src)):
-        if entry not in sys.path:
-            sys.path.insert(0, entry)
+        if entry in sys.path:
+            sys.path.remove(entry)
+        sys.path.insert(0, entry)
 
     for module_name in list(sys.modules):
         if module_name == "app" or module_name.startswith("app."):
@@ -86,17 +94,16 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
     _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    provisioned = module.ProvisionedAgent(
-        id="agent-default",
-        name="General Reviewer",
-        instructions="Provide general feedback",
+    provisioned = module.AgentRef(
+        agent_id="agent-default",
+        role="default",
         deployment="gpt-4o",
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):
-        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-1", agents=[provisioned])
+        return module.Assembly(id=assembly_id, topic_name="Topic", essay_id="essay-1", agents=[provisioned])
 
-    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
 
     orchestrator = module.EssayOrchestrator()
 
@@ -117,23 +124,21 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
     )
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    narrative_agent = module.ProvisionedAgent(
-        id="agent-narrative",
-        name="Narrative Coach",
-        instructions="Support creative storytelling",
+    narrative_agent = module.AgentRef(
+        agent_id="agent-narrative",
+        role="narrative",
         deployment="gpt-4o",
     )
-    default_agent = module.ProvisionedAgent(
-        id="agent-default",
-        name="General Reviewer",
-        instructions="Provide general feedback",
+    default_agent = module.AgentRef(
+        agent_id="agent-default",
+        role="default",
         deployment="gpt-4o",
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):  # pragma: no cover - monkeypatched helper
-        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-2", agents=[default_agent, narrative_agent])
+        return module.Assembly(id=assembly_id, topic_name="Topic", essay_id="essay-2", agents=[default_agent, narrative_agent])
 
-    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
 
     orchestrator = module.EssayOrchestrator()
 
@@ -160,17 +165,16 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
     )
     monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
-    analytical_agent = module.ProvisionedAgent(
-        id="agent-analytical",
-        name="Analytical Reviewer",
-        instructions="Analyse evidence",
+    analytical_agent = module.AgentRef(
+        agent_id="agent-analytical",
+        role="analytical",
         deployment="o3-mini",
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):
-        return module.Swarm(id=assembly_id, topic_name="Topic", essay_id="essay-3", agents=[analytical_agent])
+        return module.Assembly(id=assembly_id, topic_name="Topic", essay_id="essay-3", agents=[analytical_agent])
 
-    monkeypatch.setattr(module.EssayOrchestrator, "_load_swarm", _stub_load, raising=False)
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
 
     orchestrator = module.EssayOrchestrator()
 
@@ -195,11 +199,9 @@ class _StubContainer:
             "essay_id": "essay-stub",
             "agents": [
                 {
-                    "id": "agent-1",
-                    "name": "General Reviewer",
-                    "instructions": "Review essays",
+                    "agent_id": "agent-1",
+                    "role": "default",
                     "deployment": "gpt-4o",
-                    "temperature": 0.2,
                 }
             ],
         }
@@ -232,7 +234,7 @@ class _StubCosmosClient:
 
 
 @pytest.mark.asyncio
-async def test_load_swarm_raises_for_missing_assembly(monkeypatch, essays_app_module_fixture):
+async def test_load_assembly_raises_for_missing_assembly(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
@@ -252,7 +254,7 @@ async def test_load_swarm_raises_for_missing_assembly(monkeypatch, essays_app_mo
 
 
 @pytest.mark.asyncio
-async def test_load_swarm_returns_agents(monkeypatch, essays_app_module_fixture):
+async def test_load_assembly_returns_agents(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 

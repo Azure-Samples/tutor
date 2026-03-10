@@ -37,7 +37,7 @@
 ### Completed Changes
 
 - [x] **APIM-only client policy** implemented in `frontend/utils/api.ts`.
-- [x] **Chat flow contract fixed**: frontend sends `student_id`, `course_id`, `prompt`; backend supports `/guide` and compatibility route `/chat/guide`.
+- [x] **Chat flow contract fixed**: frontend sends `student_id`, `course_id`, `prompt`; backend supports `/guide`.
 - [x] **Case steps routing fixed**: `StepsForm` now uses avatar API where `/cases/{id}/steps` is implemented.
 - [x] **Question flow normalized**:
   - frontend uses id-based update/delete;

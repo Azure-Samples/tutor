@@ -16,16 +16,16 @@ variable "location" {
   default     = "eastus"
 }
 
+variable "foundry_location" {
+  description = "Azure region for AI Foundry resources (Hub, Project, AI Services). Deployed outside VNet."
+  type        = string
+  default     = "westus3"
+}
+
 variable "cosmos_db_name" {
   description = "Cosmos DB SQL database name."
   type        = string
   default     = "tutor"
-}
-
-variable "project_endpoint" {
-  description = "Azure AI Foundry project endpoint used by agentic services."
-  type        = string
-  default     = ""
 }
 
 variable "model_deployment_name" {

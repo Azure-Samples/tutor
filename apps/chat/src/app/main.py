@@ -38,7 +38,6 @@ async def ready() -> dict[str, str]:
 
 
 @app.post("/guide")
-@app.post("/chat/guide")
 async def guide(payload: GuidanceRequest) -> dict[str, str]:
     prompt = _resolve_prompt(payload)
     return {

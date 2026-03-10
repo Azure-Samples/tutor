@@ -5,7 +5,7 @@ import FormsModal from "@/components/common/Modals";
 import { FaTrash, FaPlus, FaRobot, FaSync } from "react-icons/fa";
 import EssayForm from "@/components/Forms/Essays";
 import AgentForm from "@/components/Forms/Agent";
-import type { Essay, EssayEvaluationResult, ProvisionedAgent } from "@/types/essays";
+import type { Essay, EssayEvaluationResult, AgentRef } from "@/types/essays";
 import { unwrapContent } from "@/types/api";
 
 const EssaysList: React.FC = () => {
@@ -17,7 +17,7 @@ const EssaysList: React.FC = () => {
   const [showAgentModal, setShowAgentModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [latestAgent, setLatestAgent] = useState<ProvisionedAgent | null>(null);
+  const [latestAgent, setLatestAgent] = useState<AgentRef | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [reprocessError, setReprocessError] = useState<string | null>(null);
   const [latestEvaluation, setLatestEvaluation] = useState<{
@@ -159,7 +159,7 @@ const EssaysList: React.FC = () => {
           {latestAgent && (
             <div className="mt-4 text-sm text-cyan-800 dark:text-cyan-200 bg-cyan-100/80 dark:bg-cyan-900/40 rounded-2xl px-4 py-3">
               <p className="font-semibold">Last provisioned agent:</p>
-              <p>{latestAgent.name} ({latestAgent.id})</p>
+              <p>{latestAgent.role} ({latestAgent.agent_id})</p>
             </div>
           )}
         </div>
@@ -168,7 +168,7 @@ const EssaysList: React.FC = () => {
           <div className="flex flex-col gap-4 mb-6">
             {latestAgent && (
               <div className="rounded-2xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/40 px-4 py-3 text-sm text-cyan-800 dark:text-cyan-200">
-                <span className="font-semibold">Last provisioned agent:</span> {latestAgent.name} ({latestAgent.id})
+                <span className="font-semibold">Last provisioned agent:</span> {latestAgent.role} ({latestAgent.agent_id})
               </div>
             )}
             <div className="flex flex-col sm:flex-row items-center justify-end gap-3">

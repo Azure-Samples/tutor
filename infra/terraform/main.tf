@@ -48,6 +48,7 @@ locals {
     "Cosmos DB Built-in Data Contributor" = azurerm_cosmosdb_account.main.id
     "Storage Blob Data Contributor"       = azurerm_storage_account.uploads.id
     "AcrPull"                             = azurerm_container_registry.main.id
+    "Cognitive Services User"             = azurerm_cognitive_account.ai_services.id
   }
 
   agent_role_assignments = {
@@ -350,4 +351,70 @@ resource "azurerm_role_assignment" "agent_permissions" {
   scope                = each.value.scope
   role_definition_name = each.value.role_name
   principal_id         = each.value.principal_id
+}
+
+# ── Azure AI Foundry (ADR-011: westus3, public endpoint) ──────────────────
+
+resource "azurerm_cognitive_account" "ai_services" {
+  name                  = "${var.name_prefix}-${var.environment}-ai-svc"
+  location              = var.foundry_location
+  resource_group_name   = azurerm_resource_group.main.name
+  kind                  = "AIServices"
+  sku_name              = "S0"
+  custom_subdomain_name = "${local.normalized_prefix}${random_string.suffix.result}ai"
+
+  public_network_access_enabled = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  tags = {
+    "azd-env-name" = var.environment
+  }
+}
+
+resource "azurerm_machine_learning_workspace" "ai_hub" {
+  name                          = "${var.name_prefix}-${var.environment}-ai-hub"
+  location                      = var.foundry_location
+  resource_group_name           = azurerm_resource_group.main.name
+  kind                          = "Hub"
+  storage_account_id            = azurerm_storage_account.uploads.id
+  application_insights_id       = azurerm_application_insights.main.id
+  public_network_access_enabled = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  tags = {
+    "azd-env-name" = var.environment
+  }
+}
+
+resource "azurerm_machine_learning_workspace" "ai_project" {
+  name                          = "${var.name_prefix}-${var.environment}-ai-project"
+  location                      = var.foundry_location
+  resource_group_name           = azurerm_resource_group.main.name
+  kind                          = "Project"
+  storage_account_id            = azurerm_storage_account.uploads.id
+  application_insights_id       = azurerm_application_insights.main.id
+  public_network_access_enabled = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  tags = {
+    "azd-env-name" = var.environment
+  }
+
+  depends_on = [azurerm_machine_learning_workspace.ai_hub]
+}
+
+resource "azurerm_role_assignment" "foundry_cognitive_services_user" {
+  for_each             = azurerm_container_app.backend_services
+  scope                = azurerm_cognitive_account.ai_services.id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = each.value.identity[0].principal_id
 }

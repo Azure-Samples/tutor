@@ -11,10 +11,6 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[2]
 UPSKILLING_APP = ROOT / "apps" / "upskilling"
 LIB_SRC = ROOT / "lib" / "src"
-if str(UPSKILLING_APP) not in sys.path:
-    sys.path.insert(0, str(UPSKILLING_APP))
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 
 def _stub_agent_framework_azure():
@@ -23,13 +19,11 @@ def _stub_agent_framework_azure():
         "agent_framework_azure_ai._agent_provider",
         "agent_framework_azure_ai._chat_client",
         "agent_framework_azure_ai._shared",
-        "agent_framework.azure",
-        "agent_framework.azure.ai",
     ):
         if mod_name not in sys.modules:
             sys.modules[mod_name] = types.ModuleType(mod_name)
-    af_azure = sys.modules["agent_framework.azure"]
-    af_azure.AzureAIAgentClient = MagicMock  # type: ignore[attr-defined]
+    af_azure_ai = sys.modules["agent_framework_azure_ai"]
+    af_azure_ai.AzureAIAgentClient = MagicMock  # type: ignore[attr-defined]
 
 
 _PLAN_PAYLOAD = {
@@ -153,20 +147,6 @@ def test_evaluate_persisted_plan(api_client):
     assert plan["status"] == "evaluated"
     assert isinstance(plan["evaluations"], list)
     assert len(plan["evaluations"]) > 0
-
-
-def test_stateless_evaluate_backward_compat(api_client):
-    payload = {
-        "timeframe": _PLAN_PAYLOAD["timeframe"],
-        "topic": _PLAN_PAYLOAD["topic"],
-        "class_id": _PLAN_PAYLOAD["class_id"],
-        "paragraphs": _PLAN_PAYLOAD["paragraphs"],
-        "performance_history": _PLAN_PAYLOAD["performance_history"],
-    }
-    r = api_client.post("/plan/evaluate", json=payload, headers=_auth_headers())
-    assert r.status_code == 200
-    result = _content(r)
-    assert "evaluations" in result
 
 
 def test_create_plan_without_auth_returns_401(api_client):

@@ -467,7 +467,7 @@ sequenceDiagram
     participant Cosmos as Cosmos DB
 
     Student->>UI: Writing essay — pauses or types question
-    UI->>APIM: POST /api/chat/guide (courseId, context, question)
+    UI->>APIM: POST /api/guide (courseId, context, question)
     APIM->>Chat: Forward (authenticated)
 
     Chat->>Config: Load pedagogical rules (topic, guardrails, limits)
@@ -543,11 +543,11 @@ graph TB
             ACR["Container Registry"]
             LOG["Log Analytics"]
             APIM["API Management"]
-            FOUNDRY["AI Foundry Project"]
             DOC_INTEL["AI Document Intelligence"]
             AI_SEARCH["Azure AI Search"]
         end
         
+        FOUNDRY["AI Foundry Project\n(westus3, public endpoint,\nTerraform-managed — ADR-011)"]
         SWA["Static Web App (Frontend)"]
         ENTRA["Microsoft Entra ID"]
     end
@@ -585,8 +585,8 @@ graph TB
     subgraph lib["lib/ (tutor-lib)"]
         CONFIG["config/\nAppFactory, Settings"]
         COSMOS_MOD["cosmos/\nCosmosCRUD, repositories"]
-        AGENTS["agents/\nAgentBuilder, BaseAgent"]
-        SCHEMAS["schemas/\nShared Pydantic models"]
+        AGENTS["agents/\nChatAgent wrappers, AzureAIAgentClient\nOrchestration: Sequential · Concurrent · Handoff"]
+        SCHEMAS["schemas/\nShared Pydantic models (Assembly, AgentRef)"]
         MIDDLEWARE["middleware/\nAuth, logging, error handling"]
         EVAL["evaluation/\nFoundryEvaluator client"]
         SEARCH["search/\nAI Search client wrapper"]
@@ -693,16 +693,18 @@ erDiagram
         object thresholds
     }
 
-    AGENT_CONFIG {
+    ASSEMBLY {
         string id PK
-        string tenantId "Partition Key"
-        string type
-        object parameters
+        string tenantId "Partition Key L1"
+        string entityId "Partition Key L2 — essay, question, or avatar case"
+        string entityType "essay | question | avatar"
+        string topicName
+        array agentRefs "list of AgentRef (Foundry agent_id + role + deployment)"
     }
-    
+
     EVALUATION_RUN {
         string id PK
-        string agentId "Partition Key"
+        string agentId "Partition Key — Foundry agent ID"
         string status
         object scores
         datetime timestamp
@@ -716,7 +718,9 @@ erDiagram
     COURSE ||--o{ QUESTION_EVALUATION : contains
     MATERIAL }o--o{ ESSAY_SUBMISSION : grounds
     INSIGHT_REPORT }o--|| INDICATOR_CONFIG : uses
-    AGENT_CONFIG ||--o{ EVALUATION_RUN : evaluated_by
+    ASSEMBLY ||--o{ EVALUATION_RUN : evaluated_by
+    ASSEMBLY }o--|| ESSAY_SUBMISSION : orchestrates
+    ASSEMBLY }o--|| QUESTION_EVALUATION : orchestrates
 ```
 
 ---
@@ -796,6 +800,8 @@ graph TB
 
 This section documents the **as-implemented** internal architecture of each microservice, showing how design patterns, agent orchestration, and Azure service integrations are wired in code.
 
+> **Foundry-First Architecture (ADR-011):** All agent definitions live in Azure AI Foundry as persistent agents with stable `agent_id` values. Services load agents from Foundry via `AzureAIAgentClient` and orchestrate them with Agent Framework rc3 patterns (`SequentialBuilder`, `ConcurrentBuilder`, `HandoffBuilder`). Cosmos DB stores **assemblies** — lightweight references that map Foundry agents to business entities (essays, questions, avatars). No backward compatibility shims exist; all services target Agent Framework `>=1.0.0rc3` with `azure-ai-projects>=2.0.0`.
+
 ### 8.1 Essays Service — Strategy + Orchestrator Pattern
 
 The essays service uses a **Strategy pattern** to select the evaluation approach and an **Orchestrator** to compose OCR, RAG, and Foundry agent execution.
@@ -805,7 +811,7 @@ flowchart TD
     API["POST /grader/interaction\nPOST /essays/{id}/evaluate\nPATCH /essays/{id}"]
     ORCH["EssayOrchestrator.invoke()"]
     RESOLVER["StrategyResolver.resolve()"]
-    LOAD_SWARM["_load_swarm()\nCosmos DB → Assembly"]
+    LOAD_ASSEMBLY["_load_assembly()\nCosmos DB → Assembly"]
 
     subgraph Strategies["Strategy Selection"]
         ANALYTICAL["AnalyticalEssayStrategy"]
@@ -822,7 +828,7 @@ flowchart TD
 
     API --> ORCH
     ORCH --> RESOLVER
-    ORCH --> LOAD_SWARM
+    ORCH --> LOAD_ASSEMBLY
     RESOLVER -->|"theme=analytical"| ANALYTICAL
     RESOLVER -->|"objective=creative"| NARRATIVE
     RESOLVER -->|"fallback"| DEFAULT
@@ -839,11 +845,12 @@ flowchart TD
 
 **Key integration points:**
 
-- **Cosmos DB**: Assemblies (agent configurations), essays, resources
+- **Cosmos DB**: Assemblies (Foundry agent references), essays, resources
 - **Blob Storage**: Original essay documents and resource files
-- **Azure AI Foundry**: Agent execution via `AgentsClient` (threads, messages, file uploads)
-- **AI Document Intelligence** (target): OCR for handwritten essay scanning
+- **Azure AI Foundry**: Agent execution via `AzureAIAgentClient` + `ChatAgent` (threads, messages, file uploads)
+- **AI Document Intelligence**: OCR for handwritten essay scanning (required — no fallback)
 - **AI Search** (target): RAG grounding for rubrics and exemplars
+- **Agent Framework rc3**: `SequentialBuilder` for OCR → strategy → grading → synthesis pipeline
 - **Partial updates**: `PATCH /essays/{id}` via `EssayPatch` model; `PUT` filters `None` values to prevent destructive overwrites of linked fields like `assembly_id`
 
 ---
@@ -880,8 +887,8 @@ flowchart TD
     end
 
     PROMPT["PromptComposer.render()\ncorrect.jinja + question + answer"]
-    AGENT["AgentRegistry.create(AgentSpec)\n→ ChatAgent"]
-    RUN["AgentRunContext.run(prompt)"]
+    AGENT["AzureAIAgentClient(agent_id)\n→ ChatAgent from Foundry"]
+    RUN["ChatAgent.run(prompt)\n→ AgentRunResponse"]
     CONFIDENCE["_infer_confidence(notes)"]
     COMPLETED["CompletedState(result)\nQuestionEvaluationResult"]
 
@@ -898,8 +905,8 @@ flowchart TD
 
 **Key integration points:**
 
-- **Cosmos DB**: Assemblies, questions, answers, graders
-- **Azure AI Foundry**: Agent execution via Microsoft Agent Framework (`ChatAgent`)
+- **Cosmos DB**: Assemblies (Foundry agent references), questions, answers, graders
+- **Azure AI Foundry**: Agent execution via Agent Framework rc3 (`ChatAgent` + `ConcurrentBuilder` for parallel dimensions)
 - **Jinja2**: Prompt rendering with question/answer context per grading dimension
 
 ---
@@ -918,9 +925,9 @@ flowchart TD
         EVALUATE["_evaluate(case, prompt_data)"]
         HISTORY["_coerce_history()\nparse chat_history JSON"]
         SYSTEM_MSG["SIMULATION_PROMPT\nTemplate substitution:\nname, profile, role, steps, case, previous_chat"]
-        AGENT_SPEC["AgentSpec(\nname, instructions, deployment, temperature)"]
-        REGISTRY["AgentRegistry.create(spec)\n→ ChatAgent"]
-        RUN_CTX["AgentRunContext.run(prompt)\n→ AgentRunResponse"]
+        AGENT_SPEC["AgentRef from Assembly\n(Foundry agent_id + deployment)"]
+        REGISTRY["AzureAIAgentClient(agent_id)\n→ ChatAgent"]
+        RUN_CTX["ChatAgent.run(prompt)\n→ AgentRunResponse"]
         EXTRACT["_extract_text(response)"]
     end
 
@@ -948,7 +955,7 @@ flowchart TD
 **Key integration points:**
 
 - **Cosmos DB**: Case profiles (steps, patient data) for avatar persona
-- **Azure OpenAI** (via Agent Framework): Conversation generation
+- **Azure AI Foundry** (via Agent Framework rc3): Conversation generation with `ChatAgent`
 - **Azure Speech** (target): TTS/STT + WebRTC for voice interaction
 
 ---
@@ -959,7 +966,7 @@ The upskilling service evaluates professor lesson plans paragraph-by-paragraph u
 
 ```mermaid
 flowchart TD
-    API["POST /plan/evaluate"]
+    API["POST /plans/{plan_id}/evaluate"]
     ORCH["PlanEvaluationOrchestrator.evaluate(request)"]
     CTX["PlanContext\n{timeframe, topic, class_id, performance_history}"]
     ITER["PlanEvaluationIterable\n→ PlanEvaluationIterator"]
@@ -977,7 +984,7 @@ flowchart TD
     end
 
     PROMPT["PromptComposer.render()\nJinja2 template with paragraph + context"]
-    AGENT_RUN["AgentRunContext.run(prompt)\nvia AgentRegistry → ChatAgent"]
+    AGENT_RUN["ChatAgent.run(prompt) via AzureAIAgentClient\nFoundry agent loaded by agent_id"]
     PARSE["_parse_feedback(text)\n→ verdict, strengths, improvements"]
     EVAL["ParagraphEvaluation\n{paragraph_index, title, feedback[]}"]
     RESULT["PlanEvaluationResponse\n{timeframe, topic, evaluations[]}"]
@@ -996,9 +1003,9 @@ flowchart TD
 
 **Key integration points:**
 
-- **Azure AI Foundry**: Three specialized agents per paragraph evaluation
+- **Azure AI Foundry**: Three specialized agents per paragraph evaluation (loaded by Foundry agent_id)
 - **Jinja2**: Template-driven prompt composition with performance history context
-- **tutor_lib**: Shared `AgentRegistry`, `AgentRunContext`, `AgentSpec`
+- **tutor_lib**: Shared `ChatAgent` wrappers, `AzureAIAgentClient`, `Assembly` models
 
 ---
 
@@ -1137,11 +1144,12 @@ flowchart TD
     ENV --> REPO_ABC
 ```
 
-**Target integration** (evaluation execution pipeline):
+**Integration** (evaluation execution pipeline):
 
-- **Azure AI Foundry**: Execute target agent against golden dataset cases
+- **Azure AI Foundry**: Execute target agent against golden dataset cases via `AzureAIAgentClient`
 - **Foundry Evaluators**: Score with groundedness, relevance, coherence, fluency
 - **Cosmos DB**: Persist run results and quality trend data
+- **Agent Framework rc3**: `SequentialBuilder` for agent run → evaluator run → metric collection
 
 ---
 
@@ -1151,7 +1159,7 @@ The chat service is scaffolded for **guided writing support** that provides hint
 
 ```mermaid
 flowchart TD
-    API["POST /chat/guide"]
+    API["POST /guide"]
     REQ["GuidanceRequest\n{student_id, course_id, prompt}"]
     HEALTH["GET /health"]
 
@@ -1204,7 +1212,7 @@ graph TB
     subgraph SharedLib["tutor-lib"]
         LIB_CONFIG["config/\nSettings, AppFactory"]
         LIB_COSMOS["cosmos/\nCosmosCRUD"]
-        LIB_AGENTS["agents/\nAgentRegistry, AgentRunContext"]
+        LIB_AGENTS["agents/\nChatAgent, AzureAIAgentClient\nSequentialBuilder, ConcurrentBuilder"]
     end
 
     subgraph Azure["Azure Services"]
@@ -1246,13 +1254,13 @@ graph TB
 
 ### 8.10 Design Pattern Summary
 
-| Service | Pattern | Agent Framework | Persistence | External AI |
-|---------|---------|-----------------|-------------|-------------|
-| **essays-svc** | Strategy + Orchestrator | FoundryAgentService (threads + files) | Cosmos DB + Blob | AI Foundry, Doc Intel, AI Search |
-| **questions-svc** | State Machine | AgentRegistry + AgentRunContext | Cosmos DB | AI Foundry |
-| **avatar-svc** | Agent + Speech | AgentRegistry + AgentRunContext | Cosmos DB | OpenAI, Speech |
-| **upskilling-svc** | Visitor + Async Iterator | AgentRegistry + AgentRunContext | Cosmos DB | AI Foundry |
-| **config-svc** | Repository + Bulk Sync | N/A (non-agentic) | Cosmos DB | None |
-| **lms-gateway** | Adapter + Job Queue | N/A (non-agentic) | Cosmos DB | External LMS APIs |
-| **evaluation-svc** | Dataset + Run Pipeline | Foundry Evaluators (target) | Cosmos DB | AI Foundry (target) |
-| **chat-svc** | Guided Tutoring (scaffold) | OpenAI + RAG (target) | Cosmos DB (target) | OpenAI, AI Search |
+| Service | Pattern | Agent Framework (rc3) | Orchestration | Persistence | External AI |
+|---------|---------|----------------------|---------------|-------------|-------------|
+| **essays-svc** | Strategy + Orchestrator | `ChatAgent` via `AzureAIAgentClient` | `SequentialBuilder` (OCR → strategy → grading → synthesis) | Cosmos DB (assemblies) + Blob | AI Foundry, Doc Intel, AI Search |
+| **questions-svc** | State Machine | `ChatAgent` via `AzureAIAgentClient` | `ConcurrentBuilder` (parallel dimension grading) | Cosmos DB (assemblies) | AI Foundry |
+| **avatar-svc** | Agent + Speech | `ChatAgent` via `AzureAIAgentClient` | Single agent with conversation memory | Cosmos DB (cases) | AI Foundry, Speech |
+| **upskilling-svc** | Visitor + Async Iterator | `ChatAgent` via `AzureAIAgentClient` | `ConcurrentBuilder` (visitors) → `SequentialBuilder` (aggregation) | Cosmos DB | AI Foundry |
+| **config-svc** | Repository + Bulk Sync | N/A (non-agentic) | N/A | Cosmos DB | None |
+| **lms-gateway** | Adapter + Job Queue | N/A (non-agentic) | N/A | Cosmos DB | External LMS APIs |
+| **evaluation-svc** | Dataset + Run Pipeline | Foundry Evaluators | `SequentialBuilder` (agent run → evaluator → metrics) | Cosmos DB | AI Foundry |
+| **chat-svc** | Guided Tutoring (scaffold) | `ChatAgent` via `AzureAIAgentClient` | Single agent with guardrails | Cosmos DB | AI Foundry, AI Search |

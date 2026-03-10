@@ -15,15 +15,12 @@ from azure.cosmos import exceptions
 from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
-from app.agents.clients import AgentAttachment, FoundryAgentService
+from tutor_lib.agents import AgentAttachment, FoundryAgentService
 from app.config import get_settings
 from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text, extract_text_with_doc_intelligence
-from app.schemas import Essay, ProvisionedAgent, Resource, Swarm
+from app.schemas import Essay, AgentRef, Resource, Assembly
 
-try:
-    from pypdf.errors import PdfReadError  # type: ignore[import]
-except ImportError:  # pragma: no cover - older PyPDF versions expose errors differently
-    PdfReadError = ValueError  # type: ignore[assignment]
+from pypdf.errors import PdfReadError
 
 
 class EssayStrategyType(str, Enum):
@@ -67,13 +64,13 @@ class EssayEvaluationStrategy:
 
     async def evaluate(
         self,
-        agent: ProvisionedAgent,
+        agent: AgentRef,
         essay: Essay,
         resources: Iterable[Resource],
     ) -> EssayEvaluationResult:
         prompt = self._composer.render(self.template_name, essay, resources)
         attachments = self._build_image_attachments(resources)
-        response_text = await self._agent_service.run_agent(agent.id, prompt, attachments=attachments)
+        response_text = await self._agent_service.run_agent(agent.agent_id, prompt, attachments=attachments)
         verdict, strengths, improvements = self._parse_response(response_text)
         return EssayEvaluationResult(
             strategy=self.strategy_type(),
@@ -183,13 +180,13 @@ class EssayOrchestrator:
 
     async def invoke(self, assembly_id: str, essay: Essay, resources: Iterable[Resource]) -> EssayEvaluationResult:
         prepared_resources = self._prepare_resources(list(resources))
-        swarm = await self._load_swarm(assembly_id, fallback_essay_id=essay.id)
+        assembly = await self._load_assembly(assembly_id, fallback_essay_id=essay.id)
         strategy_type = self._resolver.resolve(essay, prepared_resources)
         strategy = self._strategies[strategy_type]
-        agent = self._select_agent(swarm, strategy_type)
+        agent = self._select_agent(assembly, strategy_type)
         return await strategy.evaluate(agent, essay, prepared_resources)
 
-    async def _load_swarm(self, assembly_id: str, fallback_essay_id: str | None = None) -> Swarm:
+    async def _load_assembly(self, assembly_id: str, fallback_essay_id: str | None = None) -> Assembly:
         async with CosmosClient(self._cosmos_endpoint, self._credential) as client:
             database = client.get_database_client(self._database_name)
             try:
@@ -215,56 +212,45 @@ class EssayOrchestrator:
         )
         if not essay_id:
             raise ValueError(f"Assembly '{assembly_id}' did not include an essay identifier")
-        return Swarm(id=swarm_id, topic_name=topic, agents=agents, essay_id=essay_id)
+        return Assembly(id=swarm_id, topic_name=topic, agents=agents, essay_id=essay_id)
 
-    async def _hydrate_agents(self, items: Sequence[Any]) -> list[ProvisionedAgent]:
-        provisioned: list[ProvisionedAgent] = []
+    async def _hydrate_agents(self, items: Sequence[Any]) -> list[AgentRef]:
+        provisioned: list[AgentRef] = []
         for entry in items:
             if isinstance(entry, dict):
-                provisioned.append(ProvisionedAgent.model_validate(entry))
+                # Support both new lightweight format (agent_id) and legacy (id)
+                if "agent_id" in entry:
+                    provisioned.append(AgentRef.model_validate(entry))
+                elif "id" in entry:
+                    provisioned.append(AgentRef(
+                        agent_id=str(entry["id"]),
+                        role=entry.get("role", "default"),
+                        deployment=entry.get("deployment", ""),
+                    ))
                 continue
             if isinstance(entry, str):
-                remote = await self._agent_service.get_agent(entry)
-                provisioned.append(self._materialize_agent(remote))
+                provisioned.append(AgentRef(
+                    agent_id=entry,
+                    role="default",
+                    deployment="",
+                ))
                 continue
         return provisioned
 
-    def _materialize_agent(self, remote: Any) -> ProvisionedAgent:
-        agent_id = getattr(remote, "id", None)
-        if not agent_id:
-            raise ValueError("Azure AI agent response did not include an id")
-        name = getattr(remote, "name", agent_id)
-        instructions = getattr(remote, "instructions", "")
-        deployment = (
-            getattr(remote, "model", None)
-            or getattr(remote, "model_id", None)
-            or getattr(remote, "deployment_name", None)
-            or ""
-        )
-        temperature = getattr(remote, "temperature", None)
-        return ProvisionedAgent(
-            id=agent_id,
-            name=name,
-            instructions=instructions,
-            deployment=deployment,
-            temperature=temperature,
-        )
+    def _select_agent(self, assembly: Assembly, strategy_type: EssayStrategyType) -> AgentRef:
+        if not assembly.agents:
+            raise ValueError(f"Assembly '{assembly.id}' does not contain agents")
 
-    def _select_agent(self, swarm: Swarm, strategy_type: EssayStrategyType) -> ProvisionedAgent:
-        if not swarm.agents:
-            raise ValueError(f"Swarm '{swarm.id}' does not contain agents")
-
-        keywords = {
-            EssayStrategyType.ANALYTICAL: ["analytic", "analysis", "analytical"],
-            EssayStrategyType.NARRATIVE: ["narrative", "creative", "story"],
-            EssayStrategyType.DEFAULT: ["general", "default", "review"],
+        role_map = {
+            EssayStrategyType.ANALYTICAL: "analytical",
+            EssayStrategyType.NARRATIVE: "narrative",
+            EssayStrategyType.DEFAULT: "default",
         }
-        candidates = keywords.get(strategy_type, [])
-        for agent in swarm.agents:
-            haystack = f"{agent.name} {agent.instructions}".lower()
-            if any(keyword in haystack for keyword in candidates):
+        target_role = role_map.get(strategy_type, "default")
+        for agent in assembly.agents:
+            if agent.role == target_role:
                 return agent
-        return swarm.agents[0]
+        return assembly.agents[0]
 
     def _prepare_resources(self, resources: Iterable[Resource]) -> list[Resource]:
         prepared: list[Resource] = []

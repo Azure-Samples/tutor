@@ -86,12 +86,13 @@ class EssayPatch(BaseModel):
 
 
 class AgentDefinition(BaseModel):
-    """Definition of an Azure AI Foundry agent used within a swarm."""
+    """Definition used to create or reference an Azure AI Foundry agent."""
 
-    id: Optional[str] = Field(None, description="Existing Azure AI Foundry agent ID")
+    agent_id: Optional[str] = Field(None, description="Existing Azure AI Foundry agent ID (omit to create new)")
     name: str = Field(..., description="Friendly agent name")
     instructions: str = Field(..., description="System instructions for the agent")
     deployment: str = Field(..., description="Model deployment name registered in Azure AI Foundry")
+    role: str = Field(..., description="Agent role in the assembly (e.g. analytical, narrative, default)")
     temperature: Optional[float] = Field(
         default=None,
         description="Optional temperature override applied when the agent runs",
@@ -121,28 +122,30 @@ class ChatResponse(BaseModel):
     resources: list[Resource]
 
 
-class ProvisionedAgent(AgentDefinition):
-    """Representation of an agent persisted in Azure AI Foundry."""
+class AgentRef(BaseModel):
+    """Lightweight reference to an agent registered in Azure AI Foundry."""
 
-    id: str = Field(..., description="Azure AI Foundry agent ID")
-
-
-class Swarm(BaseModel):
-    """Represents a swarm stored in Cosmos DB with its provisioned agents."""
-
-    id: str = Field(..., description="Assembly ID")
-    topic_name: str = Field(..., description="Topic to Answer")
-    agents: List[ProvisionedAgent] = Field(..., description="Provisioned agent definitions")
-    essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
+    agent_id: str = Field(..., description="Azure AI Foundry agent ID")
+    role: str = Field(..., description="Agent role in the assembly (e.g. analytical, narrative, default)")
+    deployment: str = Field(..., description="Model deployment name")
 
 
-class SwarmDefinition(BaseModel):
-    """Payload used to create or update a swarm along with its agent definitions."""
+class Assembly(BaseModel):
+    """Represents an assembly stored in Cosmos DB with its agent references."""
 
     id: str = Field(..., description="Assembly ID")
     topic_name: str = Field(..., description="Topic to Answer")
+    agents: List[AgentRef] = Field(..., description="Agent references provisioned in Foundry")
     essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
-    agents: List[AgentDefinition] = Field(..., description="Agent definitions provisioning Azure AI Foundry agents")
+
+
+class AssemblyDefinition(BaseModel):
+    """Payload used to create or update an assembly along with its agent definitions."""
+
+    id: str = Field(..., description="Assembly ID")
+    topic_name: str = Field(..., description="Topic to Answer")
+    essay_id: str = Field(..., description="Essay identifier evaluated by this assembly")
+    agents: List[AgentDefinition] = Field(..., description="Agent definitions for Azure AI Foundry agents")
 
 
 RESPONSES = {

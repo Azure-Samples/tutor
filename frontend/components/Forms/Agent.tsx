@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
-import { FaRobot, FaInfoCircle, FaTerminal, FaTemperatureLow } from "react-icons/fa";
+import { FaRobot, FaInfoCircle, FaTerminal, FaTemperatureLow, FaUserTag } from "react-icons/fa";
 
 import { essaysEngine } from "@/utils/api";
-import type { AgentDefinition, ProvisionedAgent } from "@/types/essays";
+import type { AgentDefinition, AgentRef } from "@/types/essays";
 
 interface AgentFormProps {
-  onSuccess?: (agent: ProvisionedAgent) => void;
+  onSuccess?: (agent: AgentRef) => void;
 }
+
+const ROLE_OPTIONS = ["default", "analytical", "narrative"] as const;
 
 const defaultAgent: AgentDefinition = {
   name: "",
   instructions: "",
   deployment: "",
+  role: "default",
   temperature: undefined,
 };
 
@@ -38,8 +41,8 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
     setStatus(null);
     setError(null);
     try {
-      const response = await essaysEngine.post<ProvisionedAgent>("/agents", form);
-      setStatus(`Agent provisioned with id ${response.data.id}`);
+      const response = await essaysEngine.post<AgentRef>("/agents", form);
+      setStatus(`Agent provisioned with id ${response.data.agent_id}`);
       if (onSuccess) {
         onSuccess(response.data);
       }
@@ -92,6 +95,20 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
         placeholder="Azure AI Foundry deployment name"
         required
       />
+
+      <label className="flex items-center gap-2 text-orange-700 font-bold">
+        <FaUserTag /> Role
+      </label>
+      <select
+        value={form.role}
+        onChange={(event) => updateField("role", event.target.value)}
+        className="w-full rounded-2xl border-2 border-orange-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-orange-50 dark:bg-orange-900 focus:bg-white dark:focus:bg-boxdark"
+        required
+      >
+        {ROLE_OPTIONS.map((r) => (
+          <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+        ))}
+      </select>
 
       <label className="flex items-center gap-2 text-purple-700 font-bold">
         <FaTemperatureLow /> Temperature (optional)

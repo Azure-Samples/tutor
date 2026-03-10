@@ -19,13 +19,16 @@ from app.schemas import (
     RESPONSES,
     Answer,
     Assembly,
+    AssemblyDefinition,
     BodyMessage,
     ChatResponse,
     ErrorMessage,
     Grader,
+    GraderDefinition,
     Question,
     SuccessMessage,
 )
+from tutor_lib.agents import FoundryAgentService
 from tutor_lib.config import get_settings
 from tutor_lib.middleware import configure_entra_auth
 
@@ -57,6 +60,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 configure_entra_auth(app)
+
+agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
 
 
 @app.get("/health", tags=["Evaluation"])
@@ -248,19 +253,59 @@ async def list_assemblies() -> JSONResponse:
 
 
 @app.post("/assemblies", tags=["Assemblies"])
-async def create_assembly(assembly: Assembly) -> JSONResponse:
+async def create_assembly(definition: AssemblyDefinition) -> JSONResponse:
+    graders: list[Grader] = []
+    for grader_def in definition.agents:
+        if grader_def.agent_id:
+            graders.append(Grader(
+                agent_id=grader_def.agent_id,
+                dimension=grader_def.dimension,
+                deployment=grader_def.deployment,
+            ))
+        else:
+            remote = await agent_service.create_agent(
+                name=grader_def.name,
+                instructions=grader_def.instructions,
+                deployment=grader_def.deployment,
+            )
+            graders.append(Grader(
+                agent_id=remote.id,
+                dimension=grader_def.dimension,
+                deployment=grader_def.deployment,
+            ))
+    assembly = Assembly(id=definition.id, agents=graders, topic_name=definition.topic_name)
     created = await _crud(settings.cosmos.assembly_container).create_item(assembly.model_dump())
     return _success("Assembly Created", "Assembly stored", created)
 
 
 @app.put("/assemblies/{assembly_id}", tags=["Assemblies"])
-async def update_assembly(assembly_id: str, assembly: Assembly) -> JSONResponse:
+async def update_assembly(assembly_id: str, definition: AssemblyDefinition) -> JSONResponse:
     crud = _crud(settings.cosmos.assembly_container)
     try:
         existing = await crud.read_item(assembly_id)
     except Exception as exc:  # pragma: no cover
         logger.error("Error reading assembly %s", assembly_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembly not found") from exc
+    graders: list[Grader] = []
+    for grader_def in definition.agents:
+        if grader_def.agent_id:
+            graders.append(Grader(
+                agent_id=grader_def.agent_id,
+                dimension=grader_def.dimension,
+                deployment=grader_def.deployment,
+            ))
+        else:
+            remote = await agent_service.create_agent(
+                name=grader_def.name,
+                instructions=grader_def.instructions,
+                deployment=grader_def.deployment,
+            )
+            graders.append(Grader(
+                agent_id=remote.id,
+                dimension=grader_def.dimension,
+                deployment=grader_def.deployment,
+            ))
+    assembly = Assembly(id=assembly_id, agents=graders, topic_name=definition.topic_name)
     merged = {**existing, **assembly.model_dump()}
     await crud.update_item(assembly_id, merged)
     return _success("Assembly Updated", "Assembly modified", merged)

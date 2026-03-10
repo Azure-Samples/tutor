@@ -8,10 +8,6 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[2]
 LMS_SRC = ROOT / "apps" / "lms-gateway" / "src"
 LIB_SRC = ROOT / "lib" / "src"
-if str(LMS_SRC) not in sys.path:
-    sys.path.insert(0, str(LMS_SRC))
-if str(LIB_SRC) not in sys.path:
-    sys.path.insert(0, str(LIB_SRC))
 
 
 def _set_required_env() -> None:
