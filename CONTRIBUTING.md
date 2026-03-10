@@ -74,3 +74,14 @@ Before you submit your Pull Request (PR) consider the following guidelines:
     ```
 
 That's it! Thank you for your contribution!
+
+## <a name="deployment"></a> Deployment Policy
+
+**All deployments to Azure MUST use GitHub Workflows.** Manual `azd deploy`, `az containerapp update`, or direct Docker pushes are not permitted for production environments.
+
+| Workflow | Scope |
+|----------|-------|
+| `.github/workflows/azd-deploy.yml` | Infrastructure provisioning + backend services (Container Apps) |
+| `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` | Frontend (Static Web App) |
+
+Both workflows trigger automatically on push to `main`. They can also be run manually via `workflow_dispatch`. See the [deployment runbook](docs/runbooks/azd-deployment.md) for full details.

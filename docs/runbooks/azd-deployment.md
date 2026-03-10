@@ -2,6 +2,19 @@
 
 This runbook describes how to provision and deploy Tutor with Azure Developer CLI (`azd`) and Terraform.
 
+> **DEPLOYMENT POLICY — MANDATORY**
+>
+> All deployments to Azure **MUST** be performed via GitHub Workflows. Direct `azd deploy`, `az containerapp update`, or manual Docker pushes to ACR are **prohibited** for production environments. The only authorized deployment paths are:
+>
+> | Workflow | Scope | Trigger |
+> |----------|-------|---------|
+> | `.github/workflows/azd-deploy.yml` | Infrastructure + 8 backend services (Container Apps) | Push to `main` or `workflow_dispatch` |
+> | `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` | Frontend (Static Web App) | Push to `main`, PR events, or `workflow_dispatch` |
+>
+> **Why:** GitHub Workflows provide auditable, reproducible deployments with proper secret management via OIDC federation. Manual deployments bypass CI checks, status gates, and deployment traceability.
+>
+> Local `azd provision` and `azd deploy` are permitted **only** for first-time bootstrap of a new environment (see [First-Time Bootstrap](#first-time-bootstrap-local)).
+
 ## Scope
 
 - Repository: `Azure-Samples/tutor`
