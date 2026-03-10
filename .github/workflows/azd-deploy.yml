@@ -155,12 +155,14 @@ jobs:
 
       - name: Ensure deployment environment exists
         env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
         run: |
           azd env select "$AZURE_ENV_NAME" || azd env new "$AZURE_ENV_NAME" --no-prompt
+          azd env set AZURE_SUBSCRIPTION_ID "$AZURE_SUBSCRIPTION_ID"
           azd env set AZURE_LOCATION "$AZURE_LOCATION"
           azd env set RS_RESOURCE_GROUP "$TFSTATE_RESOURCE_GROUP"
           azd env set RS_STORAGE_ACCOUNT "$TFSTATE_STORAGE_ACCOUNT"
@@ -249,12 +251,14 @@ jobs:
 
       - name: Ensure deployment environment exists
         env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
         run: |
           azd env select "$AZURE_ENV_NAME" || azd env new "$AZURE_ENV_NAME" --no-prompt
+          azd env set AZURE_SUBSCRIPTION_ID "$AZURE_SUBSCRIPTION_ID"
           azd env set AZURE_LOCATION "$AZURE_LOCATION"
           azd env set RS_RESOURCE_GROUP "$TFSTATE_RESOURCE_GROUP"
           azd env set RS_STORAGE_ACCOUNT "$TFSTATE_STORAGE_ACCOUNT"
