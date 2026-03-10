@@ -160,8 +160,12 @@ resource "azurerm_container_app_environment" "main" {
 
   lifecycle {
     # Existing production environments can hold active apps; replacing the environment
-    # causes deletion conflicts and broad outages. Migrate subnet integration separately.
-    ignore_changes = [infrastructure_subnet_id]
+    # causes deletion conflicts and broad outages. Migrate environment-level settings separately.
+    prevent_destroy = true
+    ignore_changes = [
+      infrastructure_subnet_id,
+      workload_profile,
+    ]
   }
 }
 
