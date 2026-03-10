@@ -71,7 +71,7 @@ class AgentRegistry:
         client = self._client(spec.deployment)
         configured_tools = self._tool_builder.from_callbacks(spec.tools)
         return ChatAgent(
-            client=client,
+            chat_client=client,
             name=spec.name,
             instructions=spec.instructions,
             tools=configured_tools,

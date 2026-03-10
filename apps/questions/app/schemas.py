@@ -1,7 +1,6 @@
 """
 A package that manages the response bodies.
 """
-import json
 from dataclasses import dataclass
 
 from typing import Dict, List, Optional, Union

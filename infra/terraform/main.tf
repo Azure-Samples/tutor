@@ -48,7 +48,7 @@ locals {
     "Cosmos DB Built-in Data Contributor" = azurerm_cosmosdb_account.main.id
     "Storage Blob Data Contributor"       = azurerm_storage_account.uploads.id
     "AcrPull"                             = azurerm_container_registry.main.id
-    "Cognitive Services User"             = azurerm_cognitive_account.ai_services.id
+    "Cognitive Services User"             = module.ai_foundry.ai_foundry_id
   }
 
   agent_role_assignments = {
@@ -60,6 +60,8 @@ locals {
     }
   }
 }
+
+data "azurerm_client_config" "current" {}
 
 resource "random_string" "suffix" {
   length  = 6
@@ -353,68 +355,76 @@ resource "azurerm_role_assignment" "agent_permissions" {
   principal_id         = each.value.principal_id
 }
 
-# ── Azure AI Foundry (ADR-011: westus3, public endpoint) ──────────────────
+# ── Azure AI Foundry (ADR-011 → ADR-012: AVM module, public endpoint) ──────
 
-resource "azurerm_cognitive_account" "ai_services" {
-  name                  = "${var.name_prefix}-${var.environment}-ai-svc"
-  location              = var.foundry_location
-  resource_group_name   = azurerm_resource_group.main.name
-  kind                  = "AIServices"
-  sku_name              = "S0"
-  custom_subdomain_name = "${local.normalized_prefix}${random_string.suffix.result}ai"
+module "ai_foundry" {
+  source  = "Azure/avm-ptn-aiml-ai-foundry/azurerm"
+  version = "0.10.0"
 
-  public_network_access_enabled = true
+  base_name                  = "${var.name_prefix}${var.environment}${random_string.suffix.result}"
+  location                   = var.foundry_location
+  resource_group_resource_id = azurerm_resource_group.main.id
 
-  identity {
-    type = "SystemAssigned"
+  ai_foundry = {
+    name                    = "${local.normalized_prefix}${random_string.suffix.result}ai"
+    create_ai_agent_service = false
+    disable_local_auth      = false
+
+    role_assignments = {
+      for key, ca in azurerm_container_app.backend_services :
+      "ca-${key}" => {
+        role_definition_id_or_name = "Cognitive Services User"
+        principal_id               = ca.identity[0].principal_id
+        principal_type             = "ServicePrincipal"
+      }
+    }
   }
 
-  tags = {
-    "azd-env-name" = var.environment
-  }
-}
-
-resource "azurerm_machine_learning_workspace" "ai_hub" {
-  name                          = "${var.name_prefix}-${var.environment}-ai-hub"
-  location                      = var.foundry_location
-  resource_group_name           = azurerm_resource_group.main.name
-  kind                          = "Hub"
-  storage_account_id            = azurerm_storage_account.uploads.id
-  application_insights_id       = azurerm_application_insights.main.id
-  public_network_access_enabled = true
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  tags = {
-    "azd-env-name" = var.environment
-  }
-}
-
-resource "azurerm_machine_learning_workspace" "ai_project" {
-  name                          = "${var.name_prefix}-${var.environment}-ai-project"
-  location                      = var.foundry_location
-  resource_group_name           = azurerm_resource_group.main.name
-  kind                          = "Project"
-  storage_account_id            = azurerm_storage_account.uploads.id
-  application_insights_id       = azurerm_application_insights.main.id
-  public_network_access_enabled = true
-
-  identity {
-    type = "SystemAssigned"
+  ai_model_deployments = {
+    "gpt-4o" = {
+      name = var.model_deployment_name
+      model = {
+        format  = "OpenAI"
+        name    = "gpt-4o"
+        version = "2024-11-20"
+      }
+      scale = {
+        type     = "GlobalStandard"
+        capacity = 1
+      }
+    }
+    "o3-mini" = {
+      name = var.model_reasoning_deployment
+      model = {
+        format  = "OpenAI"
+        name    = "o3-mini"
+        version = "2025-01-31"
+      }
+      scale = {
+        type     = "GlobalStandard"
+        capacity = 1
+      }
+    }
   }
 
-  tags = {
-    "azd-env-name" = var.environment
+  ai_projects = {
+    tutor = {
+      name                       = "${var.name_prefix}-${var.environment}-ai-project"
+      display_name               = "Tutor AI Project"
+      description                = "Tutor platform AI project (${var.environment})"
+      create_project_connections = true
+
+      cosmos_db_connection = {
+        existing_resource_id = azurerm_cosmosdb_account.main.id
+      }
+
+      storage_account_connection = {
+        existing_resource_id = azurerm_storage_account.uploads.id
+      }
+    }
   }
 
-  depends_on = [azurerm_machine_learning_workspace.ai_hub]
-}
-
-resource "azurerm_role_assignment" "foundry_cognitive_services_user" {
-  for_each             = azurerm_container_app.backend_services
-  scope                = azurerm_cognitive_account.ai_services.id
-  role_definition_name = "Cognitive Services User"
-  principal_id         = each.value.identity[0].principal_id
+  create_byor              = false
+  create_private_endpoints = false
+  enable_telemetry         = false
 }

@@ -24,7 +24,6 @@ from app.schemas import (
     ChatResponse,
     ErrorMessage,
     Grader,
-    GraderDefinition,
     Question,
     SuccessMessage,
 )

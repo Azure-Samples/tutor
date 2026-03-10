@@ -65,7 +65,7 @@ class AgentRegistry:
         )
         configured_tools = self._tool_builder.from_callbacks(spec.tools)
         return ChatAgent(
-            client=client,
+            chat_client=client,
             instructions=spec.instructions,
             name=spec.name,
             tools=configured_tools or None,
