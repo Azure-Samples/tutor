@@ -412,7 +412,7 @@ module "ai_foundry" {
       name                       = "${var.name_prefix}-${var.environment}-ai-project"
       display_name               = "Tutor AI Project"
       description                = "Tutor platform AI project (${var.environment})"
-      create_project_connections = true
+      create_project_connections = false
 
       cosmos_db_connection = {
         existing_resource_id = azurerm_cosmosdb_account.main.id
