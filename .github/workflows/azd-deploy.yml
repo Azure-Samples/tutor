@@ -85,7 +85,7 @@ jobs:
 
     env:
       AZURE_ENV_NAME: prod
-      AZURE_LOCATION: eastus
+      AZURE_LOCATION: eastus2
 
     steps:
       - name: Checkout
@@ -227,7 +227,7 @@ jobs:
 
     env:
       AZURE_ENV_NAME: prod
-      AZURE_LOCATION: eastus
+      AZURE_LOCATION: eastus2
 
     steps:
       - name: Checkout
