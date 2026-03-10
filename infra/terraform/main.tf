@@ -148,7 +148,16 @@ resource "azurerm_private_dns_zone_virtual_network_link" "cosmos" {
   virtual_network_id    = azurerm_virtual_network.aca[0].id
 }
 
+data "azurerm_container_app_environment" "existing" {
+  count = var.reuse_existing_container_app_environment ? 1 : 0
+
+  name                = var.existing_container_app_environment_name != "" ? var.existing_container_app_environment_name : "${var.name_prefix}-${var.environment}-acae"
+  resource_group_name = azurerm_resource_group.main.name
+}
+
 resource "azurerm_container_app_environment" "main" {
+  count = var.reuse_existing_container_app_environment ? 0 : 1
+
   name                       = "${var.name_prefix}-${var.environment}-acae"
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
@@ -167,6 +176,10 @@ resource "azurerm_container_app_environment" "main" {
       workload_profile,
     ]
   }
+}
+
+locals {
+  container_app_environment_id = var.reuse_existing_container_app_environment ? data.azurerm_container_app_environment.existing[0].id : azurerm_container_app_environment.main[0].id
 }
 
 resource "azurerm_container_registry" "main" {
@@ -275,7 +288,7 @@ resource "azurerm_container_app" "backend_services" {
   for_each = toset(local.backend_service_names)
 
   name                         = "${var.name_prefix}-${each.key}-${var.environment}"
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  container_app_environment_id = local.container_app_environment_id
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 

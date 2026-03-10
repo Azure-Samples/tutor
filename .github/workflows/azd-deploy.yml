@@ -406,17 +406,17 @@ jobs:
             exit 0
           fi
 
-          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
-          methods=(get post put patch delete options head)
+          apim_edge_state_entries="$(terraform state list | grep -E '^azurerm_api_management_api\.backend_services\[|^azurerm_api_management_api_policy\.backend_services_hardening\[|^azurerm_api_management_api_operation\.backend_catch_all\[' || true)"
 
-          for service in "${services[@]}"; do
-            terraform state rm "azurerm_api_management_api.backend_services[\"${service}\"]" || true
-            terraform state rm "azurerm_api_management_api_policy.backend_services_hardening[\"${service}\"]" || true
+          if [ -z "$apim_edge_state_entries" ]; then
+            echo "No APIM service-edge resources currently tracked in foundation state."
+            exit 0
+          fi
 
-            for method in "${methods[@]}"; do
-              terraform state rm "azurerm_api_management_api_operation.backend_catch_all[\"${service}-${method}\"]" || true
-            done
-          done
+          while IFS= read -r entry; do
+            [ -z "$entry" ] && continue
+            terraform state rm "$entry" || true
+          done <<< "$apim_edge_state_entries"
 
       - name: Provision infrastructure
         env:
