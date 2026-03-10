@@ -308,6 +308,15 @@ resource "azurerm_container_app" "backend_services" {
     "azd-env-name"     = var.environment
     "azd-service-name" = each.key
   }
+
+  # Runtime app revisions are owned by application deploys, not foundation provisioning.
+  lifecycle {
+    ignore_changes = [
+      template,
+      ingress,
+      registry,
+    ]
+  }
 }
 
 resource "azurerm_api_management" "main" {
