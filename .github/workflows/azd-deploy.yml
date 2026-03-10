@@ -214,10 +214,23 @@ jobs:
           ARM_USE_OIDC: true
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
+          set -euo pipefail
+
           cd infra/terraform
           terraform init -reconfigure -backend-config=backend.hcl
+
           terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim" || true
           terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
+
+          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          for service in "${services[@]}"; do
+            api_name="${service//-/}-api"
+            api_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name};rev=1"
+            policy_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name}/policies/policy"
+
+            terraform import "azurerm_api_management_api.backend_services[\"${service}\"]" "$api_resource_id" || true
+            terraform import "azurerm_api_management_api_policy.backend_services_hardening[\"${service}\"]" "$policy_resource_id" || true
+          done
 
       - name: Provision infrastructure
         run: |
