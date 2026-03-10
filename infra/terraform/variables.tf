@@ -31,13 +31,13 @@ variable "cosmos_db_name" {
 variable "model_deployment_name" {
   description = "Default model deployment name used by services."
   type        = string
-  default     = "gpt-4o"
+  default     = "gpt-5-nano"
 }
 
 variable "model_reasoning_deployment" {
   description = "Reasoning model deployment name used by services."
   type        = string
-  default     = "o3-mini"
+  default     = "gpt-5"
 }
 
 variable "entra_tenant_id" {

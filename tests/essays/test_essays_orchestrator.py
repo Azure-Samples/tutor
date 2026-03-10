@@ -15,8 +15,8 @@ def essays_app_module_fixture(monkeypatch):
     monkeypatch.setenv("COSMOS_ENDPOINT", "https://localhost:8081/")
     monkeypatch.setenv("COSMOS_DATABASE", "unit-test-db")
     monkeypatch.setenv("PROJECT_ENDPOINT", "https://fake-endpoint.azure.com/")
-    monkeypatch.setenv("MODEL_DEPLOYMENT_NAME", "gpt-4o")
-    monkeypatch.setenv("MODEL_REASONING_DEPLOYMENT", "o3-mini")
+    monkeypatch.setenv("MODEL_DEPLOYMENT_NAME", "gpt-5-nano")
+    monkeypatch.setenv("MODEL_REASONING_DEPLOYMENT", "gpt-5")
 
     repo_root = Path(__file__).resolve().parents[2]
     essays_root = repo_root / "apps" / "essays"
@@ -48,8 +48,8 @@ def essays_main_module_fixture(monkeypatch):
     monkeypatch.setenv("COSMOS_ENDPOINT", "https://localhost:8081/")
     monkeypatch.setenv("COSMOS_DATABASE", "unit-test-db")
     monkeypatch.setenv("PROJECT_ENDPOINT", "https://fake-endpoint.azure.com/")
-    monkeypatch.setenv("MODEL_DEPLOYMENT_NAME", "gpt-4o")
-    monkeypatch.setenv("MODEL_REASONING_DEPLOYMENT", "o3-mini")
+    monkeypatch.setenv("MODEL_DEPLOYMENT_NAME", "gpt-5-nano")
+    monkeypatch.setenv("MODEL_REASONING_DEPLOYMENT", "gpt-5")
 
     repo_root = Path(__file__).resolve().parents[2]
     essays_src = repo_root / "apps" / "essays" / "src"
@@ -97,7 +97,7 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
     provisioned = module.AgentRef(
         agent_id="agent-default",
         role="default",
-        deployment="gpt-4o",
+        deployment="gpt-5-nano",
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):
@@ -127,12 +127,12 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
     narrative_agent = module.AgentRef(
         agent_id="agent-narrative",
         role="narrative",
-        deployment="gpt-4o",
+        deployment="gpt-5-nano",
     )
     default_agent = module.AgentRef(
         agent_id="agent-default",
         role="default",
-        deployment="gpt-4o",
+        deployment="gpt-5-nano",
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):  # pragma: no cover - monkeypatched helper
@@ -168,7 +168,7 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
     analytical_agent = module.AgentRef(
         agent_id="agent-analytical",
         role="analytical",
-        deployment="o3-mini",
+        deployment="gpt-5",
     )
 
     async def _stub_load(_self, assembly_id, **kwargs):
@@ -201,7 +201,7 @@ class _StubContainer:
                 {
                     "agent_id": "agent-1",
                     "role": "default",
-                    "deployment": "gpt-4o",
+                    "deployment": "gpt-5-nano",
                 }
             ],
         }

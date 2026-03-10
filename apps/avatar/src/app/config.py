@@ -39,7 +39,7 @@ class AvatarAISettings(BaseSettings):
     """Azure AI Projects configuration required to run the avatar agent."""
 
     project_endpoint: str = Field(default_factory=lambda: _env("PROJECT_ENDPOINT"), alias="PROJECT_ENDPOINT")
-    default_deployment: str = Field(default_factory=lambda: _env("MODEL_DEPLOYMENT_NAME", "gpt-4o"), alias="MODEL_DEPLOYMENT_NAME")
+    default_deployment: str = Field(default_factory=lambda: _env("MODEL_DEPLOYMENT_NAME", "gpt-5-nano"), alias="MODEL_DEPLOYMENT_NAME")
     temperature: float = Field(default_factory=lambda: float(_env("AVATAR_TEMPERATURE", "0.6")), alias="AVATAR_TEMPERATURE")
 
 

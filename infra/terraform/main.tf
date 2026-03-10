@@ -381,24 +381,24 @@ module "ai_foundry" {
   }
 
   ai_model_deployments = {
-    "gpt-4o" = {
+    "gpt-5-nano" = {
       name = var.model_deployment_name
       model = {
         format  = "OpenAI"
-        name    = "gpt-4o"
-        version = "2024-11-20"
+        name    = "gpt-5-nano"
+        version = "2025-08-07"
       }
       scale = {
         type     = "GlobalStandard"
         capacity = 1
       }
     }
-    "o3-mini" = {
+    "gpt-5" = {
       name = var.model_reasoning_deployment
       model = {
         format  = "OpenAI"
-        name    = "o3-mini"
-        version = "2025-01-31"
+        name    = "gpt-5"
+        version = "2025-08-07"
       }
       scale = {
         type     = "GlobalStandard"

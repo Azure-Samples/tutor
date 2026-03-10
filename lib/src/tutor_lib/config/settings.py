@@ -30,8 +30,8 @@ class CosmosConfig(BaseSettings):
 
 class AzureAIConfig(BaseSettings):
     project_endpoint: str = Field(alias="PROJECT_ENDPOINT")
-    default_deployment: str = Field(alias="MODEL_DEPLOYMENT_NAME", default="gpt-4o")
-    reasoning_deployment: str = Field(alias="MODEL_REASONING_DEPLOYMENT", default="o3-mini")
+    default_deployment: str = Field(alias="MODEL_DEPLOYMENT_NAME", default="gpt-5-nano")
+    reasoning_deployment: str = Field(alias="MODEL_REASONING_DEPLOYMENT", default="gpt-5")
 
 
 class StorageConfig(BaseSettings):

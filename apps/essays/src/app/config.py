@@ -41,8 +41,8 @@ class AzureAIConfig(BaseSettings):
     """Azure AI Foundry configuration for agent execution."""
 
     project_endpoint: str = Field(default_factory=lambda: _env("PROJECT_ENDPOINT"))
-    default_deployment: str = Field(default_factory=lambda: _env("MODEL_DEPLOYMENT_NAME", "gpt-4o"))
-    reasoning_deployment: str = Field(default_factory=lambda: _env("MODEL_REASONING_DEPLOYMENT", "o3-mini"))
+    default_deployment: str = Field(default_factory=lambda: _env("MODEL_DEPLOYMENT_NAME", "gpt-5-nano"))
+    reasoning_deployment: str = Field(default_factory=lambda: _env("MODEL_REASONING_DEPLOYMENT", "gpt-5"))
     model_key: str = Field(default_factory=lambda: _env("AZURE_MODEL_KEY", ""))
     model_url: str = Field(default_factory=lambda: _env("AZURE_MODEL_URL", ""))
 

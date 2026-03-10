@@ -20,7 +20,7 @@ type UnifiedAssembly = {
   agents: AgentField[];
 };
 
-const DEPLOYMENT_OPTIONS = ["gpt-4o", "gpt-4o-mini", "o3-mini"];
+const DEPLOYMENT_OPTIONS = ["gpt-5-nano", "gpt-5"];
 const ROLE_OPTIONS = ["default", "analytical", "narrative"] as const;
 
 const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () => void }> = ({ assemblyData, onSuccess }) => {
@@ -37,8 +37,8 @@ const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () =>
 
   const addAgent = () => {
     const newAgent: AgentField = form.service === "essays"
-      ? { name: "", instructions: "", deployment: "gpt-4o", role: "default", temperature: 0.7 }
-      : { name: "", instructions: "", deployment: "gpt-4o", dimension: "" };
+      ? { name: "", instructions: "", deployment: "gpt-5-nano", role: "default", temperature: 0.7 }
+      : { name: "", instructions: "", deployment: "gpt-5-nano", dimension: "" };
     setForm({ ...form, agents: [...form.agents, newAgent] });
   };
 

@@ -35,11 +35,11 @@ param openAiAccountName       string = 'tutor-openai'
 param openAiCustomDomain      string = 'openai-ctr'
 param deployOpenAiAccount     bool   = true
 param openAiRestore           bool   = false
-param openAiModelDeployment   string = 'tutor-4o'
+param openAiModelDeployment   string = 'tutor-5-nano'
 
-@allowed([ 'gpt-4o', 'gpt-4o-mini' ])
-param openAiModelName         string = 'gpt-4o'
-param openAiModelVersion      string = '2024-11-20'
+@allowed([ 'gpt-5', 'gpt-5-nano' ])
+param openAiModelName         string = 'gpt-5-nano'
+param openAiModelVersion      string = '2025-08-07'
 param openAiCapacity          int    = 80
 
 param speechAccountName       string = 'tutor-speech'

@@ -102,7 +102,7 @@ class EssayAgent:
     name: str
     instructions: str
     role: str = "default"
-    deployment: str = "gpt-4o"
+    deployment: str = "gpt-5-nano"
     temperature: float | None = None
 
 
@@ -1072,7 +1072,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Escrita Fund. I",
                 role="default",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um avaliador de redações para alunos do 5º ano do Ensino Fundamental. "
@@ -1088,7 +1088,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Conteúdo Fund. I",
                 role="narrative",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.4,
                 instructions=(
                     "Você é um avaliador de conteúdo de redações para alunos do 5º ano. "
@@ -1113,7 +1113,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Argumentação",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um professor de Língua Portuguesa especializado em textos argumentativos "
@@ -1129,7 +1129,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Linguagem Fund. II",
                 role="default",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um revisor linguístico para textos de alunos do 9º ano. Avalie:\n"
@@ -1153,7 +1153,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador Narrativo Fund. II",
                 role="narrative",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.4,
                 instructions=(
                     "Você é um professor de produção textual para alunos do 7º ano, "
@@ -1169,7 +1169,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Estilo Fund. II",
                 role="narrative",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um revisor de estilo para narrativas de alunos do 7º ano. Avalie:\n"
@@ -1193,7 +1193,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Corretor ENEM — Linguagem",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.2,
                 instructions=(
                     "Você é um corretor oficial de redações do ENEM. Avalie as competências "
@@ -1213,7 +1213,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Corretor ENEM — Conteúdo",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.2,
                 instructions=(
                     "Você é um corretor oficial de redações do ENEM. Avalie as competências "
@@ -1233,7 +1233,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Corretor ENEM — Proposta",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.2,
                 instructions=(
                     "Você é um corretor oficial de redações do ENEM. Avalie a competência "
@@ -1262,7 +1262,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Corretor ENEM — Linguagem",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.2,
                 instructions=(
                     "Você é um corretor de redações ENEM. Avalie C1 (Domínio da norma culta, 0-200) "
@@ -1276,7 +1276,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Corretor ENEM — Conteúdo",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.2,
                 instructions=(
                     "Você é um corretor de redações ENEM. Avalie C2 (Compreensão do tema, 0-200) "
@@ -1291,7 +1291,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Corretor ENEM — Proposta",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.2,
                 instructions=(
                     "Você é um corretor de redações ENEM. Avalie C5 (Proposta de intervenção, 0-200).\n\n"
@@ -1314,7 +1314,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador Teórico — Macro",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um professor de Macroeconomia de uma universidade brasileira. "
@@ -1330,7 +1330,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador Empírico — Macro",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um economista especializado em economia brasileira. "
@@ -1356,7 +1356,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Econ. Brasileira",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é professor de Economia Brasileira em uma universidade. "
@@ -1372,7 +1372,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador Acadêmico — Econ",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um revisor acadêmico de ensaios econômicos. Avalie:\n\n"
@@ -1396,7 +1396,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador Teoria dos Jogos",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é professor de Microeconomia especializado em Teoria dos Jogos. "
@@ -1412,7 +1412,7 @@ ESSAY_ASSEMBLIES: list[EssayAssemblyDef] = [
             EssayAgent(
                 name="Avaliador de Bem-Estar Social",
                 role="analytical",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 temperature=0.3,
                 instructions=(
                     "Você é um economista especializado em regulação e defesa da concorrência. "
@@ -1746,7 +1746,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         agents=[
             QuestionGrader(
                 name="Corretor Fund. I — Exatidão",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="exatidão",
                 instructions=(
                     "Você é um professor do Ensino Fundamental I (1º ao 5º ano) avaliando a resposta de um aluno. "
@@ -1761,7 +1761,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Corretor Fund. I — Clareza",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="clareza",
                 instructions=(
                     "Você é um professor do Ensino Fundamental I avaliando a **clareza** da resposta do aluno.\n\n"
@@ -1782,7 +1782,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         agents=[
             QuestionGrader(
                 name="Corretor Fund. II — Exatidão",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="exatidão",
                 instructions=(
                     "Você é um professor do Ensino Fundamental II (6º ao 9º ano) avaliando respostas. "
@@ -1797,7 +1797,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Corretor Fund. II — Raciocínio",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="raciocínio",
                 instructions=(
                     "Você é um professor do Ensino Fundamental II avaliando o **raciocínio** do aluno.\n\n"
@@ -1812,7 +1812,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Corretor Fund. II — Clareza",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="clareza",
                 instructions=(
                     "Você é um professor do Ensino Fundamental II avaliando a **clareza** da expressão.\n\n"
@@ -1833,7 +1833,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         agents=[
             QuestionGrader(
                 name="Corretor EM — Exatidão",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="exatidão",
                 instructions=(
                     "Você é um professor do Ensino Médio avaliando respostas. "
@@ -1849,7 +1849,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Corretor EM — Raciocínio",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="raciocínio",
                 instructions=(
                     "Você é um professor do Ensino Médio avaliando **raciocínio e análise**.\n\n"
@@ -1864,7 +1864,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Corretor EM — Profundidade",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="profundidade",
                 instructions=(
                     "Você é um professor do Ensino Médio avaliando a **profundidade** da resposta.\n\n"
@@ -1886,7 +1886,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
         agents=[
             QuestionGrader(
                 name="Avaliador Econ — Exatidão",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="exatidão",
                 instructions=(
                     "Você é um professor universitário de Ciências Econômicas. "
@@ -1901,7 +1901,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Avaliador Econ — Raciocínio",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="raciocínio",
                 instructions=(
                     "Você é um professor de Economia avaliando **raciocínio econômico**.\n\n"
@@ -1916,7 +1916,7 @@ QUESTION_ASSEMBLIES: list[QuestionAssemblyDef] = [
             ),
             QuestionGrader(
                 name="Avaliador Econ — Análise Crítica",
-                deployment="gpt-4o",
+                deployment="gpt-5-nano",
                 dimension="análise crítica",
                 instructions=(
                     "Você é um economista sênior avaliando a **capacidade analítica** do aluno.\n\n"
@@ -2511,3 +2511,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
