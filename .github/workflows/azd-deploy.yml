@@ -200,7 +200,19 @@ jobs:
             --assignee-principal-type ServicePrincipal \
             --role "Storage Blob Data Contributor" \
             --scope "$STORAGE_SCOPE" \
-            --only-show-errors >/dev/null || true
+            --only-show-errors >/dev/null
+
+          ASSIGNMENT_COUNT="$(az role assignment list \
+            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+            --scope "$STORAGE_SCOPE" \
+            --role "Storage Blob Data Contributor" \
+            --query 'length(@)' -o tsv)"
+
+          if [ "$ASSIGNMENT_COUNT" = "0" ]; then
+            echo "OIDC principal is missing 'Storage Blob Data Contributor' on Terraform state storage account."
+            echo "Grant role on scope: $STORAGE_SCOPE"
+            exit 1
+          fi
 
       - name: Build Terraform backend config
         env:
