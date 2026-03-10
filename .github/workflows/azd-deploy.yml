@@ -172,9 +172,15 @@ jobs:
           container_name       = "$TFSTATE_CONTAINER"
           key                  = "$TFSTATE_KEY"
           use_azuread_auth     = true
+          use_oidc             = true
           EOF
 
       - name: Validate Terraform configuration with remote backend
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           cd infra/terraform
           terraform init -reconfigure -backend-config=backend.hcl
