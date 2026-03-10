@@ -173,6 +173,27 @@ jobs:
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
 
+      - name: Ensure Terraform state account is reachable from GitHub runners
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          current_access="$(az storage account show \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --query publicNetworkAccess -o tsv)"
+
+          if [ "$current_access" = "Disabled" ]; then
+            echo "Enabling public network access on Terraform state storage account for CI connectivity."
+            az storage account update \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --name "$TFSTATE_STORAGE_ACCOUNT" \
+              --public-network-access Enabled \
+              --only-show-errors >/dev/null
+          fi
+
       - name: Ensure Terraform state RBAC for OIDC principal
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
