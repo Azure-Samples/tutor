@@ -165,6 +165,12 @@ variable "manage_apim_service_edge_in_foundation" {
   default     = false
 }
 
+variable "existing_container_app_environment_name" {
+  description = "Existing Container Apps Environment name used by backend services."
+  type        = string
+  default     = ""
+}
+
 variable "aca_vnet_integration_enabled" {
   description = "Whether the ACA environment is integrated with a VNet that can privately reach Cosmos DB."
   type        = bool

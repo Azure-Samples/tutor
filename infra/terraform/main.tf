@@ -148,30 +148,9 @@ resource "azurerm_private_dns_zone_virtual_network_link" "cosmos" {
   virtual_network_id    = azurerm_virtual_network.aca[0].id
 }
 
-resource "azurerm_container_app_environment" "main" {
-  name                       = "${var.name_prefix}-${var.environment}-acae"
-  location                   = azurerm_resource_group.main.location
-  resource_group_name        = azurerm_resource_group.main.name
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
-  infrastructure_subnet_id   = var.aca_vnet_integration_enabled ? azurerm_subnet.aca_infrastructure[0].id : null
-
-  workload_profile {
-    name                  = "Consumption"
-    workload_profile_type = "Consumption"
-  }
-
-  tags = {
-    "azd-env-name" = var.environment
-  }
-
-  lifecycle {
-    # Existing production environments can hold active apps; replacing the environment
-    # causes deletion conflicts and broad outages. Migrate environment-level settings separately.
-    prevent_destroy = true
-    ignore_changes = [
-      infrastructure_subnet_id,
-    ]
-  }
+data "azurerm_container_app_environment" "main" {
+  name                = var.existing_container_app_environment_name != "" ? var.existing_container_app_environment_name : "${var.name_prefix}-${var.environment}-acae"
+  resource_group_name = azurerm_resource_group.main.name
 }
 
 resource "azurerm_container_registry" "main" {
@@ -280,7 +259,7 @@ resource "azurerm_container_app" "backend_services" {
   for_each = toset(local.backend_service_names)
 
   name                         = "${var.name_prefix}-${each.key}-${var.environment}"
-  container_app_environment_id = azurerm_container_app_environment.main.id
+  container_app_environment_id = data.azurerm_container_app_environment.main.id
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 

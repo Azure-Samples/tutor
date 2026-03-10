@@ -418,6 +418,23 @@ jobs:
             terraform state rm "$entry" || true
           done <<< "$apim_edge_state_entries"
 
+      - name: Detach managed ACA environment from foundation state
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          set -euo pipefail
+
+          cd infra/terraform
+          if ! terraform init -reconfigure -backend-config=backend.hcl; then
+            echo "WARNING: Terraform init failed while detaching ACA environment from foundation state."
+            exit 0
+          fi
+
+          terraform state rm azurerm_container_app_environment.main || true
+
       - name: Provision infrastructure
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
