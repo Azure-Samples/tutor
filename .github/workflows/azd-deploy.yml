@@ -188,23 +188,7 @@ jobs:
             --resource https://management.azure.com/ \
             --query accessToken -o tsv)"
 
-          PRINCIPAL_OBJECT_ID="$(python - <<'PY'
-import base64
-import json
-import os
-
-token = os.environ.get("ACCESS_TOKEN", "")
-parts = token.split('.')
-if len(parts) < 2:
-    print("")
-    raise SystemExit(0)
-
-payload = parts[1]
-payload += "=" * (-len(payload) % 4)
-data = json.loads(base64.urlsafe_b64decode(payload.encode("utf-8")).decode("utf-8"))
-print(data.get("oid", ""))
-PY
-          )"
+            PRINCIPAL_OBJECT_ID="$(python -c "import base64, json, os; t=os.environ.get('ACCESS_TOKEN',''); p=t.split('.'); o='';\nif len(p) >= 2:\n payload=p[1] + '=' * (-len(p[1]) % 4); o=json.loads(base64.urlsafe_b64decode(payload.encode('utf-8')).decode('utf-8')).get('oid','');\nprint(o)")"
 
           if [ -z "$PRINCIPAL_OBJECT_ID" ]; then
             echo "Unable to resolve OIDC principal object id from access token."
