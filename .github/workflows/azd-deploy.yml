@@ -71,7 +71,11 @@ jobs:
 
           service_count="$(echo "$services_json" | jq 'length')"
 
-          echo "services_json=$services_json" >> "$GITHUB_OUTPUT"
+          {
+            echo "services_json<<GHEOF"
+            echo "$services_json"
+            echo "GHEOF"
+          } >> "$GITHUB_OUTPUT"
           echo "service_count=$service_count" >> "$GITHUB_OUTPUT"
           echo "Selected services matrix: $services_json"
 
