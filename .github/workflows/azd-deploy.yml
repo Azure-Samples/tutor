@@ -220,7 +220,29 @@ jobs:
           terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
 
       - name: Provision infrastructure
-        run: azd provision --no-prompt --debug
+        run: |
+          set -euo pipefail
+
+          max_attempts=3
+          attempt=1
+
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "Provision attempt $attempt/$max_attempts"
+            if azd provision --no-prompt --debug; then
+              echo "Provision succeeded on attempt $attempt"
+              break
+            fi
+
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "Provision failed after $max_attempts attempts"
+              exit 1
+            fi
+
+            sleep_seconds=$((attempt * 30))
+            echo "Provision failed due to transient dependency conflict. Retrying in ${sleep_seconds}s..."
+            sleep "$sleep_seconds"
+            attempt=$((attempt + 1))
+          done
 
       - name: Frontend deployment ownership
         run: |

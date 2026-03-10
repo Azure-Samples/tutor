@@ -289,11 +289,11 @@ resource "azurerm_api_management_api_operation" "backend_catch_all" {
 }
 
 resource "azurerm_api_management_api_policy" "backend_services_hardening" {
-  for_each = azurerm_api_management_api.backend_services
+  for_each = local.apim_service_paths
 
   resource_group_name = azurerm_resource_group.main.name
   api_management_name = azurerm_api_management.main.name
-  api_name            = each.value.name
+  api_name            = "${replace(each.key, "-", "")}-api"
 
   xml_content = <<-XML
     <policies>
