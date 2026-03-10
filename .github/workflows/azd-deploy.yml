@@ -254,6 +254,11 @@ jobs:
           done
 
       - name: Provision infrastructure
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
         run: |
           set -euo pipefail
 
@@ -268,8 +273,8 @@ jobs:
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "Provision did not fully converge after $max_attempts attempts; continuing with backend service deployment."
-              break
+              echo "Provision did not fully converge after $max_attempts attempts; failing workflow."
+              exit 1
             fi
 
             sleep_seconds=$((attempt * 30))
