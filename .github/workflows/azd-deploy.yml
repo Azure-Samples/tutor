@@ -226,7 +226,7 @@ jobs:
           for service in "${services[@]}"; do
             api_name="${service//-/}-api"
             api_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name};rev=1"
-            policy_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name}/policies/policy"
+            policy_resource_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim/apis/${api_name}"
 
             terraform import "azurerm_api_management_api.backend_services[\"${service}\"]" "$api_resource_id" || true
             terraform import "azurerm_api_management_api_policy.backend_services_hardening[\"${service}\"]" "$policy_resource_id" || true
