@@ -322,10 +322,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          RG="$(azd env get-value AZURE_RESOURCE_GROUP)"
-          ACR_SERVER="$(azd env get-value AZURE_CONTAINER_REGISTRY_ENDPOINT)"
-          if [ -z "$RG" ] || [ -z "$ACR_SERVER" ]; then
-            echo "Missing required azd environment outputs: AZURE_RESOURCE_GROUP or AZURE_CONTAINER_REGISTRY_ENDPOINT"
+          RG="$(azd env get-value AZURE_RESOURCE_GROUP || true)"
+          if [ -z "$RG" ]; then
+            RG="tutor-prod"
+          fi
+
+          ACR_SERVER="$(azd env get-value AZURE_CONTAINER_REGISTRY_ENDPOINT || true)"
+          if [ -z "$ACR_SERVER" ]; then
+            ACR_SERVER="$(az acr list --resource-group "$RG" --query '[0].loginServer' -o tsv)"
+          fi
+
+          if [ -z "$ACR_SERVER" ]; then
+            echo "Missing ACR endpoint and unable to discover one in resource group '$RG'"
             exit 1
           fi
 
