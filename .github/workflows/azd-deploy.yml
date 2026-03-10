@@ -207,7 +207,7 @@ jobs:
           terraform validate
 
       - name: Provision infrastructure
-        run: azd provision --no-prompt
+        run: azd provision --no-prompt --debug
 
       - name: Frontend deployment ownership
         run: |
