@@ -361,7 +361,7 @@ module "ai_foundry" {
   source  = "Azure/avm-ptn-aiml-ai-foundry/azurerm"
   version = "0.10.0"
 
-  base_name                  = "${var.name_prefix}${var.environment}${random_string.suffix.result}"
+  base_name                  = substr("${local.normalized_prefix}${random_string.suffix.result}", 0, 9)
   location                   = var.foundry_location
   resource_group_resource_id = azurerm_resource_group.main.id
 
