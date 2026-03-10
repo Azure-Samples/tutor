@@ -327,17 +327,24 @@ jobs:
             RG="tutor-prod"
           fi
 
+          ACR_NAME=""
           ACR_SERVER="$(azd env get-value AZURE_CONTAINER_REGISTRY_ENDPOINT || true)"
-          if [ -z "$ACR_SERVER" ]; then
-            ACR_SERVER="$(az acr list --resource-group "$RG" --query '[0].loginServer' -o tsv)"
+          if [ -n "$ACR_SERVER" ] && [[ "$ACR_SERVER" == *.azurecr.io ]]; then
+            ACR_NAME="${ACR_SERVER%%.azurecr.io}"
           fi
 
           if [ -z "$ACR_SERVER" ]; then
-            echo "Missing ACR endpoint and unable to discover one in resource group '$RG'"
+            ACR_NAME="$(az acr list --resource-group "$RG" --query '[0].name' -o tsv)"
+            if [ -n "$ACR_NAME" ]; then
+              ACR_SERVER="$(az acr show --name "$ACR_NAME" --resource-group "$RG" --query 'loginServer' -o tsv)"
+            fi
+          fi
+
+          if [ -z "$ACR_NAME" ] || [ -z "$ACR_SERVER" ] || [[ "$ACR_SERVER" != *.azurecr.io ]]; then
+            echo "Missing valid ACR name/server and unable to discover one in resource group '$RG'"
             exit 1
           fi
 
-          ACR_NAME="${ACR_SERVER%%.azurecr.io}"
           IMAGE="${ACR_SERVER}/tutor/${SERVICE}-${AZURE_ENV_NAME}:${GITHUB_SHA}"
           DOCKERFILE="apps/${SERVICE}/dockerfile"
 
