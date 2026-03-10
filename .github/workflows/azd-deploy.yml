@@ -202,6 +202,13 @@ jobs:
             --scope "$STORAGE_SCOPE" \
             --only-show-errors >/dev/null
 
+          az role assignment create \
+            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+            --assignee-principal-type ServicePrincipal \
+            --role "Storage Blob Data Owner" \
+            --scope "$STORAGE_SCOPE" \
+            --only-show-errors >/dev/null
+
           ASSIGNMENT_COUNT="$(az role assignment list \
             --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
             --scope "$STORAGE_SCOPE" \
