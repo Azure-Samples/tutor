@@ -259,8 +259,20 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
+          RS_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          RS_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          RS_CONTAINER_NAME: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          RS_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
         run: |
           set -euo pipefail
+
+          : "${RS_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
+          : "${RS_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
+          : "${RS_CONTAINER_NAME:?Missing secret TERRAFORM_STATE_CONTAINER}"
+          if [ -z "${RS_KEY:-}" ]; then
+            RS_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          fi
+          export RS_KEY
 
           max_attempts=3
           attempt=1
