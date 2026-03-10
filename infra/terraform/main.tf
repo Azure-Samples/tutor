@@ -93,11 +93,67 @@ resource "azurerm_application_insights" "main" {
   application_type    = "web"
 }
 
+resource "azurerm_virtual_network" "aca" {
+  count = var.aca_vnet_integration_enabled ? 1 : 0
+
+  name                = "${var.name_prefix}-${var.environment}-vnet"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  address_space       = var.aca_vnet_address_space
+}
+
+resource "azurerm_subnet" "aca_infrastructure" {
+  count = var.aca_vnet_integration_enabled ? 1 : 0
+
+  name                 = "aca-infrastructure"
+  resource_group_name  = azurerm_resource_group.main.name
+  virtual_network_name = azurerm_virtual_network.aca[0].name
+  address_prefixes     = [var.aca_infrastructure_subnet_cidr]
+
+  delegation {
+    name = "aca-environment"
+
+    service_delegation {
+      name = "Microsoft.App/environments"
+      actions = [
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
+      ]
+    }
+  }
+}
+
+resource "azurerm_subnet" "cosmos_private_endpoint" {
+  count = var.aca_vnet_integration_enabled ? 1 : 0
+
+  name                              = "cosmos-private-endpoint"
+  resource_group_name               = azurerm_resource_group.main.name
+  virtual_network_name              = azurerm_virtual_network.aca[0].name
+  address_prefixes                  = [var.cosmos_private_endpoint_subnet_cidr]
+  private_endpoint_network_policies = "Disabled"
+}
+
+resource "azurerm_private_dns_zone" "cosmos" {
+  count = var.aca_vnet_integration_enabled ? 1 : 0
+
+  name                = var.cosmos_private_dns_zone_name
+  resource_group_name = azurerm_resource_group.main.name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "cosmos" {
+  count = var.aca_vnet_integration_enabled ? 1 : 0
+
+  name                  = "${var.name_prefix}-${var.environment}-cosmos-dns-link"
+  resource_group_name   = azurerm_resource_group.main.name
+  private_dns_zone_name = azurerm_private_dns_zone.cosmos[0].name
+  virtual_network_id    = azurerm_virtual_network.aca[0].id
+}
+
 resource "azurerm_container_app_environment" "main" {
   name                       = "${var.name_prefix}-${var.environment}-acae"
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+  infrastructure_subnet_id   = var.aca_vnet_integration_enabled ? azurerm_subnet.aca_infrastructure[0].id : null
   tags = {
     "azd-env-name" = var.environment
   }
@@ -127,11 +183,11 @@ resource "azurerm_storage_container" "uploads" {
 }
 
 resource "azurerm_cosmosdb_account" "main" {
-  name                = "${local.normalized_prefix}${random_string.suffix.result}cosmos"
-  location            = azurerm_resource_group.main.location
-  resource_group_name = azurerm_resource_group.main.name
-  offer_type          = "Standard"
-  kind                = "GlobalDocumentDB"
+  name                          = "${local.normalized_prefix}${random_string.suffix.result}cosmos"
+  location                      = azurerm_resource_group.main.location
+  resource_group_name           = azurerm_resource_group.main.name
+  offer_type                    = "Standard"
+  kind                          = "GlobalDocumentDB"
   public_network_access_enabled = var.cosmos_public_network_access_enabled
   ip_range_filter               = toset(var.cosmos_allowed_public_ip_ranges)
 
@@ -164,6 +220,27 @@ resource "azurerm_cosmosdb_account" "main" {
 
   capabilities {
     name = "EnableServerless"
+  }
+}
+
+resource "azurerm_private_endpoint" "cosmos" {
+  count = var.aca_vnet_integration_enabled ? 1 : 0
+
+  name                = "${var.name_prefix}-${var.environment}-cosmos-pe"
+  location            = azurerm_resource_group.main.location
+  resource_group_name = azurerm_resource_group.main.name
+  subnet_id           = azurerm_subnet.cosmos_private_endpoint[0].id
+
+  private_service_connection {
+    name                           = "${var.name_prefix}-${var.environment}-cosmos-psc"
+    private_connection_resource_id = azurerm_cosmosdb_account.main.id
+    subresource_names              = ["Sql"]
+    is_manual_connection           = false
+  }
+
+  private_dns_zone_group {
+    name                 = "cosmos-private-dns"
+    private_dns_zone_ids = [azurerm_private_dns_zone.cosmos[0].id]
   }
 }
 

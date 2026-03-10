@@ -165,6 +165,30 @@ variable "aca_vnet_integration_enabled" {
   default     = false
 }
 
+variable "aca_vnet_address_space" {
+  description = "Address space for the VNet used by ACA private data-path components."
+  type        = list(string)
+  default     = ["10.40.0.0/16"]
+}
+
+variable "aca_infrastructure_subnet_cidr" {
+  description = "CIDR for the ACA infrastructure subnet."
+  type        = string
+  default     = "10.40.0.0/23"
+}
+
+variable "cosmos_private_endpoint_subnet_cidr" {
+  description = "CIDR for the subnet hosting the Cosmos DB private endpoint."
+  type        = string
+  default     = "10.40.2.0/24"
+}
+
+variable "cosmos_private_dns_zone_name" {
+  description = "Private DNS zone for Cosmos DB private endpoint name resolution."
+  type        = string
+  default     = "privatelink.documents.azure.com"
+}
+
 variable "cosmos_public_network_access_enabled" {
   description = "Controls Cosmos DB public network access. Keep true until private connectivity is in place."
   type        = bool
