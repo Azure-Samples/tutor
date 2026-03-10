@@ -137,6 +137,8 @@ jobs:
     env:
       AZURE_ENV_NAME: prod
       AZURE_LOCATION: eastus2
+      TF_VAR_environment: prod
+      TF_VAR_existing_container_app_environment_name: tutor-prod-acae
 
     steps:
       - name: Checkout
