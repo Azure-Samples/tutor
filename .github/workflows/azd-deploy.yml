@@ -23,6 +23,7 @@ jobs:
     outputs:
       services_json: ${{ steps.detect.outputs.services_json }}
       service_count: ${{ steps.detect.outputs.service_count }}
+      provision_required: ${{ steps.detect.outputs.provision_required }}
 
     steps:
       - name: Checkout
@@ -41,9 +42,11 @@ jobs:
 
           all_services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
           selected_services=()
+          provision_required=false
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             selected_services=("${all_services[@]}")
+            provision_required=true
           else
             before="$BEFORE_SHA"
             if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
@@ -54,6 +57,7 @@ jobs:
 
             if echo "$changed_files" | grep -Eq '^(azure\.yaml|infra/terraform/|lib/|\.github/workflows/azd-deploy\.yml)'; then
               selected_services=("${all_services[@]}")
+              provision_required=true
             else
               for service in "${all_services[@]}"; do
                 if echo "$changed_files" | grep -Eq "^apps/${service}/"; then
@@ -77,11 +81,14 @@ jobs:
             echo "GHEOF"
           } >> "$GITHUB_OUTPUT"
           echo "service_count=$service_count" >> "$GITHUB_OUTPUT"
+          echo "provision_required=$provision_required" >> "$GITHUB_OUTPUT"
           echo "Selected services matrix: $services_json"
+          echo "Provision required: $provision_required"
 
   provision:
     runs-on: ubuntu-latest
     needs: detect-changes
+    if: needs.detect-changes.outputs.provision_required == 'true'
 
     env:
       AZURE_ENV_NAME: prod
@@ -402,7 +409,7 @@ jobs:
     needs:
       - detect-changes
       - provision
-    if: needs.detect-changes.outputs.service_count != '0'
+    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success')
     strategy:
       fail-fast: false
       matrix:
