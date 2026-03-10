@@ -172,16 +172,37 @@ jobs:
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
 
+      - name: Resolve Terraform state access key
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          TFSTATE_ACCESS_KEY="$(az storage account keys list \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+            --query '[0].value' -o tsv)"
+
+          if [ -z "$TFSTATE_ACCESS_KEY" ]; then
+            echo "Unable to resolve Terraform state storage account key."
+            exit 1
+          fi
+
+          echo "TFSTATE_ACCESS_KEY=$TFSTATE_ACCESS_KEY" >> "$GITHUB_ENV"
+          azd env set RS_ACCESS_KEY "$TFSTATE_ACCESS_KEY"
+
       - name: Build Terraform backend config
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
+          TFSTATE_ACCESS_KEY: ${{ env.TFSTATE_ACCESS_KEY }}
         run: |
           : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
+          : "${TFSTATE_ACCESS_KEY:?Missing state storage access key}"
           if [ -z "$TFSTATE_KEY" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
@@ -190,8 +211,7 @@ jobs:
           storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
           container_name       = "$TFSTATE_CONTAINER"
           key                  = "$TFSTATE_KEY"
-          use_azuread_auth     = true
-          use_oidc             = true
+          access_key           = "$TFSTATE_ACCESS_KEY"
           EOF
 
       - name: Validate Terraform configuration with remote backend
@@ -263,12 +283,14 @@ jobs:
           RS_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           RS_CONTAINER_NAME: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           RS_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
+          RS_ACCESS_KEY: ${{ env.TFSTATE_ACCESS_KEY }}
         run: |
           set -euo pipefail
 
           : "${RS_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${RS_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${RS_CONTAINER_NAME:?Missing secret TERRAFORM_STATE_CONTAINER}"
+          : "${RS_ACCESS_KEY:?Missing resolved state storage access key}"
           if [ -z "${RS_KEY:-}" ]; then
             RS_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi

@@ -3,6 +3,7 @@
   "container_name": "${RS_CONTAINER_NAME}",
   "key": "${RS_KEY}",
   "resource_group_name": "${RS_RESOURCE_GROUP}",
+  "access_key": "${RS_ACCESS_KEY}",
   "use_azuread_auth": true,
   "use_oidc": true
 }
