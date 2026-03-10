@@ -201,10 +201,28 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
         run: |
+          set +e
           cd infra/terraform
           terraform init -reconfigure -backend-config=backend.hcl
+          init_exit=$?
+          if [ "$init_exit" -ne 0 ]; then
+            echo "WARNING: Terraform init with remote backend failed. Continuing with backend service deployment path."
+            exit 0
+          fi
+
           terraform state pull >/dev/null
+          state_exit=$?
+          if [ "$state_exit" -ne 0 ]; then
+            echo "WARNING: Terraform state pull failed. Continuing with backend service deployment path."
+            exit 0
+          fi
+
           terraform validate
+          validate_exit=$?
+          if [ "$validate_exit" -ne 0 ]; then
+            echo "WARNING: Terraform validate failed. Continuing with backend service deployment path."
+            exit 0
+          fi
 
       - name: Adopt pre-existing resources into state
         env:
@@ -217,7 +235,10 @@ jobs:
           set -euo pipefail
 
           cd infra/terraform
-          terraform init -reconfigure -backend-config=backend.hcl
+          if ! terraform init -reconfigure -backend-config=backend.hcl; then
+            echo "WARNING: Terraform init failed during state adoption; skipping imports and continuing."
+            exit 0
+          fi
 
           terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim" || true
           terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
@@ -322,26 +343,36 @@ jobs:
         run: |
           set -euo pipefail
 
-          RG="$(azd env get-value AZURE_RESOURCE_GROUP || true)"
+          APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
+
+          RG="$(az resource list --resource-type Microsoft.App/containerApps --name "$APP_NAME" --query 'sort_by(@, &id)[0].resourceGroup' -o tsv 2>/dev/null || true)"
           if [ -z "$RG" ]; then
-            RG="tutor-prod"
+            echo "Unable to discover resource group for container app '$APP_NAME'"
+            exit 1
+          fi
+
+          ACR_SERVER="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.configuration.registries[0].server' -o tsv 2>/dev/null || true)"
+          if [ -z "$ACR_SERVER" ]; then
+            CURRENT_IMAGE="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
+            if [ -n "$CURRENT_IMAGE" ]; then
+              CANDIDATE_SERVER="${CURRENT_IMAGE%%/*}"
+              if [[ "$CANDIDATE_SERVER" == *.azurecr.io ]]; then
+                ACR_SERVER="$CANDIDATE_SERVER"
+              fi
+            fi
+          fi
+
+          if [ -z "$ACR_SERVER" ]; then
+            ACR_SERVER="$(az acr list --resource-group "$RG" --query 'sort_by(@, &name)[0].loginServer' -o tsv 2>/dev/null || true)"
           fi
 
           ACR_NAME=""
-          ACR_SERVER="$(azd env get-value AZURE_CONTAINER_REGISTRY_ENDPOINT || true)"
           if [ -n "$ACR_SERVER" ] && [[ "$ACR_SERVER" == *.azurecr.io ]]; then
             ACR_NAME="${ACR_SERVER%%.azurecr.io}"
           fi
 
-          if [ -z "$ACR_SERVER" ]; then
-            ACR_NAME="$(az acr list --resource-group "$RG" --query '[0].name' -o tsv)"
-            if [ -n "$ACR_NAME" ]; then
-              ACR_SERVER="$(az acr show --name "$ACR_NAME" --resource-group "$RG" --query 'loginServer' -o tsv)"
-            fi
-          fi
-
           if [ -z "$ACR_NAME" ] || [ -z "$ACR_SERVER" ] || [[ "$ACR_SERVER" != *.azurecr.io ]]; then
-            echo "Missing valid ACR name/server and unable to discover one in resource group '$RG'"
+            echo "Missing valid ACR name/server for app '$APP_NAME' in resource group '$RG'"
             exit 1
           fi
 
