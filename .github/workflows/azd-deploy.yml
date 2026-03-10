@@ -391,6 +391,12 @@ jobs:
           terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim" || true
           terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
 
+          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          for service in "${services[@]}"; do
+            app_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.App/containerApps/tutor-${service}-prod"
+            terraform import "azurerm_container_app.backend_services[\"${service}\"]" "$app_id" || true
+          done
+
       - name: Detach APIM service-edge resources from foundation state
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
