@@ -262,7 +262,7 @@ resource "azurerm_api_management_api" "backend_services" {
   display_name          = "${each.key} API"
   path                  = each.value
   protocols             = ["https"]
-  service_url           = "https://${azurerm_container_app.backend_services[each.key].latest_revision_fqdn}"
+  service_url           = "https://${azurerm_container_app.backend_services[each.key].ingress[0].fqdn}"
   subscription_required = false
 }
 
