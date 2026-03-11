@@ -138,7 +138,8 @@ class AvatarHandler {
         document.body.appendChild(audioElement);
       }
       if (event.track.kind === "video" && this.onVideoStream) {
-        this.onVideoStream(event.streams[0]);
+        const stream = event.streams[0] ?? new MediaStream([event.track]);
+        this.onVideoStream(stream);
       }
     };
 
@@ -262,6 +263,7 @@ type AvatarChatProps = {
 const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   const [isLoading, setIsLoading] = useState(false);
   const videoRef = useRef<HTMLDivElement>(null);
+  const avatarVideoRef = useRef<HTMLVideoElement>(null);
   const [spokenText, setSpokenText] = useState("");
   const avatarHandlerRef = useRef<AvatarHandler | null>(null);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(true);
@@ -362,6 +364,16 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   }, [selectedCase]);
 
   useEffect(() => {
+    const videoElement = avatarVideoRef.current;
+    if (!videoElement || !avatarVideoStream) return;
+
+    videoElement.srcObject = avatarVideoStream;
+    void videoElement.play().catch((error) => {
+      console.warn("Avatar video autoplay was blocked:", error);
+    });
+  }, [avatarVideoStream]);
+
+  useEffect(() => {
     if (!avatarHandlerRef.current || !selectedCase) return;
 
     const processTranscript = async (text: string) => {
@@ -454,12 +466,8 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
               <video
                 autoPlay
                 playsInline
-                muted={false}
-                ref={el => {
-                  if (el && avatarVideoStream) {
-                    el.srcObject = avatarVideoStream;
-                  }
-                }}
+                muted
+                ref={avatarVideoRef}
                 className="w-full h-full object-contain rounded-xl"
               />
             ) : !selectedCase ? (
