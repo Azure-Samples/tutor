@@ -771,6 +771,90 @@ jobs:
             return 1
           }
 
+          dump_revision_diagnostics() {
+            local latest_revision=""
+
+            latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
+
+            echo "Revision summary for '$APP_NAME':"
+            az containerapp revision list \
+              --resource-group "$RG" \
+              --name "$APP_NAME" \
+              --query '[].{name:name,active:properties.active,runningState:properties.runningState,replicas:properties.replicas,createdTime:properties.createdTime,image:properties.template.containers[0].image}' \
+              -o table || true
+
+            if [ -n "$latest_revision" ]; then
+              echo "System logs for latest revision '$latest_revision':"
+              az containerapp logs show \
+                --resource-group "$RG" \
+                --name "$APP_NAME" \
+                --type system \
+                --revision "$latest_revision" \
+                --tail 120 || true
+            fi
+          }
+
+          wait_for_latest_revision_ready() {
+            local max_attempts=40
+            local attempt=1
+            local latest_revision=""
+            local latest_ready_revision=""
+            local running_state=""
+            local replicas=""
+
+            while [ "$attempt" -le "$max_attempts" ]; do
+              latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
+              latest_ready_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv 2>/dev/null || true)"
+
+              if [ -n "$latest_revision" ]; then
+                running_state="$(az containerapp revision show --resource-group "$RG" --name "$APP_NAME" --revision "$latest_revision" --query 'properties.runningState' -o tsv 2>/dev/null || true)"
+                replicas="$(az containerapp revision show --resource-group "$RG" --name "$APP_NAME" --revision "$latest_revision" --query 'properties.replicas' -o tsv 2>/dev/null || true)"
+              else
+                running_state=""
+                replicas=""
+              fi
+
+              if [ -n "$latest_revision" ] \
+                && [ "$latest_revision" = "$latest_ready_revision" ] \
+                && [ "$running_state" = "Running" ] \
+                && [ "${replicas:-0}" != "0" ]; then
+                echo "Latest revision '$latest_revision' is ready and running for '$APP_NAME'."
+                return 0
+              fi
+
+              if [ "$running_state" = "ActivationFailed" ]; then
+                echo "Latest revision '$latest_revision' entered ActivationFailed for '$APP_NAME'."
+                dump_revision_diagnostics
+                return 1
+              fi
+
+              echo "Waiting for latest revision readiness on '$APP_NAME' (latest: ${latest_revision:-none}, ready: ${latest_ready_revision:-none}, runningState: ${running_state:-unknown}, replicas: ${replicas:-0}) attempt $attempt/$max_attempts..."
+              sleep 15
+              attempt=$((attempt + 1))
+            done
+
+            echo "Timed out waiting for latest revision readiness on '$APP_NAME'."
+            dump_revision_diagnostics
+            return 1
+          }
+
+          rollback_to_latest_ready_revision() {
+            local latest_revision=""
+            local latest_ready_revision=""
+
+            latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
+            latest_ready_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv 2>/dev/null || true)"
+
+            if [ -n "$latest_ready_revision" ] && [ "$latest_ready_revision" != "$latest_revision" ]; then
+              echo "Attempting rollback traffic to latest ready revision '$latest_ready_revision' for '$APP_NAME'."
+              az containerapp ingress traffic set \
+                --resource-group "$RG" \
+                --name "$APP_NAME" \
+                --revision-weight "${latest_ready_revision}=100" \
+                --output none || true
+            fi
+          }
+
           RG="$(az resource list --resource-type Microsoft.App/containerApps --name "$APP_NAME" --query 'sort_by(@, &id)[0].resourceGroup' -o tsv 2>/dev/null || true)"
           if [ -z "$RG" ]; then
             echo "Unable to discover resource group for container app '$APP_NAME'"
@@ -805,6 +889,42 @@ jobs:
           IMAGE="${ACR_SERVER}/tutor/${SERVICE}-${AZURE_ENV_NAME}:${GITHUB_SHA}"
           DOCKERFILE="apps/${SERVICE}/dockerfile"
 
+          eval "$(azd env get-values | sed -E 's/^([^=]+)=(.*)$/export \1=\2/')"
+
+          ENV_VARS=(
+            "COSMOS_ENDPOINT=${COSMOS_ENDPOINT:-}"
+            "COSMOS_DATABASE=${COSMOS_DATABASE:-}"
+            "COSMOS_AVATAR_CASE_TABLE=${COSMOS_AVATAR_CASE_TABLE:-}"
+            "COSMOS_CONFIGURATION_TABLE=${COSMOS_CONFIGURATION_TABLE:-}"
+            "COSMOS_STUDENT_TABLE=${COSMOS_STUDENT_TABLE:-}"
+            "COSMOS_PROFESSOR_TABLE=${COSMOS_PROFESSOR_TABLE:-}"
+            "COSMOS_COURSE_TABLE=${COSMOS_COURSE_TABLE:-}"
+            "COSMOS_CLASS_TABLE=${COSMOS_CLASS_TABLE:-}"
+            "COSMOS_GROUP_TABLE=${COSMOS_GROUP_TABLE:-}"
+            "COSMOS_ESSAY_TABLE=${COSMOS_ESSAY_TABLE:-}"
+            "COSMOS_RESOURCE_TABLE=${COSMOS_RESOURCE_TABLE:-}"
+            "COSMOS_ASSEMBLY_TABLE=${COSMOS_ASSEMBLY_TABLE:-}"
+            "COSMOS_QUESTION_TABLE=${COSMOS_QUESTION_TABLE:-}"
+            "COSMOS_ANSWER_TABLE=${COSMOS_ANSWER_TABLE:-}"
+            "COSMOS_GRADER_TABLE=${COSMOS_GRADER_TABLE:-}"
+            "COSMOS_UPSKILLING_TABLE=${COSMOS_UPSKILLING_TABLE:-}"
+            "PROJECT_ENDPOINT=${PROJECT_ENDPOINT:-}"
+            "MODEL_DEPLOYMENT_NAME=${MODEL_DEPLOYMENT_NAME:-}"
+            "MODEL_REASONING_DEPLOYMENT=${MODEL_REASONING_DEPLOYMENT:-}"
+            "BLOB_CONNECTION_STRING=${BLOB_CONNECTION_STRING:-}"
+            "BLOB_CONTAINER_NAME=${BLOB_CONTAINER_NAME:-}"
+            "SPEECH_RESOURCE_ID=${SPEECH_RESOURCE_ID:-}"
+            "SPEECH_REGION=${SPEECH_REGION:-}"
+            "ENTRA_AUTH_ENABLED=${ENTRA_AUTH_ENABLED:-false}"
+            "ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}"
+            "ENTRA_API_CLIENT_ID=${ENTRA_API_CLIENT_ID:-}"
+            "ENTRA_TOKEN_AUDIENCE=${ENTRA_TOKEN_AUDIENCE:-}"
+            "ENTRA_ALLOWED_CLIENT_APP_IDS=${ENTRA_ALLOWED_CLIENT_APP_IDS:-}"
+            "ENTRA_TEACHER_CLIENT_ID=${ENTRA_TEACHER_CLIENT_ID:-}"
+            "ENTRA_TEACHER_CLIENT_SECRET=${ENTRA_TEACHER_CLIENT_SECRET:-}"
+            "STUDENT_SECRET_SALT=${STUDENT_SECRET_SALT:-}"
+          )
+
           if [ ! -f "$DOCKERFILE" ]; then
             echo "Dockerfile not found for service '$SERVICE' at $DOCKERFILE"
             exit 1
@@ -824,6 +944,7 @@ jobs:
               --resource-group "$RG" \
               --name "$APP_NAME" \
               --image "$IMAGE" \
+              --set-env-vars "${ENV_VARS[@]}" \
               --no-wait \
               --output none 2>&1)"
             update_exit=$?
@@ -831,8 +952,17 @@ jobs:
 
             if [ "$update_exit" -eq 0 ]; then
               if wait_for_target_image_rollout; then
-                echo "Container app '$APP_NAME' updated successfully on attempt $update_attempt/$max_update_attempts."
-                break
+                if wait_for_latest_revision_ready; then
+                  echo "Container app '$APP_NAME' updated successfully on attempt $update_attempt/$max_update_attempts."
+                  break
+                fi
+
+                echo "Container app '$APP_NAME' image updated but latest revision is not ready on attempt $update_attempt/$max_update_attempts."
+                rollback_to_latest_ready_revision
+                wait_for_container_app_ready
+                sleep $((update_attempt * 10))
+                update_attempt=$((update_attempt + 1))
+                continue
               fi
 
               echo "Container app '$APP_NAME' update accepted but rollout not confirmed on attempt $update_attempt/$max_update_attempts."
