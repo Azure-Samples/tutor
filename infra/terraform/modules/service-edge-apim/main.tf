@@ -59,12 +59,60 @@ resource "azurerm_api_management_api_policy" "service" {
     <policies>
       <inbound>
         <base />
+        <set-variable name="request-origin" value="@(context.Request.Headers.GetValueOrDefault(&quot;Origin&quot;, &quot;&quot;))" />
+        <choose>
+          <when condition="@(
+            context.Request.Method == &quot;OPTIONS&quot;
+            &amp;&amp; !string.IsNullOrEmpty((string)context.Variables[&quot;request-origin&quot;])
+            &amp;&amp; (
+              ((string)context.Variables[&quot;request-origin&quot;]).EndsWith(&quot;.azurestaticapps.net&quot;, StringComparison.OrdinalIgnoreCase)
+              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:3000&quot;, StringComparison.OrdinalIgnoreCase)
+              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:5173&quot;, StringComparison.OrdinalIgnoreCase)
+            )
+          )">
+            <return-response>
+              <set-status code="204" reason="No Content" />
+              <set-header name="Access-Control-Allow-Origin" exists-action="override">
+                <value>@((string)context.Variables[&quot;request-origin&quot;])</value>
+              </set-header>
+              <set-header name="Access-Control-Allow-Methods" exists-action="override">
+                <value>GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD</value>
+              </set-header>
+              <set-header name="Access-Control-Allow-Headers" exists-action="override">
+                <value>*</value>
+              </set-header>
+              <set-header name="Access-Control-Max-Age" exists-action="override">
+                <value>86400</value>
+              </set-header>
+              <set-header name="Vary" exists-action="append">
+                <value>Origin</value>
+              </set-header>
+            </return-response>
+          </when>
+        </choose>
       </inbound>
       <backend>
         <base />
       </backend>
       <outbound>
         <base />
+        <choose>
+          <when condition="@(
+            !string.IsNullOrEmpty((string)context.Variables[&quot;request-origin&quot;])
+            &amp;&amp; (
+              ((string)context.Variables[&quot;request-origin&quot;]).EndsWith(&quot;.azurestaticapps.net&quot;, StringComparison.OrdinalIgnoreCase)
+              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:3000&quot;, StringComparison.OrdinalIgnoreCase)
+              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:5173&quot;, StringComparison.OrdinalIgnoreCase)
+            )
+          )">
+            <set-header name="Access-Control-Allow-Origin" exists-action="override">
+              <value>@((string)context.Variables[&quot;request-origin&quot;])</value>
+            </set-header>
+            <set-header name="Vary" exists-action="append">
+              <value>Origin</value>
+            </set-header>
+          </when>
+        </choose>
       </outbound>
       <on-error>
         <base />
