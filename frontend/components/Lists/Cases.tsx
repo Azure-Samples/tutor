@@ -8,6 +8,33 @@ import CaseForm from "@/components/Forms/Cases";
 import StepsForm from "@/components/Forms/Steps";
 import ProfileForm from "@/components/Forms/Profile";
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const extractCasesFromPayload = (data: unknown): Case[] => {
+  if (Array.isArray(data)) {
+    return data as Case[];
+  }
+
+  if (isRecord(data) && Array.isArray((data as { result?: unknown }).result)) {
+    return (data as { result?: Case[] }).result ?? [];
+  }
+
+  return [];
+};
+
+const extractCaseFromPayload = (data: unknown): Case | null => {
+  const hasValidId = (value: unknown): value is Case =>
+    isRecord(value) && typeof value.id === "string" && value.id.trim().length > 0;
+
+  if (isRecord(data) && isRecord((data as { result?: unknown }).result)) {
+    const result = (data as { result?: unknown }).result;
+    return hasValidId(result) ? result : null;
+  }
+
+  return hasValidId(data) ? data : null;
+};
+
 const CasesList: React.FC = () => {
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +52,8 @@ const CasesList: React.FC = () => {
       setLoading(true);
       setLoadError(false);
       const res = await avatarEngine.get("/cases");
-      setCases(res.data.result || []);
+      const payload = extractCasesFromPayload(res.data);
+      setCases(payload);
     } catch (error) {
       console.error("Error fetching cases:", error);
       setCases([]);
@@ -56,11 +84,18 @@ const CasesList: React.FC = () => {
   const handleEditClick = async (id?: string) => {
     if (!id) return;
     setModalLoading(true);
+    setSelectedCase(null);
     closeAllModals();
     setShowEditModal(true);
-    const res = await avatarEngine.get(`/cases/${id}`);
-    setSelectedCase(res.data.result);
-    setModalLoading(false);
+    try {
+      const res = await avatarEngine.get(`/cases/${id}`);
+      setSelectedCase(extractCaseFromPayload(res.data));
+    } catch (error) {
+      console.error("Error fetching case details for edit:", error);
+      setSelectedCase(null);
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   const handleProfileClick = async (id?: string) => {
@@ -68,9 +103,15 @@ const CasesList: React.FC = () => {
     setModalLoading(true);
     closeAllModals();
     setShowProfileModal(true);
-    const res = await avatarEngine.get(`/cases/${id}`);
-    setSelectedCase(res.data.result);
-    setModalLoading(false);
+    try {
+      const res = await avatarEngine.get(`/cases/${id}`);
+      setSelectedCase(extractCaseFromPayload(res.data));
+    } catch (error) {
+      console.error("Error fetching case details for profile:", error);
+      setSelectedCase(null);
+    } finally {
+      setModalLoading(false);
+    }
   };
 
   const handleDeleteClick = (c: Case) => {
@@ -180,13 +221,23 @@ const CasesList: React.FC = () => {
         )}
       </FormsModal>
       <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Case">
-        <CaseForm
-          caseData={selectedCase!}
-          onSuccess={() => {
-            closeAllModals();
-            fetchCases();
-          }}
-        />
+        {modalLoading ? (
+          <div className="flex justify-center items-center h-40">
+            <span className="text-lg text-gray-500">Loading...</span>
+          </div>
+        ) : selectedCase ? (
+          <CaseForm
+            caseData={selectedCase}
+            onSuccess={() => {
+              closeAllModals();
+              fetchCases();
+            }}
+          />
+        ) : (
+          <div className="flex justify-center items-center h-40">
+            <span className="text-lg text-gray-500">Unable to load case details for editing.</span>
+          </div>
+        )}
       </FormsModal>
       <FormsModal open={showProfileModal && !showCreateModal && !showStepsModal && !showEditModal && !showDeleteModal} onClose={closeAllModals} title="Case Profile">
         {modalLoading ? (

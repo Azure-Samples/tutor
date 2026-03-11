@@ -50,7 +50,15 @@ const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () =>
     e.preventDefault();
     setStatus("Saving...");
     try {
-      const assemblyId = form.id?.trim() || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `asm-${Date.now()}`);
+      const trimmedId = form.id?.trim();
+      const assemblyId = isEdit
+        ? (trimmedId || assemblyData?.id || "")
+        : (trimmedId || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `asm-${Date.now()}`));
+
+      if (isEdit && !assemblyId) {
+        throw new Error("Missing assembly id for update.");
+      }
+
       const agents = form.agents.map((a) => ({
         ...(a.agent_id ? { agent_id: a.agent_id } : {}),
         name: a.name,
@@ -64,7 +72,9 @@ const AssemblyForm: React.FC<{ assemblyData?: UnifiedAssembly; onSuccess?: () =>
       let res;
       if (form.service === "essays") {
         const payload = { id: assemblyId, topic_name: form.topic_name, essay_id: form.essay_id || "", agents };
-        res = await essaysEngine.post("/assemblies", payload);
+        res = isEdit
+          ? await essaysEngine.put(`/assemblies/${assemblyId}`, payload)
+          : await essaysEngine.post("/assemblies", payload);
       } else {
         const payload = { id: assemblyId, topic_name: form.topic_name, agents };
         if (isEdit) {

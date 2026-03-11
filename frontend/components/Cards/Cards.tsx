@@ -1,11 +1,21 @@
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { webApp, transcriptionApi } from "@/utils/api";
 import { Manager } from "@/types/manager";
 import { Specialist } from "@/types/specialist";
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const extractManagerFromPayload = (data: unknown): Manager | null => {
+  if (isRecord(data) && isRecord((data as { result?: unknown }).result)) {
+    return (data as { result?: Manager }).result ?? null;
+  }
+
+  return isRecord(data) ? (data as Manager) : null;
+};
 
 const CardLayout = () => {
   const [managers, setManagers] = useState<Manager[]>([]);
@@ -19,7 +29,13 @@ const CardLayout = () => {
       try {
         const response = await webApp.get("/managers-names");
         if (response.status === 200) {
-          setManagers(response?.data?.detail?.managers);
+          const detail = isRecord(response.data) && isRecord((response.data as { detail?: unknown }).detail)
+            ? (response.data as { detail: Record<string, unknown> }).detail
+            : null;
+          const managers = detail && Array.isArray(detail.managers)
+            ? (detail.managers as Manager[])
+            : [];
+          setManagers(managers);
         } else {
           console.error("Failed to fetch managers:", response.statusText);
         }
@@ -34,12 +50,18 @@ const CardLayout = () => {
     setLoading(true);
     try {
       const response = await transcriptionApi.get(`/transcription-data?manager=${encodeURIComponent(managerName)}`);
-      const managerData = response.data.result;
+      const resolvedManagerData = extractManagerFromPayload(response.data);
       
-      if (managerData) {
+      if (resolvedManagerData) {
+        const assistantCandidates = Array.isArray(resolvedManagerData.assistants)
+          ? resolvedManagerData.assistants
+          : Array.isArray(resolvedManagerData.specialists)
+            ? resolvedManagerData.specialists
+            : [];
+
         setSelectedManager({
-          ...managerData,
-          specialists: managerData.assistants.map((specialist: Specialist) => ({
+          ...resolvedManagerData,
+          specialists: assistantCandidates.map((specialist: Specialist) => ({
             ...specialist,
             image: "/images/users/user-02.png",
           })),

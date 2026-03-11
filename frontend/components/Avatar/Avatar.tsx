@@ -23,6 +23,21 @@ type AvatarConfig = {
   videoFormat: SpeechSDK.AvatarVideoFormat;
 };
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const extractCasesFromPayload = (data: unknown): Case[] => {
+  if (Array.isArray(data)) {
+    return data as Case[];
+  }
+
+  if (isRecord(data) && Array.isArray((data as { result?: unknown }).result)) {
+    return (data as { result?: Case[] }).result ?? [];
+  }
+
+  return [];
+};
+
 class AvatarHandler {
   public speechConfig!: SpeechSDK.SpeechConfig;
   private avatarConfig: SpeechSDK.AvatarConfig;
@@ -273,7 +288,7 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
       try {
         const response = await avatarEngine.get("/cases");
         if (response.status === 200) {
-          const cases = response.data.result || [];
+          const cases = extractCasesFromPayload(response.data);
           setAvailableCases(cases);
           if (initialCaseId) {
             const found = cases.find((item: Case) => item.id === initialCaseId);
