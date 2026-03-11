@@ -30,6 +30,8 @@ locals {
   service_name = "avatar"
 }
 
+# No-op change to trigger service-edge stack reconciliation in CI.
+
 module "service_edge" {
   source = "../../../modules/service-edge-apim"
 
