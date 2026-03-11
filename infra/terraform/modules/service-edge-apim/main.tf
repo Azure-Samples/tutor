@@ -60,20 +60,25 @@ resource "azurerm_api_management_api_policy" "service" {
       <inbound>
         <base />
         <set-variable name="request-origin" value="@(context.Request.Headers.GetValueOrDefault(&quot;Origin&quot;, &quot;&quot;))" />
+        <set-variable name="allowed-origin" value="@(
+          !string.IsNullOrEmpty((string)context.Variables[&quot;request-origin&quot;])
+          &amp;&amp; (
+            ((string)context.Variables[&quot;request-origin&quot;]).EndsWith(&quot;.azurestaticapps.net&quot;, StringComparison.OrdinalIgnoreCase)
+            || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:3000&quot;, StringComparison.OrdinalIgnoreCase)
+            || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:5173&quot;, StringComparison.OrdinalIgnoreCase)
+          )
+          ? (string)context.Variables[&quot;request-origin&quot;]
+          : &quot;&quot;
+        )" />
         <choose>
           <when condition="@(
             context.Request.Method == &quot;OPTIONS&quot;
-            &amp;&amp; !string.IsNullOrEmpty((string)context.Variables[&quot;request-origin&quot;])
-            &amp;&amp; (
-              ((string)context.Variables[&quot;request-origin&quot;]).EndsWith(&quot;.azurestaticapps.net&quot;, StringComparison.OrdinalIgnoreCase)
-              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:3000&quot;, StringComparison.OrdinalIgnoreCase)
-              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:5173&quot;, StringComparison.OrdinalIgnoreCase)
-            )
+            &amp;&amp; !string.IsNullOrEmpty((string)context.Variables[&quot;allowed-origin&quot;])
           )">
             <return-response>
               <set-status code="204" reason="No Content" />
               <set-header name="Access-Control-Allow-Origin" exists-action="override">
-                <value>@((string)context.Variables[&quot;request-origin&quot;])</value>
+                <value>@((string)context.Variables[&quot;allowed-origin&quot;])</value>
               </set-header>
               <set-header name="Access-Control-Allow-Methods" exists-action="override">
                 <value>GET,POST,PUT,PATCH,DELETE,OPTIONS,HEAD</value>
@@ -97,16 +102,9 @@ resource "azurerm_api_management_api_policy" "service" {
       <outbound>
         <base />
         <choose>
-          <when condition="@(
-            !string.IsNullOrEmpty((string)context.Variables[&quot;request-origin&quot;])
-            &amp;&amp; (
-              ((string)context.Variables[&quot;request-origin&quot;]).EndsWith(&quot;.azurestaticapps.net&quot;, StringComparison.OrdinalIgnoreCase)
-              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:3000&quot;, StringComparison.OrdinalIgnoreCase)
-              || ((string)context.Variables[&quot;request-origin&quot;]).Equals(&quot;http://localhost:5173&quot;, StringComparison.OrdinalIgnoreCase)
-            )
-          )">
+          <when condition="@(!string.IsNullOrEmpty((string)context.Variables[&quot;allowed-origin&quot;]))">
             <set-header name="Access-Control-Allow-Origin" exists-action="override">
-              <value>@((string)context.Variables[&quot;request-origin&quot;])</value>
+              <value>@((string)context.Variables[&quot;allowed-origin&quot;])</value>
             </set-header>
             <set-header name="Vary" exists-action="append">
               <value>Origin</value>
@@ -116,6 +114,16 @@ resource "azurerm_api_management_api_policy" "service" {
       </outbound>
       <on-error>
         <base />
+        <choose>
+          <when condition="@(!string.IsNullOrEmpty((string)context.Variables.GetValueOrDefault(&quot;allowed-origin&quot;, &quot;&quot;)))">
+            <set-header name="Access-Control-Allow-Origin" exists-action="override">
+              <value>@((string)context.Variables[&quot;allowed-origin&quot;])</value>
+            </set-header>
+            <set-header name="Vary" exists-action="append">
+              <value>Origin</value>
+            </set-header>
+          </when>
+        </choose>
       </on-error>
     </policies>
   XML
