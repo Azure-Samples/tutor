@@ -1,5 +1,7 @@
 # Tutor Questions Backend
 
+<!-- CI trigger: redeploy questions service -->
+
 This service provides the question-answering and evaluation engine for The Tutor platform.
 
 ## Objective

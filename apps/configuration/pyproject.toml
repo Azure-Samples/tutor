@@ -1,4 +1,5 @@
 [project]
+# CI trigger: redeploy configuration service
 name = "tutor"
 version = "0.2.0"
 description = "Modernized tutoring platform backends and services"
