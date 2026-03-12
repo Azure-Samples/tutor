@@ -759,11 +759,22 @@ jobs:
             fi
 
             set +e
-            provision_output="$(azd provision --no-prompt --debug 2>&1)"
+            provision_log="azd-provision-attempt-${attempt}.log"
+            timeout --signal=TERM --kill-after=2m 45m azd provision --no-prompt --debug >"$provision_log" 2>&1 &
+            provision_pid=$!
+
+            while kill -0 "$provision_pid" 2>/dev/null; do
+              echo "Provision attempt $attempt/$max_attempts is still running..."
+              tail -n 20 "$provision_log" 2>/dev/null || true
+              sleep 30
+            done
+
+            wait "$provision_pid"
             provision_exit=$?
             set -e
 
-            echo "$provision_output"
+            echo "===== azd provision output (attempt $attempt/$max_attempts) ====="
+            tail -n 400 "$provision_log" || true
 
             if [ "$provision_exit" -eq 0 ]; then
               echo "Provision succeeded on attempt $attempt"
@@ -775,7 +786,9 @@ jobs:
               exit 1
             fi
 
-            if ! echo "$provision_output" | grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired|AuthorizationFailure|Failed to get existing workspaces|listing blobs|terraform init failed'; then
+            if [ "$provision_exit" -eq 124 ]; then
+              echo "Provision attempt timed out after 45 minutes; treating as transient and retrying."
+            elif ! grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired|AuthorizationFailure|Failed to get existing workspaces|listing blobs|terraform init failed' "$provision_log"; then
               echo "Provision failed with a non-transient error; not retrying further."
               exit "$provision_exit"
             fi
