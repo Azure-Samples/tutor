@@ -3,6 +3,7 @@ name: Azure Deploy (azd)
 on:
   workflow_dispatch:
     inputs:
+      release_tier:
         description: "Release tier to deploy"
         required: false
         default: "auto"
@@ -223,8 +224,6 @@ jobs:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
-      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
       TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
