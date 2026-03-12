@@ -325,8 +325,27 @@ jobs:
           RG_NAME="tutor-${AZURE_ENV_NAME}"
           ACA_NAME="tutor-${AZURE_ENV_NAME}-acae"
 
-          if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
-            aca_state="$(az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+          check_aca_exists() {
+            if timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
+              return 0
+            fi
+
+            local status=$?
+            if [ "$status" -eq 124 ]; then
+              echo "Timed out while checking ACA environment ${ACA_NAME}."
+            fi
+            return "$status"
+          }
+
+          check_aca_exists
+          aca_exists_status=$?
+
+          if [ "$aca_exists_status" -eq 0 ]; then
+            aca_state="$(timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+            if [ -z "$aca_state" ]; then
+              echo "Unable to retrieve ACA environment provisioning state for ${ACA_NAME}; aborting."
+              exit 1
+            fi
 
             if [ "$aca_state" = "Succeeded" ]; then
               echo "Detected healthy ACA environment ${ACA_NAME}; Terraform will reference it."
@@ -337,24 +356,38 @@ jobs:
             else
               echo "Detected ACA environment ${ACA_NAME} with provisioningState='${aca_state:-unknown}'."
               echo "Deleting failed/unhealthy ACA environment so Terraform can recreate it cleanly."
-              az containerapp env delete --resource-group "$RG_NAME" --name "$ACA_NAME" --yes
+              timeout 60s az containerapp env delete --resource-group "$RG_NAME" --name "$ACA_NAME" --yes --no-wait
 
               max_wait_attempts=30
               wait_attempt=1
               while [ "$wait_attempt" -le "$max_wait_attempts" ]; do
-                if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
+                check_aca_exists
+                aca_exists_status=$?
+
+                if [ "$aca_exists_status" -eq 0 ]; then
                   echo "Waiting for ACA environment deletion (${wait_attempt}/${max_wait_attempts})..."
                   sleep 20
                   wait_attempt=$((wait_attempt + 1))
                   continue
                 fi
 
+                if [ "$aca_exists_status" -eq 124 ]; then
+                  echo "Timed out while waiting for ACA environment deletion."
+                  exit 1
+                fi
+
                 echo "Failed/unhealthy ACA environment removed. Terraform will create a new managed environment."
                 break
               done
 
-              if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
+              check_aca_exists
+              aca_exists_status=$?
+              if [ "$aca_exists_status" -eq 0 ]; then
                 echo "ACA environment ${ACA_NAME} still exists after waiting for deletion; aborting deployment."
+                exit 1
+              fi
+              if [ "$aca_exists_status" -eq 124 ]; then
+                echo "Timed out while performing final ACA existence check; aborting deployment."
                 exit 1
               fi
 
@@ -363,6 +396,9 @@ jobs:
               azd env set TF_VAR_existing_container_app_environment_name ""
               azd env set TF_VAR_reuse_existing_container_app_environment "false"
             fi
+          elif [ "$aca_exists_status" -eq 124 ]; then
+            echo "Timed out while querying ACA environment ${ACA_NAME}; aborting deployment."
+            exit 1
           else
             echo "No existing ACA environment detected; Terraform will create managed environment ${ACA_NAME}."
             echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
