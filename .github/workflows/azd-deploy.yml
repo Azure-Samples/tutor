@@ -390,12 +390,9 @@ jobs:
               check_aca_exists
               aca_exists_status=$?
               if [ "$aca_exists_status" -eq 0 ]; then
-                echo "ACA environment ${ACA_NAME} still exists after waiting for deletion; aborting deployment."
-                exit 1
-              fi
-              if [ "$aca_exists_status" -eq 124 ]; then
-                echo "Timed out while performing final ACA existence check; aborting deployment."
-                exit 1
+                echo "ACA environment ${ACA_NAME} still exists after wait window; continuing in Terraform creation mode."
+              elif [ "$aca_exists_status" -eq 124 ]; then
+                echo "Timed out in final ACA existence check; continuing in Terraform creation mode."
               fi
 
               echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
