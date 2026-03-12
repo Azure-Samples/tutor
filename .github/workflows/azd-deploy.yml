@@ -310,7 +310,9 @@ jobs:
           azd env set RS_RESOURCE_GROUP "$TFSTATE_RESOURCE_GROUP"
           azd env set RS_STORAGE_ACCOUNT "$TFSTATE_STORAGE_ACCOUNT"
           azd env set RS_CONTAINER_NAME "$TFSTATE_CONTAINER"
-          if [ -z "$TFSTATE_KEY" ]; then
+          if [ "$AZURE_ENV_NAME" != "prod" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          elif [ -z "$TFSTATE_KEY" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
@@ -435,7 +437,9 @@ jobs:
           : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
-          if [ -z "$TFSTATE_KEY" ]; then
+          if [ "$AZURE_ENV_NAME" != "prod" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          elif [ -z "$TFSTATE_KEY" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
           cat > infra/terraform/backend.hcl <<EOF
@@ -571,7 +575,9 @@ jobs:
           : "${RS_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${RS_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${RS_CONTAINER_NAME:?Missing secret TERRAFORM_STATE_CONTAINER}"
-          if [ -z "${RS_KEY:-}" ]; then
+          if [ "$AZURE_ENV_NAME" != "prod" ]; then
+            RS_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          elif [ -z "${RS_KEY:-}" ]; then
             RS_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
           export RS_KEY
@@ -852,7 +858,9 @@ jobs:
           azd env set RS_RESOURCE_GROUP "$TFSTATE_RESOURCE_GROUP"
           azd env set RS_STORAGE_ACCOUNT "$TFSTATE_STORAGE_ACCOUNT"
           azd env set RS_CONTAINER_NAME "$TFSTATE_CONTAINER"
-          if [ -z "$TFSTATE_KEY" ]; then
+          if [ "$AZURE_ENV_NAME" != "prod" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          elif [ -z "$TFSTATE_KEY" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
