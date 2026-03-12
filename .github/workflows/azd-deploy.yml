@@ -227,7 +227,7 @@ jobs:
       ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
       TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
-      TF_VAR_existing_container_app_environment_name: ${{ needs.resolve-release.outputs.aca_environment_name }}
+      TF_VAR_existing_container_app_environment_name: ${{ needs.resolve-release.outputs.release_tier == 'prod' && needs.resolve-release.outputs.aca_environment_name || '' }}
 
     steps:
       - name: Checkout
