@@ -171,6 +171,12 @@ variable "existing_container_app_environment_name" {
   default     = ""
 }
 
+variable "reuse_existing_container_app_environment" {
+  description = "Whether Terraform should reuse an existing Container Apps Environment instead of creating one."
+  type        = bool
+  default     = false
+}
+
 variable "aca_vnet_integration_enabled" {
   description = "Whether the ACA environment is integrated with a VNet that can privately reach Cosmos DB."
   type        = bool
