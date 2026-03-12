@@ -71,13 +71,14 @@ const HomePage = () => {
           <Link
             key={func.title}
             href={func.href}
-            className="flex flex-col items-center p-8 bg-gradient-to-br from-blue-50 to-green-50 hover:from-cyan-100 hover:to-green-100 shadow-xl rounded-2xl transition-transform duration-200 cursor-pointer text-center border-2 border-cyan-200 hover:border-green-300 dark:bg-gradient-to-br dark:from-blue-900 dark:to-green-900 dark:hover:from-cyan-800 dark:hover:to-green-800 hover:scale-105"
+            aria-label={`Open ${func.title}`}
+            className="flex min-h-56 flex-col items-center p-8 bg-gradient-to-br from-blue-50 to-green-50 hover:from-cyan-100 hover:to-green-100 shadow-xl rounded-2xl transition-transform duration-200 cursor-pointer text-center border-2 border-cyan-200 hover:border-green-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:bg-gradient-to-br dark:from-blue-900 dark:to-green-900 dark:hover:from-cyan-800 dark:hover:to-green-800 hover:scale-105"
           >
             <Image
               width={120}
               height={120}
               src={func.icon}
-              alt={func.title}
+              alt={`${func.title} feature`}
               className="mb-4 rounded-full border-2 border-cyan-300 shadow bg-white"
             />
             <h3 className="text-xl font-extrabold text-blue-700 dark:text-cyan-200 mb-2">{func.title}</h3>

@@ -7,6 +7,7 @@ from dataclasses import asdict
 from functools import lru_cache
 from typing import Any
 
+from azure.cosmos import exceptions as cosmos_exceptions
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -89,7 +90,7 @@ async def _resolve_question_id(crud: CosmosCRUD, key: str) -> str:
     try:
         await crud.read_item(key)
         return key
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         items = await crud.list_items()
         match = next((item for item in items if item.get("topic") == key and item.get("id")), None)
         if not match:
@@ -156,7 +157,7 @@ async def update_question(question_id: str, question: Question) -> JSONResponse:
 
     try:
         existing = await crud.read_item(resolved_id)
-    except Exception as exc:  # pragma: no cover - defensive logging
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error reading question %s", question_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found") from exc
     merged = {**existing, **question.model_dump(), "id": resolved_id}
@@ -169,7 +170,7 @@ async def delete_question(question_id: str) -> JSONResponse:
     resolved_id = await _resolve_question_id(_crud(settings.cosmos.question_container), question_id)
     try:
         await _crud(settings.cosmos.question_container).delete_item(resolved_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error deleting question %s", question_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found") from exc
     return _success("Question Deleted", "Question removed", {"question_id": resolved_id})
@@ -192,7 +193,7 @@ async def update_answer(answer_id: str, answer: Answer) -> JSONResponse:
     crud = _crud(settings.cosmos.answer_container)
     try:
         existing = await crud.read_item(answer_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error reading answer %s", answer_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found") from exc
     merged = {**existing, **answer.model_dump()}
@@ -204,7 +205,7 @@ async def update_answer(answer_id: str, answer: Answer) -> JSONResponse:
 async def delete_answer(answer_id: str) -> JSONResponse:
     try:
         await _crud(settings.cosmos.answer_container).delete_item(answer_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error deleting answer %s", answer_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found") from exc
     return _success("Answer Deleted", "Answer removed", {"answer_id": answer_id})
@@ -227,7 +228,7 @@ async def update_grader(grader_id: str, grader: Grader) -> JSONResponse:
     crud = _crud(settings.cosmos.grader_container)
     try:
         existing = await crud.read_item(grader_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error reading grader %s", grader_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grader not found") from exc
     merged = {**existing, **grader.model_dump()}
@@ -239,7 +240,7 @@ async def update_grader(grader_id: str, grader: Grader) -> JSONResponse:
 async def delete_grader(grader_id: str) -> JSONResponse:
     try:
         await _crud(settings.cosmos.grader_container).delete_item(grader_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error deleting grader %s", grader_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grader not found") from exc
     return _success("Grader Deleted", "Grader removed", {"grader_id": grader_id})
@@ -282,7 +283,7 @@ async def update_assembly(assembly_id: str, definition: AssemblyDefinition) -> J
     crud = _crud(settings.cosmos.assembly_container)
     try:
         existing = await crud.read_item(assembly_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error reading assembly %s", assembly_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembly not found") from exc
     graders: list[Grader] = []
@@ -314,7 +315,7 @@ async def update_assembly(assembly_id: str, definition: AssemblyDefinition) -> J
 async def delete_assembly(assembly_id: str) -> JSONResponse:
     try:
         await _crud(settings.cosmos.assembly_container).delete_item(assembly_id)
-    except Exception as exc:  # pragma: no cover
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         logger.error("Error deleting assembly %s", assembly_id, exc_info=exc)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembly not found") from exc
     return _success("Assembly Deleted", "Assembly removed", {"assembly_id": assembly_id})

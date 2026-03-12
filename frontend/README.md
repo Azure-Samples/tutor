@@ -18,7 +18,14 @@ The frontend enables:
 - **Chat:** Ask questions and discuss topics with the AI.
 - **Essays:** Submit essays for detailed, multi-agent evaluation.
 - **Questions:** Answer objective questions and receive instant, multi-part feedback.
-- **Configuration:** Personalize your learning environment and manage settings.
+- **Configuration:** Personalize your learning environment and manage settings, including question administration pages for graders and answers.
+
+## Questions Administration Pages
+
+The configuration area now includes dedicated routes for question-evaluation entities:
+
+- `/configuration/questions/graders` — Manage grader definitions (`agent_id`, `dimension`, `deployment`)
+- `/configuration/questions/answers` — Manage answer records used in question evaluation flows
 
 ## Infrastructure Requirements
 

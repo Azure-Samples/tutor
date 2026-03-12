@@ -17,14 +17,14 @@ const Breadcrumb = ({ pageName, subtitle }: BreadcrumbProps) => {
           </p>
         )}
       </div>
-      <nav aria-label="Breadcrumb">
+      <nav aria-label="Breadcrumb trail">
         <ol className="flex items-center gap-2">
           <li>
             <Link className="font-medium text-kelly-green hover:underline transition-colors duration-200" href="/">
               Tutor /
             </Link>
           </li>
-          <li className="font-medium text-non-photo-blue">{pageName}</li>
+          <li aria-current="page" className="font-medium text-non-photo-blue">{pageName}</li>
         </ol>
       </nav>
     </div>

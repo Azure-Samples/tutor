@@ -6,10 +6,10 @@ This runbook describes how to provision and deploy Tutor with Azure Developer CL
 >
 > All deployments to Azure **MUST** be performed via GitHub Workflows. Direct `azd deploy`, `az containerapp update`, or manual Docker pushes to ACR are **prohibited** for production environments. The only authorized deployment paths are:
 >
-> | Workflow | Scope | Trigger |
-> |----------|-------|---------|
-> | `.github/workflows/azd-deploy.yml` | Infrastructure + 8 backend services (Container Apps) | Push to `main` or `workflow_dispatch` |
-> | `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` | Frontend (Static Web App) | Push to `main`, PR events, or `workflow_dispatch` |
+> Authorized workflows:
+>
+> - `.github/workflows/azd-deploy.yml` → Infrastructure + 8 backend services (Container Apps), triggered by push to `main`/`dev`/tags or `workflow_dispatch`.
+> - `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` → Frontend (Static Web App), triggered by push to `main`/`dev`/tags, PR events, or `workflow_dispatch`.
 >
 > **Why:** GitHub Workflows provide auditable, reproducible deployments with proper secret management via OIDC federation. Manual deployments bypass CI checks, status gates, and deployment traceability.
 >
@@ -31,14 +31,16 @@ Set these in repository or environment secrets:
 - `AZURE_SUBSCRIPTION_ID`
 - `NEXT_PUBLIC_APIM_BASE_URL` (used by Static Web Apps frontend build)
 
-## Workflow Defaults
+## Release Routing Policy
 
-Current workflow defaults in `.github/workflows/azd-deploy.yml`:
+Current release routing in `.github/workflows/azd-deploy.yml` and `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`:
 
-- `AZURE_ENV_NAME=prod`
-- `AZURE_LOCATION=eastus`
+- `prod` releases are allowed **only** from tags containing `stable`.
+- Any non-stable tag, branch push, or non-prod workflow dispatch routes to `dev`.
+- `prod` mode is strict (no fallback/remediation shortcuts).
+- `dev` mode allows controlled mitigation (fallback/remediation) while preserving private networking baselines.
 
-Adjust in the workflow file if your target environment differs.
+Default deployment region remains `eastus2`.
 
 ## First-Time Bootstrap (Local)
 
@@ -184,6 +186,28 @@ terraform plan
 ```
 
 - Use ACA revision rollback for affected service if needed.
+
+## Fast Environment Deprovision
+
+Use `scripts/deprovision-environment.ps1` to remove and prune one environment quickly.
+
+Dry-run:
+
+```pwsh
+pwsh ./scripts/deprovision-environment.ps1 -Environment dev
+```
+
+Execute deletion:
+
+```pwsh
+pwsh ./scripts/deprovision-environment.ps1 -Environment dev -Execute -WaitForDelete -ConfirmResourceGroup tutor-dev
+```
+
+Execute deletion + prune environment-specific ACR repositories:
+
+```pwsh
+pwsh ./scripts/deprovision-environment.ps1 -Environment dev -Execute -PruneAcrImages -WaitForDelete -ConfirmResourceGroup tutor-dev
+```
 
 ## Incident Notes Template
 

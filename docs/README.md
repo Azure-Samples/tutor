@@ -17,6 +17,7 @@
 | [Infrastructure](./infrastructure.md) | Azure Developer CLI (azd) + Terraform with Azure Verified Modules — cloud-only |
 | [Local Development](./local-development.md) | Run services locally against cloud backends for sampling & testing |
 | [Runbooks](./runbooks/azd-deployment.md) | Operational runbooks for deployment and support |
+| [Reviewer Checklist](./runbooks/reviewer-checklist.md) | Fine-grained PR review checklist for compatibility, quality, and merge safety |
 
 ## Quick Links
 

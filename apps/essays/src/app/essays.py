@@ -12,13 +12,12 @@ from typing import Any, Iterable, Sequence
 import jinja2
 
 from azure.cosmos import exceptions
-from azure.cosmos.aio import CosmosClient
-from azure.identity.aio import DefaultAzureCredential
 
 from tutor_lib.agents import AgentAttachment, FoundryAgentService
 from app.config import get_settings
 from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text, extract_text_with_doc_intelligence
 from app.schemas import Essay, AgentRef, Resource, Assembly
+from tutor_lib.cosmos import AssemblyRepository
 
 from pypdf.errors import PdfReadError
 
@@ -162,10 +161,7 @@ class EssayOrchestrator:
         prompt_dir = Path(__file__).parent / "prompts"
         self._composer = PromptComposer(prompt_dir)
         self._agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)  # pylint: disable=no-member
-        self._cosmos_endpoint = settings.cosmos.endpoint  # pylint: disable=no-member
-        self._database_name = settings.cosmos.database  # pylint: disable=no-member
-        self._assembly_container = settings.cosmos.assembly_container  # pylint: disable=no-member
-        self._credential = DefaultAzureCredential()
+        self._assembly_repository = AssemblyRepository(settings.cosmos)
         self._strategies: dict[EssayStrategyType, EssayEvaluationStrategy] = {
             EssayStrategyType.ANALYTICAL: AnalyticalEssayStrategy(
                 self._agent_service, self._composer
@@ -187,18 +183,11 @@ class EssayOrchestrator:
         return await strategy.evaluate(agent, essay, prepared_resources)
 
     async def _load_assembly(self, assembly_id: str, fallback_essay_id: str | None = None) -> Assembly:
-        async with CosmosClient(self._cosmos_endpoint, self._credential) as client:
-            database = client.get_database_client(self._database_name)
-            try:
-                await database.read()
-            except exceptions.CosmosResourceNotFoundError as exc:  # pragma: no cover - configuration error
-                raise ValueError(f"Database not found: {self._database_name}") from exc
+        try:
+            record = await self._assembly_repository.get_by_id(assembly_id)
+        except exceptions.CosmosResourceNotFoundError as exc:
+            raise ValueError(f"Assembly not found: {assembly_id}") from exc
 
-            container = database.get_container_client(self._assembly_container)
-            try:
-                record = await container.read_item(item=assembly_id, partition_key=assembly_id)
-            except exceptions.CosmosResourceNotFoundError as exc:
-                raise ValueError(f"Assembly not found: {assembly_id}") from exc
         agents = await self._hydrate_agents(record.get("agents", []))
         if not agents:
             raise ValueError(f"Assembly '{assembly_id}' is missing provisioned agents")

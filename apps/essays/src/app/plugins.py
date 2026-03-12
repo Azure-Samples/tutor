@@ -12,8 +12,8 @@ from io import BytesIO
 from typing import Any, Optional, Union
 
 import requests
+import agent_framework as _af
 from PIL import Image
-from agent_framework import ai_function
 from agent_framework_azure_ai import AgentToolkit
 from azure.ai.vision.imageanalysis import ImageAnalysisClient, VisualFeatures
 from azure.core.credentials import AzureKeyCredential
@@ -21,6 +21,13 @@ from azure.cosmos.aio import CosmosClient
 
 
 logger = logging.getLogger(__name__)
+ai_function = getattr(_af, "tool", getattr(_af, "ai_function", None))
+
+if ai_function is None:
+    raise RuntimeError(
+        "The installed agent-framework package does not export tool/ai_function. "
+        "Install a compatible agent-framework version."
+    )
 
 __all__ = ["VisionSettings", "VisionToolkit", "build_vision_toolkit"]
 

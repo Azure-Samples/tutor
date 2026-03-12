@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
+from tutor_lib.config import TutorSettings, get_settings as get_shared_settings
 
 
 load_dotenv()
@@ -53,9 +54,9 @@ class AvatarSpeechSettings(BaseSettings):
 class AvatarSettings(BaseSettings):
     """Service-scoped settings assembled from environment variables."""
 
-    cosmos: AvatarCosmosSettings = Field(default_factory=AvatarCosmosSettings)  # type: ignore[arg-type]
-    azure_ai: AvatarAISettings = Field(default_factory=AvatarAISettings)  # type: ignore[arg-type]
-    speech: AvatarSpeechSettings = Field(default_factory=AvatarSpeechSettings)  # type: ignore[arg-type]
+    cosmos: AvatarCosmosSettings
+    azure_ai: AvatarAISettings
+    speech: AvatarSpeechSettings | None = None
     cors_origins: Iterable[str] = Field(default_factory=lambda: ["*"])
 
     model_config = {
@@ -69,4 +70,28 @@ class AvatarSettings(BaseSettings):
 def get_settings() -> AvatarSettings:
     """Return cached settings instance to avoid repeated environment parsing."""
 
-    return AvatarSettings()  # type: ignore[call-arg]
+    shared: TutorSettings = get_shared_settings()
+
+    speech_resource_id = os.getenv("SPEECH_RESOURCE_ID", "").strip()
+    speech_region = os.getenv("SPEECH_REGION", "").strip()
+    speech: AvatarSpeechSettings | None = None
+    if speech_resource_id and speech_region:
+        speech = AvatarSpeechSettings(
+            SPEECH_RESOURCE_ID=speech_resource_id,
+            SPEECH_REGION=speech_region,
+        )
+
+    return AvatarSettings(
+        cosmos=AvatarCosmosSettings(
+            COSMOS_ENDPOINT=shared.cosmos.endpoint,
+            COSMOS_DATABASE=shared.cosmos.database,
+            COSMOS_AVATAR_CASE_TABLE=shared.cosmos.avatar_case_container,
+        ),
+        azure_ai=AvatarAISettings(
+            PROJECT_ENDPOINT=shared.azure_ai.project_endpoint,
+            MODEL_DEPLOYMENT_NAME=shared.azure_ai.default_deployment,
+            AVATAR_TEMPERATURE=float(os.getenv("AVATAR_TEMPERATURE", "0.6")),
+        ),
+        speech=speech,
+        cors_origins=shared.cors_origins,
+    )

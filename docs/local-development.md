@@ -177,6 +177,18 @@ cp .env.example .env
 
 </details>
 
+<details>
+<summary><strong>avatar</strong> — Speech session token brokering</summary>
+
+| Variable | Notes |
+|----------|-------|
+| `SPEECH_RESOURCE_ID` | Azure Speech resource ARM ID used to build AAD token (`aad#<resourceId>#<token>`) |
+| `SPEECH_REGION` | Azure Speech region used by relay token endpoint |
+
+If these variables are not set, `/speech/session-token` will return service-unavailable.
+
+</details>
+
 ### 4.4 — Disable Authentication for Local Testing
 
 By default authentication is **disabled** (`ENTRA_AUTH_ENABLED=false`). This is the recommended setting for local development and sampling. When enabled, all API calls require a valid Entra ID JWT.

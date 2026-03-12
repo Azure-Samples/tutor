@@ -5,13 +5,13 @@ import ChatCard from "@/components/Chat/ChatCard";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Avaliação de Trascrições | Gerentes",
-  description: "Página de Avaliação de Transcrições",
+  title: "Chat | Tutor",
+  description: "Chat with your data, ask questions, and get clear, supportive answers.",
 };
 
 const TablesPage = () => {
   return (
-    <DefaultLayout>
+    <DefaultLayout metadata={metadata}>
       <Breadcrumb pageName="Converse com seus Dados" subtitle="Chat with your data, ask questions, and get clear, supportive answers. Your curiosity is welcome here!" />
       <ChatCard />
     </DefaultLayout>

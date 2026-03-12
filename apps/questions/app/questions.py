@@ -9,11 +9,10 @@ from typing import Iterable, Protocol
 import jinja2
 
 from azure.cosmos import exceptions
-from azure.cosmos.aio import CosmosClient
-from azure.identity.aio import DefaultAzureCredential
 
 from tutor_lib.agents import FoundryAgentService
 from tutor_lib.config import get_settings
+from tutor_lib.cosmos import AssemblyRepository
 
 from app.interfaces import DimensionEvaluation, QuestionEvaluationResult, QuestionEvaluationStatus
 from app.schemas import Answer, Assembly, Grader, Question
@@ -101,6 +100,7 @@ class QuestionStateMachine:
         self.question = question
         self.answer = answer
         self.agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
+        self._assembly_repository = AssemblyRepository(settings.cosmos)
         self.prompt_composer = PromptComposer(Path(__file__).parent / "prompts")
         self.graders: list[Grader] = []
         self._result: QuestionEvaluationResult | None = None
@@ -115,33 +115,26 @@ class QuestionStateMachine:
     async def ensure_assembly(self) -> None:
         if self.graders:
             return
-        async with DefaultAzureCredential() as credential:
-            async with CosmosClient(self._settings.cosmos.endpoint, credential) as client:
-                database = client.get_database_client(self._settings.cosmos.database)
-                try:
-                    await database.read()
-                except exceptions.CosmosResourceNotFoundError as exc:  # pragma: no cover
-                    raise ValueError(f"Database not found: {self._settings.cosmos.database}") from exc
-                container = database.get_container_client(self._settings.cosmos.assembly_container)
-                try:
-                    item = await container.read_item(item=self._assembly_id, partition_key=self._assembly_id)
-                except exceptions.CosmosResourceNotFoundError as exc:  # pragma: no cover
-                    raise ValueError(f"Assembly not found: {self._assembly_id}") from exc
-                raw_agents = item.get("agents") or item.get("avatars", [])
-                graders: list[Grader] = []
-                for entry in raw_agents:
-                    if isinstance(entry, dict):
-                        if "agent_id" in entry:
-                            graders.append(Grader.model_validate(entry))
-                        elif "id" in entry:
-                            graders.append(Grader(
-                                agent_id=str(entry["id"]),
-                                dimension=entry.get("dimension", ""),
-                                deployment=entry.get("deployment", ""),
-                            ))
-                if not graders:
-                    raise ValueError(f"Assembly '{self._assembly_id}' has no graders")
-                self.graders = graders
+        try:
+            item = await self._assembly_repository.get_by_id(self._assembly_id)
+        except exceptions.CosmosResourceNotFoundError as exc:  # pragma: no cover
+            raise ValueError(f"Assembly not found: {self._assembly_id}") from exc
+
+        raw_agents = item.get("agents") or item.get("avatars", [])
+        graders: list[Grader] = []
+        for entry in raw_agents:
+            if isinstance(entry, dict):
+                if "agent_id" in entry:
+                    graders.append(Grader.model_validate(entry))
+                elif "id" in entry:
+                    graders.append(Grader(
+                        agent_id=str(entry["id"]),
+                        dimension=entry.get("dimension", ""),
+                        deployment=entry.get("deployment", ""),
+                    ))
+        if not graders:
+            raise ValueError(f"Assembly '{self._assembly_id}' has no graders")
+        self.graders = graders
 
 
 async def evaluate_question(assembly_id: str, question: Question, answer: Answer) -> QuestionEvaluationResult:

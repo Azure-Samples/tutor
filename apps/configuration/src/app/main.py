@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Any
 from uuid import uuid4
 
+from azure.cosmos import exceptions as cosmos_exceptions
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -203,7 +204,7 @@ async def create_theme(theme: ThemeInput, _: str = Depends(require_professor)) -
 async def get_theme(theme_id: str, _: str = Depends(require_professor)) -> JSONResponse:
     try:
         item = await _crud(settings.cosmos.configuration_container).read_item(theme_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found") from exc
 
     if item.get("kind") != THEME_KIND:
@@ -217,7 +218,7 @@ async def update_theme(theme_id: str, theme: ThemeInput, _: str = Depends(requir
     crud = _crud(settings.cosmos.configuration_container)
     try:
         existing = await crud.read_item(theme_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found") from exc
 
     if existing.get("kind") != THEME_KIND:
@@ -233,7 +234,7 @@ async def delete_theme(theme_id: str, _: str = Depends(require_professor)) -> JS
     crud = _crud(settings.cosmos.configuration_container)
     try:
         existing = await crud.read_item(theme_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Theme not found") from exc
 
     if existing.get("kind") != THEME_KIND:
@@ -252,7 +253,7 @@ async def assign_cases_to_group(
     crud = _crud(settings.cosmos.group_container)
     try:
         group = await crud.read_item(group_id)
-    except Exception as exc:  # noqa: BLE001 - surface 404 for missing groups
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found") from exc
 
     group["assigned_case_ids"] = assignment.case_ids

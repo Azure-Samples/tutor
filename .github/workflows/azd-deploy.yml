@@ -2,9 +2,22 @@ name: Azure Deploy (azd)
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tier:
+        description: "Release tier to deploy"
+        required: false
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - dev
+          - prod
   push:
     branches:
       - main
+      - dev
+    tags:
+      - "*"
     paths:
       - "azure.yaml"
       - "infra/terraform/**"
@@ -12,13 +25,83 @@ on:
       - "lib/**"
       - ".github/workflows/azd-deploy.yml"
 
+concurrency:
+  group: azd-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   id-token: write
   contents: read
 
 jobs:
+  resolve-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tier: ${{ steps.resolve.outputs.release_tier }}
+      azure_env_name: ${{ steps.resolve.outputs.azure_env_name }}
+      strict_security: ${{ steps.resolve.outputs.strict_security }}
+      azure_location: ${{ steps.resolve.outputs.azure_location }}
+      aca_environment_name: ${{ steps.resolve.outputs.aca_environment_name }}
+    steps:
+      - name: Resolve release profile
+        id: resolve
+        env:
+          INPUT_RELEASE_TIER: ${{ github.event.inputs.release_tier }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          is_stable_tag="false"
+          if [[ "$GITHUB_REF" == refs/tags/* ]] && [[ "$GITHUB_REF_NAME" == *stable* ]]; then
+            is_stable_tag="true"
+          fi
+
+          requested_tier="${INPUT_RELEASE_TIER:-auto}"
+          if [ "$requested_tier" = "auto" ]; then
+            if [ "$is_stable_tag" = "true" ]; then
+              release_tier="prod"
+            else
+              release_tier="dev"
+            fi
+          else
+            release_tier="$requested_tier"
+          fi
+
+          if [ "$release_tier" = "prod" ] && [ "$is_stable_tag" != "true" ]; then
+            echo "Prod releases are allowed only from stable tags. Current ref '$GITHUB_REF_NAME' is not stable-tagged."
+            exit 1
+          fi
+
+          case "$release_tier" in
+            prod)
+              strict_security="true"
+              azure_env_name="prod"
+              ;;
+            dev)
+              strict_security="false"
+              azure_env_name="dev"
+              ;;
+            *)
+              echo "Unsupported release tier: $release_tier"
+              exit 1
+              ;;
+          esac
+
+          azure_location="eastus2"
+          aca_environment_name="tutor-${azure_env_name}-acae"
+
+          echo "release_tier=$release_tier" >> "$GITHUB_OUTPUT"
+          echo "azure_env_name=$azure_env_name" >> "$GITHUB_OUTPUT"
+          echo "strict_security=$strict_security" >> "$GITHUB_OUTPUT"
+          echo "azure_location=$azure_location" >> "$GITHUB_OUTPUT"
+          echo "aca_environment_name=$aca_environment_name" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved release profile: tier=$release_tier env=$azure_env_name strict=$strict_security location=$azure_location"
+
   detect-changes:
     runs-on: ubuntu-latest
+    needs: resolve-release
     outputs:
       services_json: ${{ steps.detect.outputs.services_json }}
       service_count: ${{ steps.detect.outputs.service_count }}
@@ -52,6 +135,7 @@ jobs:
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             selected_services=("${all_services[@]}")
+            selected_service_infra=("${all_services[@]}")
             provision_required=true
           else
             before="$BEFORE_SHA"
@@ -75,16 +159,19 @@ jobs:
                   if [[ "$file" != infra/terraform/stacks/* ]]; then
                     provision_required=true
                     selected_services=("${all_services[@]}")
+                    selected_service_infra=("${all_services[@]}")
                   fi
                   ;;
                 lib/*)
                   selected_services=("${all_services[@]}")
+                  selected_service_infra=("${all_services[@]}")
                   ;;
               esac
 
               for service in "${all_services[@]}"; do
                 if [[ "$file" == apps/${service}/* ]]; then
                   selected_services+=("$service")
+                  selected_service_infra+=("$service")
                 fi
                 if [[ "$file" == infra/terraform/stacks/services/${service}/* ]]; then
                   selected_service_infra+=("$service")
@@ -131,14 +218,19 @@ jobs:
 
   provision:
     runs-on: ubuntu-latest
-    needs: detect-changes
+    needs:
+      - resolve-release
+      - detect-changes
     if: needs.detect-changes.outputs.provision_required == 'true'
 
     env:
-      AZURE_ENV_NAME: prod
-      AZURE_LOCATION: eastus2
-      TF_VAR_environment: prod
-      TF_VAR_existing_container_app_environment_name: tutor-prod-acae
+      RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
+      STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
+      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
+      AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
+      TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
+      TF_VAR_existing_container_app_environment_name: ${{ needs.resolve-release.outputs.aca_environment_name }}
 
     steps:
       - name: Checkout
@@ -384,18 +476,27 @@ jobs:
         run: |
           set -euo pipefail
 
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          APIM_NAME="tutor-${AZURE_ENV_NAME}-apim"
+
           cd infra/terraform
           if ! terraform init -reconfigure -backend-config=backend.hcl; then
             echo "WARNING: Terraform init failed during state adoption; skipping imports and continuing."
             exit 0
           fi
 
-          terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.ApiManagement/service/tutor-prod-apim" || true
-          terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.DocumentDB/databaseAccounts/tutorprodq2o8o4cosmos/sqlDatabases/tutor/containers/upskilling_plans" || true
+          terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ApiManagement/service/${APIM_NAME}" || true
+
+          cosmos_account_id="$(az cosmosdb list -g "$RG_NAME" --query '[0].id' -o tsv 2>/dev/null || true)"
+          if [ -n "$cosmos_account_id" ]; then
+            terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "${cosmos_account_id}/sqlDatabases/tutor/containers/upskilling_plans" || true
+          else
+            echo "No Cosmos account discovered in ${RG_NAME}; skipping upskilling_plans import."
+          fi
 
           services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
           for service in "${services[@]}"; do
-            app_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/tutor-prod/providers/Microsoft.App/containerApps/tutor-${service}-prod"
+            app_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/tutor-${service}-${AZURE_ENV_NAME}"
             terraform import "azurerm_container_app.backend_services[\"${service}\"]" "$app_id" || true
           done
 
@@ -506,12 +607,16 @@ jobs:
   stack-routing-summary:
     runs-on: ubuntu-latest
     needs:
+      - resolve-release
       - detect-changes
       - provision
     if: always()
     steps:
       - name: Print stack routing summary
         run: |
+          echo "release_tier=${{ needs.resolve-release.outputs.release_tier }}"
+          echo "strict_security=${{ needs.resolve-release.outputs.strict_security }}"
+          echo "azure_env_name=${{ needs.resolve-release.outputs.azure_env_name }}"
           echo "provision_required=${{ needs.detect-changes.outputs.provision_required }}"
           echo "services_json=${{ needs.detect-changes.outputs.services_json }}"
           echo "service_infra_json=${{ needs.detect-changes.outputs.service_infra_json }}"
@@ -533,6 +638,7 @@ jobs:
   provision-service-infra:
     runs-on: ubuntu-latest
     needs:
+      - resolve-release
       - detect-changes
       - provision
     if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success')
@@ -542,7 +648,10 @@ jobs:
         include: ${{ fromJson(needs.detect-changes.outputs.service_infra_json) }}
 
     env:
-      AZURE_ENV_NAME: prod
+      RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
+      STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
+      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
 
     steps:
       - name: Checkout
@@ -608,12 +717,15 @@ jobs:
   provision-frontend-infra:
     runs-on: ubuntu-latest
     needs:
+      - resolve-release
       - detect-changes
       - provision
     if: always() && needs.detect-changes.outputs.changed_frontend_infra == 'true' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision.result == 'success')
 
     env:
-      AZURE_ENV_NAME: prod
+      RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
+      STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
+      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
 
     steps:
       - name: Checkout
@@ -659,6 +771,7 @@ jobs:
   deploy-backend-services:
     runs-on: ubuntu-latest
     needs:
+      - resolve-release
       - detect-changes
       - provision
       - provision-service-infra
@@ -669,8 +782,10 @@ jobs:
         include: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
 
     env:
-      AZURE_ENV_NAME: prod
-      AZURE_LOCATION: eastus2
+      RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
+      STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
+      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
 
     steps:
       - name: Checkout
@@ -989,3 +1104,181 @@ jobs:
             echo "Container app '$APP_NAME' update did not succeed after $max_update_attempts attempts."
             exit 1
           fi
+
+  post-deploy-guardrails:
+    runs-on: ubuntu-latest
+    needs:
+      - resolve-release
+      - detect-changes
+      - deploy-backend-services
+    if: always() && needs.detect-changes.outputs.service_count != '0' && needs.deploy-backend-services.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.detect-changes.outputs.services_json) }}
+
+    env:
+      RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
+      STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
+      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Resolve guardrail context
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+          echo "RG=tutor-${AZURE_ENV_NAME}" >> "$GITHUB_ENV"
+          echo "APIM_NAME=tutor-${AZURE_ENV_NAME}-apim" >> "$GITHUB_ENV"
+          echo "APP_NAME=tutor-${SERVICE}-${AZURE_ENV_NAME}" >> "$GITHUB_ENV"
+          echo "API_ID=${SERVICE}-api" >> "$GITHUB_ENV"
+          echo "EXPECTED_PATH=api/${SERVICE}" >> "$GITHUB_ENV"
+          echo "STACK_DIR=infra/terraform/stacks/services/${SERVICE}" >> "$GITHUB_ENV"
+
+      - name: Enforce network baseline (VNet + Private Endpoint)
+        run: |
+          set -euo pipefail
+
+          echo "=== Network baseline check :: ${RG} ==="
+          aca_subnet_id="$(az containerapp env show -g "$RG" -n "$ACA_ENVIRONMENT_NAME" --query 'properties.vnetConfiguration.infrastructureSubnetId' -o tsv 2>/dev/null || true)"
+          if [ -z "$aca_subnet_id" ]; then
+            echo "ACA environment '${ACA_ENVIRONMENT_NAME}' is not integrated with a VNet subnet."
+            exit 1
+          fi
+
+          cosmos_public_access="$(az cosmosdb list -g "$RG" --query '[0].publicNetworkAccess' -o tsv 2>/dev/null || true)"
+          if [ -n "$cosmos_public_access" ] && [ "$cosmos_public_access" != "Disabled" ]; then
+            echo "Cosmos DB public network access must be Disabled, found: ${cosmos_public_access}."
+            exit 1
+          fi
+
+          cosmos_private_endpoint_count="$(az network private-endpoint list -g "$RG" --query "[?contains(privateLinkServiceConnections[0].privateLinkServiceId, 'Microsoft.DocumentDB/databaseAccounts')]| length(@)" -o tsv 2>/dev/null || echo 0)"
+          if [ "${cosmos_private_endpoint_count:-0}" = "0" ]; then
+            echo "No Cosmos DB private endpoint found in resource group ${RG}."
+            exit 1
+          fi
+
+      - name: Validate ACA revision readiness
+        run: |
+          set -euo pipefail
+
+          echo "=== ACA readiness check :: ${APP_NAME} ==="
+          latest_revision="$(az containerapp show -g "$RG" -n "$APP_NAME" --query 'properties.latestRevisionName' -o tsv)"
+          latest_ready_revision="$(az containerapp show -g "$RG" -n "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv)"
+          running_state="$(az containerapp revision show -g "$RG" -n "$APP_NAME" --revision "$latest_revision" --query 'properties.runningState' -o tsv)"
+          replicas="$(az containerapp revision show -g "$RG" -n "$APP_NAME" --revision "$latest_revision" --query 'properties.replicas' -o tsv)"
+
+          is_healthy="true"
+          if [ "$latest_revision" != "$latest_ready_revision" ] || [ "$running_state" != "Running" ] || [ "${replicas:-0}" = "0" ]; then
+            is_healthy="false"
+          fi
+
+          if [ "$is_healthy" = "false" ]; then
+            echo "Latest revision is not healthy (latest=$latest_revision, ready=$latest_ready_revision, state=$running_state, replicas=${replicas:-0})."
+
+            if [ "$STRICT_SECURITY" = "true" ]; then
+              echo "Strict mode enabled for ${RELEASE_TIER}; fallback is not allowed."
+              az containerapp revision list \
+                -g "$RG" \
+                -n "$APP_NAME" \
+                --query '[].{name:name,active:properties.active,runningState:properties.runningState,replicas:properties.replicas,createdTime:properties.createdTime,image:properties.template.containers[0].image}' \
+                -o table || true
+              exit 1
+            fi
+
+            if [ -n "$latest_ready_revision" ] && [ "$latest_ready_revision" != "$latest_revision" ]; then
+              echo "Relaxed mode for ${RELEASE_TIER}: applying traffic fallback to '$latest_ready_revision'."
+              az containerapp ingress traffic set -g "$RG" -n "$APP_NAME" --revision-weight "${latest_ready_revision}=100" --output none
+              az containerapp revision deactivate -g "$RG" -n "$APP_NAME" --revision "$latest_revision" --output none || true
+            else
+              echo "No healthy fallback revision available."
+              exit 1
+            fi
+          fi
+
+      - name: Validate APIM route integrity
+        run: |
+          set -euo pipefail
+
+          echo "=== APIM route integrity check :: ${API_ID} ==="
+          api_json="$(az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" -o json)"
+          api_path="$(jq -r '.path' <<<"$api_json")"
+          subscription_required="$(jq -r '.subscriptionRequired' <<<"$api_json")"
+          protocols_ok="$(jq -r '(.protocols|length==1 and .protocols[0]=="https")' <<<"$api_json")"
+
+          app_fqdn="$(az containerapp show -g "$RG" -n "$APP_NAME" --query 'properties.configuration.ingress.fqdn' -o tsv)"
+          expected_service_url="https://${app_fqdn}"
+          actual_service_url="$(jq -r '.serviceUrl' <<<"$api_json")"
+
+          [ "$api_path" = "$EXPECTED_PATH" ] || { echo "APIM path drift: expected=$EXPECTED_PATH actual=$api_path"; exit 1; }
+          [ "$subscription_required" = "false" ] || { echo "APIM subscriptionRequired drift: $subscription_required"; exit 1; }
+          [ "$protocols_ok" = "true" ] || { echo "APIM protocol drift: expected https only"; exit 1; }
+          [ "$actual_service_url" = "$expected_service_url" ] || { echo "APIM serviceUrl drift: expected=$expected_service_url actual=$actual_service_url"; exit 1; }
+
+      - name: Validate APIM policy and remediate drift (non-prod)
+        env:
+          SERVICE: ${{ matrix.service }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+        run: |
+          set -euo pipefail
+
+          echo "=== APIM policy drift check :: ${API_ID} ==="
+          policy_url="https://management.azure.com/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG}/providers/Microsoft.ApiManagement/service/${APIM_NAME}/apis/${API_ID}/policies/policy?api-version=2022-08-01"
+          live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
+
+          if ! grep -q 'set-variable name="allowed-origin"' <<<"$live_policy"; then
+            if [ "$STRICT_SECURITY" = "true" ]; then
+              echo "APIM policy drift detected for ${API_ID}. Strict mode enabled; remediation disabled."
+              exit 1
+            fi
+
+            echo "APIM policy drift detected for ${API_ID}. Applying one-shot Terraform remediation in ${RELEASE_TIER}."
+
+            cat > "$STACK_DIR/backend.hcl" <<EOF
+            resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
+            storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
+            container_name       = "$TFSTATE_CONTAINER"
+            key                  = "tutor-${AZURE_ENV_NAME}-service-edge-${SERVICE}.tfstate"
+            use_azuread_auth     = true
+            use_oidc             = true
+            EOF
+
+            terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
+            terraform -chdir="$STACK_DIR" apply -auto-approve
+
+            live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
+            if ! grep -q 'set-variable name="allowed-origin"' <<<"$live_policy"; then
+              echo "APIM policy remediation failed for ${API_ID}."
+              exit 1
+            fi
+          fi
+
+      - name: APIM smoke check
+        run: |
+          set -euo pipefail
+
+          echo "=== APIM smoke check :: ${API_ID} ==="
+          status_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 20 "https://${APIM_NAME}.azure-api.net/${EXPECTED_PATH}/health" || echo 000)"
+          if [ "$status_code" = "000" ] || [ "$status_code" -ge 500 ]; then
+            echo "APIM smoke check failed for ${API_ID}: HTTP ${status_code}."
+            exit 1
+          fi
+
+          echo "Guardrails passed for ${API_ID}."

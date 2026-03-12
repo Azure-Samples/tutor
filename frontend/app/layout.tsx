@@ -15,7 +15,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
 
   // const pathname = usePathname();
@@ -29,7 +28,13 @@ export default function RootLayout({
       <HumanEvaluationProvider>
         <html lang="en">
           <body>
-            <div id="#root" className="dark:bg-boxdark-2 dark:text-bodydark">
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[10000] focus:rounded-md focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-black"
+            >
+              Skip to main content
+            </a>
+            <div id="root" className="dark:bg-boxdark-2 dark:text-bodydark">
               {loading ? <Loader /> : children}
             </div>
           </body>

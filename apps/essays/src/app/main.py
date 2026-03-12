@@ -9,6 +9,8 @@ from io import BytesIO
 from typing import Any, Iterable
 from uuid import uuid4
 
+from azure.core import exceptions as azure_exceptions
+from azure.cosmos import exceptions as cosmos_exceptions
 from pydantic import ValidationError
 
 from fastapi import File, FastAPI, Form, HTTPException, Request, UploadFile, status
@@ -319,14 +321,11 @@ async def _get_essay_document(essay_id: str) -> dict[str, Any] | None:
     whose ``student_id`` differs from their ``id`` (e.g. template essays
     with no ``student_id``).  A query avoids this.
     """
-    try:
-        results = await _crud(settings.cosmos.essay_container).list_items(
-            query="SELECT * FROM c WHERE c.id = @id",
-            parameters=[{"name": "@id", "value": essay_id}],
-        )
-        return results[0] if results else None
-    except Exception:
-        return None
+    results = await _crud(settings.cosmos.essay_container).list_items(
+        query="SELECT * FROM c WHERE c.id = @id",
+        parameters=[{"name": "@id", "value": essay_id}],
+    )
+    return results[0] if results else None
 
 
 async def _require_essay_document(essay_id: str) -> dict[str, Any]:
@@ -643,7 +642,7 @@ async def update_resource(resource_id: str, resource: Resource) -> JSONResponse:
     crud = _crud(settings.cosmos.resources_container)
     try:
         existing = await crud.read_item(resource_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found") from exc
     incoming = resource.model_dump()
     encoded = incoming.get("encoded_content")
@@ -665,7 +664,7 @@ async def delete_resource(resource_id: str) -> JSONResponse:
     crud = _crud(settings.cosmos.resources_container)
     try:
         await crud.delete_item(resource_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found") from exc
     _cache_resource_bytes(resource_id, None)
     return _create_success_response("Resource Deleted", "Resource removed", {"resource_id": resource_id})
@@ -711,7 +710,7 @@ async def list_agents(limit: int | None = None) -> JSONResponse:
 async def get_agent(agent_id: str) -> JSONResponse:
     try:
         remote = await agent_service.get_agent(agent_id)
-    except Exception as exc:
+    except (azure_exceptions.ResourceNotFoundError, cosmos_exceptions.CosmosResourceNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found") from exc
 
     provisioned = _materialize_agent(remote)
@@ -764,7 +763,7 @@ async def update_assembly(assembly_id: str, assembly: AssemblyDefinition) -> JSO
     crud = _crud(settings.cosmos.assembly_container)
     try:
         existing = await crud.read_item(assembly_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembly not found") from exc
     existing_essay_id = existing.get("essay_id") or existing.get("essayId")
     if existing_essay_id and existing_essay_id != assembly.essay_id:
@@ -796,7 +795,7 @@ async def delete_assembly(assembly_id: str) -> JSONResponse:
     crud = _crud(settings.cosmos.assembly_container)
     try:
         record = await crud.read_item(assembly_id)
-    except Exception as exc:
+    except cosmos_exceptions.CosmosResourceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembly not found") from exc
     await crud.delete_item(assembly_id)
     essay_identifier = record.get("essay_id") or record.get("essayId")
