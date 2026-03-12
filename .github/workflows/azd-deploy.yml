@@ -535,6 +535,44 @@ jobs:
             attempt=$((attempt + 1))
           done
 
+      - name: Break stale Terraform state lease (best effort)
+        env:
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          state_key="$TFSTATE_KEY"
+          if [ "$AZURE_ENV_NAME" != "prod" ] || [ -z "$state_key" ]; then
+            state_key="tutor-${AZURE_ENV_NAME}.tfstate"
+          fi
+
+          lease_state="$(az storage blob show \
+            --auth-mode login \
+            --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+            --container-name "$TFSTATE_CONTAINER" \
+            --name "$state_key" \
+            --query 'properties.lease.state' \
+            -o tsv 2>/dev/null || true)"
+
+          if [ -z "$lease_state" ] || [ "$lease_state" = "null" ]; then
+            echo "State blob lease state unavailable; continuing without lease break."
+            exit 0
+          fi
+
+          echo "Current state blob lease state: $lease_state"
+          if [ "$lease_state" = "leased" ]; then
+            echo "Breaking stale lease for state blob $state_key"
+            az storage blob lease break \
+              --auth-mode login \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --container-name "$TFSTATE_CONTAINER" \
+              --blob-name "$state_key" \
+              --output none || true
+            sleep 5
+          fi
+
       - name: Build Terraform backend config
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
