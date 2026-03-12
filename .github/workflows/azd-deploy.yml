@@ -346,8 +346,12 @@ jobs:
               aca_state="$(timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'provisioningState' -o tsv 2>/dev/null || true)"
             fi
             if [ -z "$aca_state" ] || [ "$aca_state" = "null" ]; then
-              echo "Unable to resolve provisioning state for ${ACA_NAME}; defaulting to reuse existing environment."
-              aca_state="Succeeded"
+              echo "Unable to resolve provisioning state for ${ACA_NAME}; defaulting to Terraform-managed creation mode."
+              echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
+              echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
+              azd env set TF_VAR_existing_container_app_environment_name ""
+              azd env set TF_VAR_reuse_existing_container_app_environment "false"
+              exit 0
             fi
 
             if [ "$aca_state" = "Succeeded" ]; then
