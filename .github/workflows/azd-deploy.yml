@@ -228,6 +228,7 @@ jobs:
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
       TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
       TF_VAR_existing_container_app_environment_name: ${{ needs.resolve-release.outputs.release_tier == 'prod' && needs.resolve-release.outputs.aca_environment_name || '' }}
+      TF_VAR_reuse_existing_container_app_environment: ${{ needs.resolve-release.outputs.release_tier == 'prod' && 'true' || 'false' }}
 
     steps:
       - name: Checkout
@@ -330,7 +331,9 @@ jobs:
             if [ "$aca_state" = "Succeeded" ]; then
               echo "Detected healthy ACA environment ${ACA_NAME}; Terraform will reference it."
               echo "TF_VAR_existing_container_app_environment_name=${ACA_NAME}" >> "$GITHUB_ENV"
+              echo "TF_VAR_reuse_existing_container_app_environment=true" >> "$GITHUB_ENV"
               azd env set TF_VAR_existing_container_app_environment_name "$ACA_NAME"
+              azd env set TF_VAR_reuse_existing_container_app_environment "true"
             else
               echo "Detected ACA environment ${ACA_NAME} with provisioningState='${aca_state:-unknown}'."
               echo "Deleting failed/unhealthy ACA environment so Terraform can recreate it cleanly."
@@ -356,12 +359,16 @@ jobs:
               fi
 
               echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
+              echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
               azd env set TF_VAR_existing_container_app_environment_name ""
+              azd env set TF_VAR_reuse_existing_container_app_environment "false"
             fi
           else
             echo "No existing ACA environment detected; Terraform will create managed environment ${ACA_NAME}."
             echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
+            echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
             azd env set TF_VAR_existing_container_app_environment_name ""
+            azd env set TF_VAR_reuse_existing_container_app_environment "false"
           fi
 
       - name: Refresh Azure Login after ACA reconciliation

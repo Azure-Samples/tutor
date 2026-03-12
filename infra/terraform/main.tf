@@ -1,7 +1,7 @@
 locals {
   normalized_prefix = lower(replace("${var.name_prefix}${var.environment}", "-", ""))
   container_app_environment_name = var.existing_container_app_environment_name != "" ? var.existing_container_app_environment_name : "${var.name_prefix}-${var.environment}-acae"
-  container_app_environment_id   = var.existing_container_app_environment_name != "" ? data.azurerm_container_app_environment.main[0].id : azurerm_container_app_environment.main[0].id
+  container_app_environment_id   = var.reuse_existing_container_app_environment ? data.azurerm_container_app_environment.main[0].id : azurerm_container_app_environment.main[0].id
   backend_service_names = [
     "avatar",
     "configuration",
@@ -151,13 +151,13 @@ resource "azurerm_private_dns_zone_virtual_network_link" "cosmos" {
 }
 
 data "azurerm_container_app_environment" "main" {
-  count               = var.existing_container_app_environment_name != "" ? 1 : 0
+  count               = var.reuse_existing_container_app_environment ? 1 : 0
   name                = local.container_app_environment_name
   resource_group_name = azurerm_resource_group.main.name
 }
 
 resource "azurerm_container_app_environment" "main" {
-  count                      = var.existing_container_app_environment_name == "" ? 1 : 0
+  count                      = var.reuse_existing_container_app_environment ? 0 : 1
   name                       = local.container_app_environment_name
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
