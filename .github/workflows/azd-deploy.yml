@@ -723,6 +723,7 @@ jobs:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
 
     steps:
       - name: Checkout
