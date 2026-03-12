@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 const EssaysPage = () => {
   return (
-    <DefaultLayout>
+    <DefaultLayout metadata={metadata}>
       <Breadcrumb 
         pageName="Essay Evaluation" 
         subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights." 

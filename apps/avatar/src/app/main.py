@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 import uuid
 from functools import lru_cache
-from typing import Any, Iterable
+from typing import Any, Iterable, cast
 
 from azure.cosmos import exceptions
 from fastapi import Body, FastAPI, HTTPException, Request, status
@@ -22,7 +22,7 @@ from app.schemas import BodyMessage, Case, ChatResponse, ErrorMessage, RESPONSES
 from tutor_lib.middleware import configure_entra_auth
 
 
-settings = get_settings()
+settings = cast(Any, get_settings())
 
 app = FastAPI(
     title="Avatar",
@@ -74,10 +74,12 @@ def _avatar() -> AvatarChat:
 
 @lru_cache(maxsize=1)
 def _speech_broker() -> SpeechTokenBroker:
-    speech_settings = settings.model_dump().get("speech", {})
+    speech_settings = settings.speech
+    if speech_settings is None:
+        raise RuntimeError("Speech broker is not configured. Set SPEECH_RESOURCE_ID and SPEECH_REGION.")
     return SpeechTokenBroker(
-        resource_id=str(speech_settings.get("resource_id", "")),
-        region=str(speech_settings.get("region", "")),
+        resource_id=speech_settings.resource_id,
+        region=speech_settings.region,
     )
 
 

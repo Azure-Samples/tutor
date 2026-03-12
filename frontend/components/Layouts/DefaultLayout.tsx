@@ -14,7 +14,7 @@ export default function DefaultLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const sidebarSwitcherRef = useRef<HTMLButtonElement>(null);
   return (
-    <main>
+    <main id="main-content" className="min-h-screen">
       {metadata && (
         <>
           {metadata.title && (

@@ -9,11 +9,10 @@ const Header = (props: {
   setSidebarOpen: (arg0: boolean) => void;
   sidebarSwitcherRef?: React.RefObject<HTMLButtonElement>;
 }) => {
-  console.log(props.sidebarOpen);
   return (
     <header className="fixed top-0 left-0 z-999 flex w-full h-16 bg-white drop-shadow-1 dark:bg-boxdark dark:drop-shadow-none items-center px-10">
       <div className="flex items-center h-full gap-4">
-        <Link href="/" className="flex items-center justify-center h-full">
+        <Link href="/" aria-label="Go to Tutor home" className="flex items-center justify-center h-full">
           <Image
             width={60}
             height={60}

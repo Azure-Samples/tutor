@@ -7,8 +7,7 @@ from typing import Any, Dict, List
 
 from azure.cosmos import exceptions
 
-from app.agents.clients import AgentRegistry, AgentSpec
-from app.agents.run import AgentRunContext
+from tutor_lib.agents import AgentRegistry, AgentRunContext, AgentSpec
 from app.config import AvatarSettings
 from app.cosmos import CosmosCRUD
 from app.prompts import SIMULATION_PROMPT

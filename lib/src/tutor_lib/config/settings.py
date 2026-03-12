@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 
 
 class CosmosConfig(BaseSettings):
-    endpoint: str = Field(alias="COSMOS_ENDPOINT")
+    endpoint: str = Field(alias="COSMOS_ENDPOINT", default="")
     database: str = Field(alias="COSMOS_DATABASE", default="tutor")
     essay_container: str = Field(alias="COSMOS_ESSAY_TABLE", default="essays")
     question_container: str = Field(alias="COSMOS_QUESTION_TABLE", default="questions")
@@ -29,7 +29,7 @@ class CosmosConfig(BaseSettings):
 
 
 class AzureAIConfig(BaseSettings):
-    project_endpoint: str = Field(alias="PROJECT_ENDPOINT")
+    project_endpoint: str = Field(alias="PROJECT_ENDPOINT", default="")
     default_deployment: str = Field(alias="MODEL_DEPLOYMENT_NAME", default="gpt-5-nano")
     reasoning_deployment: str = Field(alias="MODEL_REASONING_DEPLOYMENT", default="gpt-5")
 

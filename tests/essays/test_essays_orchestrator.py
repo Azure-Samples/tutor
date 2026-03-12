@@ -87,12 +87,33 @@ class _FakeCredential:  # noqa: D401 - simple stub credential
     pass
 
 
+class _StubAssemblyRepository:
+    def __init__(self, existing_ids, not_found):
+        self._existing_ids = set(existing_ids)
+        self._not_found = not_found
+
+    async def get_by_id(self, assembly_id: str):
+        if assembly_id not in self._existing_ids:
+            raise self._not_found("missing")
+        return {
+            "id": assembly_id,
+            "topic_name": "Topic",
+            "essay_id": "essay-stub",
+            "agents": [
+                {
+                    "agent_id": "agent-1",
+                    "role": "default",
+                    "deployment": "gpt-5-nano",
+                }
+            ],
+        }
+
+
 @pytest.mark.asyncio
 async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
     monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
     _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
-    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
     provisioned = module.AgentRef(
         agent_id="agent-default",
@@ -122,7 +143,6 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
     _StubFoundryAgentService.response_text = (
         "Narrative verdict\n\nStrengths: Vivid imagery\n\nImprovements: Clarify ending"
     )
-    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
     narrative_agent = module.AgentRef(
         agent_id="agent-narrative",
@@ -163,7 +183,6 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
     _StubFoundryAgentService.response_text = (
         "Analytical verdict\n\nStrengths: Rigorous evidence\n\nImprovements: Expand counterpoints"
     )
-    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
 
     analytical_agent = module.AgentRef(
         agent_id="agent-analytical",
@@ -238,13 +257,13 @@ async def test_load_assembly_raises_for_missing_assembly(monkeypatch, essays_app
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
-    def _client_factory(*_args, **_kwargs):
-        return _StubCosmosClient(existing_ids=set(), not_found=not_found)
-
     monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
-    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
-    monkeypatch.setattr(module, "CosmosClient", _client_factory)
     monkeypatch.setattr(module.exceptions, "CosmosResourceNotFoundError", not_found)
+    monkeypatch.setattr(
+        module,
+        "AssemblyRepository",
+        lambda *_args, **_kwargs: _StubAssemblyRepository(existing_ids=set(), not_found=not_found),
+    )
 
     orchestrator = module.EssayOrchestrator()
     essay = module.Essay(id="essay-missing", topic="History", content="Text")
@@ -258,9 +277,6 @@ async def test_load_assembly_returns_agents(monkeypatch, essays_app_module_fixtu
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
-    def _client_factory(*_args, **_kwargs):
-        return _StubCosmosClient(existing_ids={"assembly-present"}, not_found=not_found)
-
     created: list[_StubFoundryAgentService] = []
 
     class _RecordingService(_StubFoundryAgentService):
@@ -270,9 +286,15 @@ async def test_load_assembly_returns_agents(monkeypatch, essays_app_module_fixtu
 
     monkeypatch.setattr(module, "FoundryAgentService", _RecordingService)
     _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
-    monkeypatch.setattr(module, "DefaultAzureCredential", _FakeCredential)
-    monkeypatch.setattr(module, "CosmosClient", _client_factory)
     monkeypatch.setattr(module.exceptions, "CosmosResourceNotFoundError", not_found)
+    monkeypatch.setattr(
+        module,
+        "AssemblyRepository",
+        lambda *_args, **_kwargs: _StubAssemblyRepository(
+            existing_ids={"assembly-present"},
+            not_found=not_found,
+        ),
+    )
 
     orchestrator = module.EssayOrchestrator()
     essay = module.Essay(id="essay-present", topic="History", content="Text")
