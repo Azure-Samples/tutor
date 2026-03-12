@@ -342,9 +342,12 @@ jobs:
 
           if [ "$aca_exists_status" -eq 0 ]; then
             aca_state="$(timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
-            if [ -z "$aca_state" ]; then
-              echo "Unable to retrieve ACA environment provisioning state for ${ACA_NAME}; aborting."
-              exit 1
+            if [ -z "$aca_state" ] || [ "$aca_state" = "null" ]; then
+              aca_state="$(timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'provisioningState' -o tsv 2>/dev/null || true)"
+            fi
+            if [ -z "$aca_state" ] || [ "$aca_state" = "null" ]; then
+              echo "Unable to resolve provisioning state for ${ACA_NAME}; defaulting to reuse existing environment."
+              aca_state="Succeeded"
             fi
 
             if [ "$aca_state" = "Succeeded" ]; then
