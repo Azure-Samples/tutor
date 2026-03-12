@@ -317,6 +317,23 @@ jobs:
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
 
+      - name: Resolve ACA environment ownership mode
+        run: |
+          set -euo pipefail
+
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          ACA_NAME="tutor-${AZURE_ENV_NAME}-acae"
+
+          if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
+            echo "Detected existing ACA environment ${ACA_NAME}; Terraform will reference it."
+            echo "TF_VAR_existing_container_app_environment_name=${ACA_NAME}" >> "$GITHUB_ENV"
+            azd env set TF_VAR_existing_container_app_environment_name "$ACA_NAME"
+          else
+            echo "No existing ACA environment detected; Terraform will create managed environment ${ACA_NAME}."
+            echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
+            azd env set TF_VAR_existing_container_app_environment_name ""
+          fi
+
       - name: Ensure Terraform state account is reachable from GitHub runners
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
@@ -502,11 +519,6 @@ jobs:
 
           terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ApiManagement/service/${APIM_NAME}" || true
 
-          if [ "$AZURE_ENV_NAME" != "prod" ]; then
-            aca_env_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/managedEnvironments/tutor-${AZURE_ENV_NAME}-acae"
-            terraform import 'azurerm_container_app_environment.main[0]' "$aca_env_id" || true
-          fi
-
           cosmos_account_id="$(az cosmosdb list -g "$RG_NAME" --query '[0].id' -o tsv 2>/dev/null || true)"
           if [ -n "$cosmos_account_id" ]; then
             terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "${cosmos_account_id}/sqlDatabases/tutor/containers/upskilling_plans" || true
@@ -546,23 +558,6 @@ jobs:
             [ -z "$entry" ] && continue
             terraform state rm "$entry" || true
           done <<< "$apim_edge_state_entries"
-
-      - name: Detach managed ACA environment from foundation state
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-        run: |
-          set -euo pipefail
-
-          cd infra/terraform
-          if ! terraform init -reconfigure -backend-config=backend.hcl; then
-            echo "WARNING: Terraform init failed while detaching ACA environment from foundation state."
-            exit 0
-          fi
-
-          terraform state rm azurerm_container_app_environment.main || true
 
       - name: Provision infrastructure
         env:
