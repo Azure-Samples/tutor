@@ -658,7 +658,11 @@ jobs:
           services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
           for service in "${services[@]}"; do
             app_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/tutor-${service}-${AZURE_ENV_NAME}"
-            terraform import "azurerm_container_app.backend_services[\"${service}\"]" "$app_id" || true
+            if az containerapp show --resource-group "$RG_NAME" --name "tutor-${service}-${AZURE_ENV_NAME}" >/dev/null 2>&1; then
+              terraform import "azurerm_container_app.backend_services[\"${service}\"]" "$app_id" || true
+            else
+              terraform state rm "azurerm_container_app.backend_services[\"${service}\"]" || true
+            fi
           done
 
       - name: Detach APIM service-edge resources from foundation state
