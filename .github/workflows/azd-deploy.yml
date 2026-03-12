@@ -502,6 +502,11 @@ jobs:
 
           terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ApiManagement/service/${APIM_NAME}" || true
 
+          if [ "$AZURE_ENV_NAME" != "prod" ]; then
+            aca_env_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/managedEnvironments/tutor-${AZURE_ENV_NAME}-acae"
+            terraform import 'azurerm_container_app_environment.main[0]' "$aca_env_id" || true
+          fi
+
           cosmos_account_id="$(az cosmosdb list -g "$RG_NAME" --query '[0].id' -o tsv 2>/dev/null || true)"
           if [ -n "$cosmos_account_id" ]; then
             terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "${cosmos_account_id}/sqlDatabases/tutor/containers/upskilling_plans" || true
