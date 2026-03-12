@@ -8,8 +8,8 @@ This runbook describes how to provision and deploy Tutor with Azure Developer CL
 >
 > Authorized workflows:
 >
-> - `.github/workflows/azd-deploy.yml` → Infrastructure + 8 backend services (Container Apps), triggered by push to `main`/`dev`/tags or `workflow_dispatch`.
-> - `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` → Frontend (Static Web App), triggered by push to `main`/`dev`/tags, PR events, or `workflow_dispatch`.
+- `.github/workflows/azd-deploy.yml` → Infrastructure + 8 backend services (Container Apps), triggered by push to `main` or `workflow_dispatch`.
+- `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` → Frontend (Static Web App), triggered by push to `main`, PR events, or `workflow_dispatch`.
 >
 > **Why:** GitHub Workflows provide auditable, reproducible deployments with proper secret management via OIDC federation. Manual deployments bypass CI checks, status gates, and deployment traceability.
 >
@@ -33,12 +33,11 @@ Set these in repository or environment secrets:
 
 ## Release Routing Policy
 
-Current release routing in `.github/workflows/azd-deploy.yml` and `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`:
+Current deployment routing in `.github/workflows/azd-deploy.yml` and `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`:
 
-- `prod` releases are allowed **only** from tags containing `stable`.
-- Any non-stable tag, branch push, or non-prod workflow dispatch routes to `dev`.
-- `prod` mode is strict (no fallback/remediation shortcuts).
-- `dev` mode allows controlled mitigation (fallback/remediation) while preserving private networking baselines.
+- Push to `main` triggers the authorized backend/frontend workflows.
+- Manual `workflow_dispatch` can be used for controlled reruns.
+- Production hardening and guardrails are enforced in workflow execution.
 
 Default deployment region remains `eastus2`.
 

@@ -228,6 +228,7 @@ jobs:
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
       ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
+      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
       TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
       TF_VAR_existing_container_app_environment_name: ${{ needs.resolve-release.outputs.aca_environment_name }}
