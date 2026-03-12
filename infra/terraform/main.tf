@@ -290,18 +290,6 @@ resource "azurerm_container_app" "backend_services" {
       image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
       cpu    = 0.5
       memory = "1Gi"
-
-      liveness_probe {
-        path      = "/health"
-        port      = 8000
-        transport = "HTTP"
-      }
-
-      readiness_probe {
-        path      = "/ready"
-        port      = 8000
-        transport = "HTTP"
-      }
     }
   }
 
