@@ -364,6 +364,20 @@ jobs:
             azd env set TF_VAR_existing_container_app_environment_name ""
           fi
 
+      - name: Refresh Azure Login after ACA reconciliation
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Refresh Azure Developer CLI Login after ACA reconciliation
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: azd auth login --federated-credential-provider github --client-id "$AZURE_CLIENT_ID" --tenant-id "$AZURE_TENANT_ID"
+
       - name: Ensure Terraform state account is reachable from GitHub runners
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
