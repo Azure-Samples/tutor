@@ -325,9 +325,39 @@ jobs:
           ACA_NAME="tutor-${AZURE_ENV_NAME}-acae"
 
           if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
-            echo "Detected existing ACA environment ${ACA_NAME}; Terraform will reference it."
-            echo "TF_VAR_existing_container_app_environment_name=${ACA_NAME}" >> "$GITHUB_ENV"
-            azd env set TF_VAR_existing_container_app_environment_name "$ACA_NAME"
+            aca_state="$(az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+
+            if [ "$aca_state" = "Succeeded" ]; then
+              echo "Detected healthy ACA environment ${ACA_NAME}; Terraform will reference it."
+              echo "TF_VAR_existing_container_app_environment_name=${ACA_NAME}" >> "$GITHUB_ENV"
+              azd env set TF_VAR_existing_container_app_environment_name "$ACA_NAME"
+            else
+              echo "Detected ACA environment ${ACA_NAME} with provisioningState='${aca_state:-unknown}'."
+              echo "Deleting failed/unhealthy ACA environment so Terraform can recreate it cleanly."
+              az containerapp env delete --resource-group "$RG_NAME" --name "$ACA_NAME" --yes
+
+              max_wait_attempts=30
+              wait_attempt=1
+              while [ "$wait_attempt" -le "$max_wait_attempts" ]; do
+                if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
+                  echo "Waiting for ACA environment deletion (${wait_attempt}/${max_wait_attempts})..."
+                  sleep 20
+                  wait_attempt=$((wait_attempt + 1))
+                  continue
+                fi
+
+                echo "Failed/unhealthy ACA environment removed. Terraform will create a new managed environment."
+                break
+              done
+
+              if az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
+                echo "ACA environment ${ACA_NAME} still exists after waiting for deletion; aborting deployment."
+                exit 1
+              fi
+
+              echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
+              azd env set TF_VAR_existing_container_app_environment_name ""
+            fi
           else
             echo "No existing ACA environment detected; Terraform will create managed environment ${ACA_NAME}."
             echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
