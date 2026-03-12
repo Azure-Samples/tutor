@@ -327,6 +327,11 @@ jobs:
             --name "$TFSTATE_STORAGE_ACCOUNT" \
             --query publicNetworkAccess -o tsv)"
 
+          current_default_action="$(az storage account show \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --query networkRuleSet.defaultAction -o tsv)"
+
           if [ "$current_access" = "Disabled" ]; then
             echo "Enabling public network access on Terraform state storage account for CI connectivity."
             az storage account update \
@@ -336,8 +341,18 @@ jobs:
               --only-show-errors >/dev/null
           fi
 
+          if [ "$current_default_action" = "Deny" ]; then
+            echo "Setting Terraform state storage default network action to Allow for GitHub runner access."
+            az storage account update \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --name "$TFSTATE_STORAGE_ACCOUNT" \
+              --default-action Allow \
+              --only-show-errors >/dev/null
+          fi
+
       - name: Ensure Terraform state RBAC for OIDC principal
         env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
@@ -349,11 +364,17 @@ jobs:
             --name "$TFSTATE_STORAGE_ACCOUNT" \
             --query id -o tsv)"
 
-          ACCESS_TOKEN="$(az account get-access-token \
-            --resource https://management.azure.com/ \
-            --query accessToken -o tsv)"
+          CONTAINER_SCOPE="${STORAGE_SCOPE}/blobServices/default/containers/${TFSTATE_CONTAINER}"
 
-                PRINCIPAL_OBJECT_ID="$(ACCESS_TOKEN="$ACCESS_TOKEN" python -c "import base64,json,os; t=os.environ.get('ACCESS_TOKEN',''); p=t.split('.'); payload=(p[1] + '=' * (-len(p[1]) % 4)) if len(p) > 1 else ''; print(json.loads(base64.urlsafe_b64decode(payload.encode('utf-8')).decode('utf-8')).get('oid','') if payload else '')")"
+          PRINCIPAL_OBJECT_ID="$(az ad sp show --id "$AZURE_CLIENT_ID" --query id -o tsv 2>/dev/null || true)"
+
+          if [ -z "$PRINCIPAL_OBJECT_ID" ]; then
+            ACCESS_TOKEN="$(az account get-access-token \
+              --resource https://management.azure.com/ \
+              --query accessToken -o tsv)"
+
+            PRINCIPAL_OBJECT_ID="$(ACCESS_TOKEN="$ACCESS_TOKEN" python -c "import base64,json,os; t=os.environ.get('ACCESS_TOKEN',''); p=t.split('.'); payload=(p[1] + '=' * (-len(p[1]) % 4)) if len(p) > 1 else ''; print(json.loads(base64.urlsafe_b64decode(payload.encode('utf-8')).decode('utf-8')).get('oid','') if payload else '')")"
+          fi
 
           if [ -z "$PRINCIPAL_OBJECT_ID" ]; then
             echo "Unable to resolve OIDC principal object id from access token."
@@ -370,19 +391,25 @@ jobs:
           az role assignment create \
             --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
             --assignee-principal-type ServicePrincipal \
-            --role "Storage Blob Data Owner" \
-            --scope "$STORAGE_SCOPE" \
+            --role "Storage Blob Data Contributor" \
+            --scope "$CONTAINER_SCOPE" \
             --only-show-errors >/dev/null || true
 
-          ASSIGNMENT_COUNT="$(az role assignment list \
+          ACCOUNT_ASSIGNMENT_COUNT="$(az role assignment list \
             --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
             --scope "$STORAGE_SCOPE" \
             --role "Storage Blob Data Contributor" \
             --query 'length(@)' -o tsv)"
 
-          if [ "$ASSIGNMENT_COUNT" = "0" ]; then
-            echo "OIDC principal is missing 'Storage Blob Data Contributor' on Terraform state storage account."
-            echo "Grant role on scope: $STORAGE_SCOPE"
+          CONTAINER_ASSIGNMENT_COUNT="$(az role assignment list \
+            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
+            --scope "$CONTAINER_SCOPE" \
+            --role "Storage Blob Data Contributor" \
+            --query 'length(@)' -o tsv)"
+
+          if [ "$ACCOUNT_ASSIGNMENT_COUNT" = "0" ] && [ "$CONTAINER_ASSIGNMENT_COUNT" = "0" ]; then
+            echo "OIDC principal is missing 'Storage Blob Data Contributor' on Terraform state storage account/container."
+            echo "Grant role on scope: $STORAGE_SCOPE or $CONTAINER_SCOPE"
             exit 1
           fi
 
@@ -391,7 +418,12 @@ jobs:
           max_attempts=20
           attempt=1
           while [ "$attempt" -le "$max_attempts" ]; do
-            if az storage blob list \
+            if az storage container show \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --name "$TFSTATE_CONTAINER" \
+              --auth-mode login \
+              --only-show-errors >/dev/null 2>&1 && \
+              az storage blob list \
               --account-name "$TFSTATE_STORAGE_ACCOUNT" \
               --container-name "$TFSTATE_CONTAINER" \
               --auth-mode login \
@@ -568,6 +600,24 @@ jobs:
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "Provision attempt $attempt/$max_attempts"
 
+            if ! az storage blob list \
+              --account-name "$RS_STORAGE_ACCOUNT" \
+              --container-name "$RS_CONTAINER_NAME" \
+              --auth-mode login \
+              --num-results 1 \
+              --only-show-errors >/dev/null 2>&1; then
+              if [ "$attempt" -eq "$max_attempts" ]; then
+                echo "Terraform state data-plane access is still unavailable after $max_attempts attempts."
+                exit 1
+              fi
+
+              sleep_seconds=$((attempt * 60))
+              echo "State data-plane access not ready yet. Waiting ${sleep_seconds}s before retry."
+              sleep "$sleep_seconds"
+              attempt=$((attempt + 1))
+              continue
+            fi
+
             set +e
             provision_output="$(azd provision --no-prompt --debug 2>&1)"
             provision_exit=$?
@@ -585,7 +635,7 @@ jobs:
               exit 1
             fi
 
-            if ! echo "$provision_output" | grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired'; then
+            if ! echo "$provision_output" | grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired|AuthorizationFailure|Failed to get existing workspaces|listing blobs|terraform init failed'; then
               echo "Provision failed with a non-transient error; not retrying further."
               exit "$provision_exit"
             fi
