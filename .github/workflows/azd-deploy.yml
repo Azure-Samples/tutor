@@ -332,22 +332,28 @@ jobs:
             --name "$TFSTATE_STORAGE_ACCOUNT" \
             --query networkRuleSet.defaultAction -o tsv)"
 
+          echo "TFSTATE_ORIGINAL_PUBLIC_NETWORK_ACCESS=$current_access" >> "$GITHUB_ENV"
+          echo "TFSTATE_ORIGINAL_DEFAULT_ACTION=$current_default_action" >> "$GITHUB_ENV"
+          echo "TFSTATE_NETWORK_BASELINE_CHANGED=false" >> "$GITHUB_ENV"
+
           if [ "$current_access" = "Disabled" ]; then
-            echo "Enabling public network access on Terraform state storage account for CI connectivity."
+            echo "Temporarily enabling public network access on Terraform state storage account for CI connectivity."
             az storage account update \
               --resource-group "$TFSTATE_RESOURCE_GROUP" \
               --name "$TFSTATE_STORAGE_ACCOUNT" \
               --public-network-access Enabled \
               --only-show-errors >/dev/null
+            echo "TFSTATE_NETWORK_BASELINE_CHANGED=true" >> "$GITHUB_ENV"
           fi
 
           if [ "$current_default_action" = "Deny" ]; then
-            echo "Setting Terraform state storage default network action to Allow for GitHub runner access."
+            echo "Temporarily setting Terraform state storage default network action to Allow for GitHub runner access."
             az storage account update \
               --resource-group "$TFSTATE_RESOURCE_GROUP" \
               --name "$TFSTATE_STORAGE_ACCOUNT" \
               --default-action Allow \
               --only-show-errors >/dev/null
+            echo "TFSTATE_NETWORK_BASELINE_CHANGED=true" >> "$GITHUB_ENV"
           fi
 
       - name: Ensure Terraform state RBAC for OIDC principal
@@ -385,21 +391,8 @@ jobs:
             --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
             --assignee-principal-type ServicePrincipal \
             --role "Storage Blob Data Contributor" \
-            --scope "$STORAGE_SCOPE" \
-            --only-show-errors >/dev/null || true
-
-          az role assignment create \
-            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
-            --assignee-principal-type ServicePrincipal \
-            --role "Storage Blob Data Contributor" \
             --scope "$CONTAINER_SCOPE" \
             --only-show-errors >/dev/null || true
-
-          ACCOUNT_ASSIGNMENT_COUNT="$(az role assignment list \
-            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
-            --scope "$STORAGE_SCOPE" \
-            --role "Storage Blob Data Contributor" \
-            --query 'length(@)' -o tsv)"
 
           CONTAINER_ASSIGNMENT_COUNT="$(az role assignment list \
             --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
@@ -407,9 +400,9 @@ jobs:
             --role "Storage Blob Data Contributor" \
             --query 'length(@)' -o tsv)"
 
-          if [ "$ACCOUNT_ASSIGNMENT_COUNT" = "0" ] && [ "$CONTAINER_ASSIGNMENT_COUNT" = "0" ]; then
-            echo "OIDC principal is missing 'Storage Blob Data Contributor' on Terraform state storage account/container."
-            echo "Grant role on scope: $STORAGE_SCOPE or $CONTAINER_SCOPE"
+          if [ "$CONTAINER_ASSIGNMENT_COUNT" = "0" ]; then
+            echo "OIDC principal is missing 'Storage Blob Data Contributor' on Terraform state container scope."
+            echo "Grant role on scope: $CONTAINER_SCOPE"
             exit 1
           fi
 
@@ -650,6 +643,31 @@ jobs:
         run: |
           echo "Frontend SWA is deployed by .github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
           echo "azd-deploy.yml intentionally deploys infrastructure and backend services only."
+
+      - name: Restore Terraform state account network baseline
+        if: always()
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          if [ "${TFSTATE_NETWORK_BASELINE_CHANGED:-false}" != "true" ]; then
+            echo "Terraform state network baseline unchanged; no restore required."
+            exit 0
+          fi
+
+          target_public="${TFSTATE_ORIGINAL_PUBLIC_NETWORK_ACCESS:-Enabled}"
+          target_default_action="${TFSTATE_ORIGINAL_DEFAULT_ACTION:-Allow}"
+
+          echo "Restoring Terraform state storage network baseline: publicNetworkAccess=${target_public}, defaultAction=${target_default_action}."
+
+          az storage account update \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --public-network-access "$target_public" \
+            --default-action "$target_default_action" \
+            --only-show-errors >/dev/null
 
   stack-routing-summary:
     runs-on: ubuntu-latest
