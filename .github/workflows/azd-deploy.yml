@@ -283,13 +283,32 @@ jobs:
             exit 1
           }
 
-      - name: Azure Login
+      - name: Azure Login (attempt 1)
+        id: azure_login_primary
+        continue-on-error: true
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           allow-no-subscriptions: true
+
+      - name: Azure Login (retry)
+        id: azure_login_retry
+        if: steps.azure_login_primary.outcome == 'failure'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Ensure Azure login succeeded
+        run: |
+          if [ "${{ steps.azure_login_primary.outcome }}" = "failure" ] && [ "${{ steps.azure_login_retry.outcome }}" = "failure" ]; then
+            echo "Azure login failed on both attempt 1 and retry."
+            exit 1
+          fi
 
       - name: Azure Developer CLI Login
         env:
