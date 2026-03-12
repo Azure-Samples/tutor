@@ -375,23 +375,23 @@ jobs:
             exit 1
           fi
 
-          az role assignment create \
+          set +e
+          role_assignment_output="$(az role assignment create \
             --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
             --assignee-principal-type ServicePrincipal \
             --role "Storage Blob Data Contributor" \
             --scope "$CONTAINER_SCOPE" \
-            --only-show-errors >/dev/null || true
+            --only-show-errors 2>&1)"
+          role_assignment_exit=$?
+          set -e
 
-          CONTAINER_ASSIGNMENT_COUNT="$(az role assignment list \
-            --assignee-object-id "$PRINCIPAL_OBJECT_ID" \
-            --scope "$CONTAINER_SCOPE" \
-            --role "Storage Blob Data Contributor" \
-            --query 'length(@)' -o tsv)"
-
-          if [ "$CONTAINER_ASSIGNMENT_COUNT" = "0" ]; then
-            echo "OIDC principal is missing 'Storage Blob Data Contributor' on Terraform state container scope."
-            echo "Grant role on scope: $CONTAINER_SCOPE"
-            exit 1
+          if [ "$role_assignment_exit" -ne 0 ]; then
+            if echo "$role_assignment_output" | grep -Eq 'AuthorizationFailed|roleAssignments/write'; then
+              echo "Current principal cannot create RBAC assignments at runtime. Continuing with existing permissions check."
+            else
+              echo "Role assignment create returned a non-fatal error; continuing with existing permissions check."
+              echo "$role_assignment_output"
+            fi
           fi
 
           # Role assignment visibility does not guarantee immediate data-plane access.
@@ -416,6 +416,7 @@ jobs:
 
             if [ "$attempt" -eq "$max_attempts" ]; then
               echo "OIDC principal still cannot access state container data-plane after RBAC propagation wait."
+              echo "Required permanent access: grant 'Storage Blob Data Contributor' to principal $PRINCIPAL_OBJECT_ID on scope $CONTAINER_SCOPE."
               exit 1
             fi
 
