@@ -530,8 +530,24 @@ jobs:
           fi
           export RS_KEY
 
+          # Ensure azd always targets the live remote state values.
+          azd env set RS_RESOURCE_GROUP "$RS_RESOURCE_GROUP"
+          azd env set RS_STORAGE_ACCOUNT "$RS_STORAGE_ACCOUNT"
+          azd env set RS_CONTAINER_NAME "$RS_CONTAINER_NAME"
+          azd env set RS_KEY "$RS_KEY"
+
           max_attempts=3
           attempt=1
+          previous_transient_signature=""
+
+          extract_transient_signature() {
+            local log_file="$1"
+            grep -E 'RequestConflict|ContainerAppOperationInProgress|Operation expired|LeaseIdMissing' "$log_file" \
+              | sed -E 's/[[:space:]]+/ /g' \
+              | sed -E 's/[0-9a-fA-F-]{20,}/<id>/g' \
+              | sort -u \
+              | tr '\n' '|' || true
+          }
 
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "=== Provision attempt $attempt/$max_attempts ==="
@@ -557,6 +573,21 @@ jobs:
               echo "Provision failed with non-transient error; not retrying."
               exit "$provision_exit"
             fi
+
+            current_transient_signature="$(extract_transient_signature "$provision_log")"
+            if [ -n "$previous_transient_signature" ]; then
+              if [ "$current_transient_signature" = "$previous_transient_signature" ]; then
+                echo "Provision stopped: transient errors persisted across attempts (no recovery trend)."
+                exit "$provision_exit"
+              fi
+
+              echo "Provision stopped: new transient error signature detected compared to previous attempt."
+              echo "Previous: ${previous_transient_signature}"
+              echo "Current : ${current_transient_signature}"
+              exit "$provision_exit"
+            fi
+
+            previous_transient_signature="$current_transient_signature"
 
             sleep_seconds=$((attempt * 60))
             echo "Transient conflict detected. Retrying in ${sleep_seconds}s..."
