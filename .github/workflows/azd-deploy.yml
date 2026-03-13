@@ -507,6 +507,49 @@ jobs:
       # APIM service-edge resources are now managed by per-service stacks
       # via moved blocks. No runtime state surgery needed.
 
+      - name: Wait for ACA deletion reconciliation
+        env:
+          ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
+        run: |
+          set -euo pipefail
+
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          ACA_NAME="${ACA_ENVIRONMENT_NAME}"
+          max_attempts=40
+          attempt=1
+
+          while [ "$attempt" -le "$max_attempts" ]; do
+            aca_json="$(az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" -o json 2>/dev/null || true)"
+
+            if [ -z "$aca_json" ]; then
+              echo "ACA environment '$ACA_NAME' not found. Safe to proceed with provisioning."
+              break
+            fi
+
+            state="$(echo "$aca_json" | jq -r '.properties.provisioningState // .provisioningState // "unknown"')"
+
+            if [ "$state" = "Succeeded" ]; then
+              echo "ACA environment '$ACA_NAME' is healthy (Succeeded)."
+              break
+            fi
+
+            if echo "$state" | grep -Eq 'Deleting|InProgress|Updating|ScheduledForDelete'; then
+              echo "ACA environment '$ACA_NAME' currently in '$state' state. Waiting for reconciliation ($attempt/$max_attempts)..."
+              sleep 30
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            echo "ACA environment '$ACA_NAME' is in unexpected provisioning state '$state'."
+            echo "Failing fast to avoid repeated provision conflicts."
+            exit 1
+          done
+
+          if [ "$attempt" -gt "$max_attempts" ]; then
+            echo "ACA environment '$ACA_NAME' did not reconcile within wait window."
+            exit 1
+          fi
+
       - name: Provision infrastructure
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
