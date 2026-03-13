@@ -406,19 +406,19 @@ resource "azurerm_api_management_api_policy" "backend_services_hardening" {
 }
 
 resource "azurerm_role_assignment" "container_app_acr_pull" {
-  for_each             = azurerm_container_app.backend_services
+  for_each             = toset(local.backend_service_names)
   scope                = azurerm_container_registry.main.id
   role_definition_name = "AcrPull"
-  principal_id         = each.value.identity[0].principal_id
+  principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
 }
 
 # RC1 fix: AI Foundry role assignments extracted from AVM module to avoid
 # Invalid for_each when container app identities are unknown at plan time.
 resource "azurerm_role_assignment" "container_app_cognitive_services" {
-  for_each             = azurerm_container_app.backend_services
+  for_each             = toset(local.backend_service_names)
   scope                = module.ai_foundry.ai_foundry_id
   role_definition_name = "Cognitive Services User"
-  principal_id         = each.value.identity[0].principal_id
+  principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
 }
 
 resource "azurerm_static_web_app" "frontend" {
