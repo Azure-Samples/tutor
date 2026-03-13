@@ -215,6 +215,7 @@ jobs:
 
   provision:
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     needs:
       - resolve-release
       - detect-changes
@@ -787,7 +788,8 @@ jobs:
             fi
 
             if [ "$provision_exit" -eq 124 ]; then
-              echo "Provision attempt timed out after 45 minutes; treating as transient and retrying."
+              echo "Provision attempt timed out after 45 minutes. Failing fast to avoid prolonged stalled runs."
+              exit 1
             elif ! grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired|AuthorizationFailure|Failed to get existing workspaces|listing blobs|terraform init failed' "$provision_log"; then
               echo "Provision failed with a non-transient error; not retrying further."
               exit "$provision_exit"
