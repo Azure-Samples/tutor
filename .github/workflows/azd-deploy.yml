@@ -580,6 +580,7 @@ jobs:
           azd env set RS_KEY "$RS_KEY"
 
           max_attempts=3
+          max_attempt_minutes=20
           attempt=1
           previous_transient_signature=""
 
@@ -597,7 +598,7 @@ jobs:
 
             set +e
             provision_log="azd-provision-attempt-${attempt}.log"
-            azd provision --no-prompt 2>&1 | tee "$provision_log"
+            timeout --signal=TERM --kill-after=2m "${max_attempt_minutes}m" azd provision --no-prompt 2>&1 | tee "$provision_log"
             provision_exit=${PIPESTATUS[0]}
             set -e
 
@@ -608,6 +609,12 @@ jobs:
 
             if [ "$attempt" -eq "$max_attempts" ]; then
               echo "Provision failed after $max_attempts attempts."
+              exit 1
+            fi
+
+            if [ "$provision_exit" -eq 124 ]; then
+              echo "Provision stopped: attempt exceeded ${max_attempt_minutes}m timeout."
+              echo "Failing fast to avoid long-running hangs."
               exit 1
             fi
 
