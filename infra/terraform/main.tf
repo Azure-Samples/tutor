@@ -166,6 +166,7 @@ resource "azurerm_container_app_environment" "main" {
   lifecycle {
     ignore_changes = [
       infrastructure_subnet_id,
+      infrastructure_resource_group_name,
     ]
   }
 }
