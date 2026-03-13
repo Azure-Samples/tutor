@@ -342,6 +342,15 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ "$RELEASE_TIER" != "prod" ]; then
+            echo "Non-prod release tier detected; keeping Terraform-managed ACA mode."
+            echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
+            echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
+            azd env set TF_VAR_existing_container_app_environment_name ""
+            azd env set TF_VAR_reuse_existing_container_app_environment "false"
+            exit 0
+          fi
+
           RG_NAME="tutor-${AZURE_ENV_NAME}"
           ACA_NAME="tutor-${AZURE_ENV_NAME}-acae"
 
