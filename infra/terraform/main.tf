@@ -164,6 +164,8 @@ resource "azurerm_container_app_environment" "main" {
   infrastructure_subnet_id   = var.aca_vnet_integration_enabled ? azurerm_subnet.aca_infrastructure[0].id : null
 
   lifecycle {
+    prevent_destroy = true
+
     ignore_changes = [
       infrastructure_subnet_id,
       infrastructure_resource_group_name,

@@ -500,6 +500,58 @@ jobs:
 
           terraform validate
 
+      - name: Reconcile ACA environment in Terraform state
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          set -euo pipefail
+          cd infra/terraform
+
+          terraform init -reconfigure -backend-config=backend.hcl
+
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          ACA_ID="$(az containerapp env show --resource-group "$RG_NAME" --name "$ACA_ENVIRONMENT_NAME" --query id -o tsv 2>/dev/null || true)"
+
+          if [ -z "$ACA_ID" ]; then
+            echo "ACA environment '$ACA_ENVIRONMENT_NAME' not found in resource group '$RG_NAME'. State import not required."
+            exit 0
+          fi
+
+          if terraform state show 'azurerm_container_app_environment.main[0]' >/dev/null 2>&1; then
+            echo "Detected legacy state address azurerm_container_app_environment.main[0]. Moving to azurerm_container_app_environment.main..."
+            terraform state mv 'azurerm_container_app_environment.main[0]' azurerm_container_app_environment.main
+          fi
+
+          if terraform state show azurerm_container_app_environment.main >/dev/null 2>&1; then
+            echo "Terraform state already contains azurerm_container_app_environment.main. No import needed."
+            exit 0
+          fi
+
+          echo "ACA environment exists in Azure but is missing from Terraform state. Importing azurerm_container_app_environment.main..."
+
+          set +e
+          import_output="$(terraform import azurerm_container_app_environment.main "$ACA_ID" 2>&1)"
+          import_exit=$?
+          set -e
+
+          if [ "$import_exit" -ne 0 ]; then
+            echo "$import_output"
+            echo "Failed to import existing ACA environment '$ACA_ENVIRONMENT_NAME' into Terraform state."
+            exit "$import_exit"
+          fi
+
+          echo "$import_output"
+
+          if ! terraform state show azurerm_container_app_environment.main >/dev/null 2>&1; then
+            echo "ACA import did not materialize at azurerm_container_app_environment.main. Failing fast."
+            exit 1
+          fi
+
+          echo "Successfully imported ACA environment into Terraform state."
+
       # State adoption is no longer needed every run. Resources are now stable
       # in state. If a one-time import is needed, use declarative import blocks
       # in main.tf (Terraform >= 1.9) and remove them after the first apply.
@@ -556,6 +608,7 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
+          TF_CLI_ARGS_apply: -parallelism=1
           RS_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           RS_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           RS_CONTAINER_NAME: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
