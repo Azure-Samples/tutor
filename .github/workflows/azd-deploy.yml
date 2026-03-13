@@ -576,6 +576,27 @@ jobs:
               continue
             fi
 
+            provisioning_state="$(az containerapp show --resource-group "$RG_NAME" --name "$app_name" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+            if [ "$provisioning_state" != "Succeeded" ]; then
+              echo "Container App '$app_name' is in provisioning state '$provisioning_state'. Deleting to allow clean Terraform recreate..."
+              az containerapp delete --resource-group "$RG_NAME" --name "$app_name" --yes --only-show-errors >/dev/null
+
+              for _ in $(seq 1 30); do
+                if ! az containerapp show --resource-group "$RG_NAME" --name "$app_name" --only-show-errors >/dev/null 2>&1; then
+                  echo "Container App '$app_name' deletion confirmed."
+                  break
+                fi
+                sleep 10
+              done
+
+              if az containerapp show --resource-group "$RG_NAME" --name "$app_name" --only-show-errors >/dev/null 2>&1; then
+                echo "Container App '$app_name' did not delete within the expected window."
+                exit 1
+              fi
+
+              continue
+            fi
+
             app_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/${app_name}"
 
             if [ -z "$app_id" ]; then
