@@ -552,6 +552,55 @@ jobs:
 
           echo "Successfully imported ACA environment into Terraform state."
 
+      - name: Reconcile backend ACA apps in Terraform state
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+        run: |
+          set -euo pipefail
+          cd infra/terraform
+
+          terraform init -reconfigure -backend-config=backend.hcl
+
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+
+          for service in "${services[@]}"; do
+            app_name="tutor-${service}-${AZURE_ENV_NAME}"
+            tf_addr="azurerm_container_app.backend_services[\"${service}\"]"
+
+            app_id="$(az containerapp show --resource-group "$RG_NAME" --name "$app_name" --query id -o tsv 2>/dev/null || true)"
+
+            if [ -z "$app_id" ]; then
+              echo "Container App '$app_name' not found in Azure. Skipping state import."
+              continue
+            fi
+
+            if terraform state show "$tf_addr" >/dev/null 2>&1; then
+              echo "Terraform state already contains $tf_addr. No import needed."
+              continue
+            fi
+
+            echo "Container App '$app_name' exists in Azure but is missing from Terraform state. Importing $tf_addr..."
+
+            set +e
+            import_output="$(terraform import "$tf_addr" "$app_id" 2>&1)"
+            import_exit=$?
+            set -e
+
+            if [ "$import_exit" -ne 0 ]; then
+              echo "$import_output"
+              echo "Failed to import existing Container App '$app_name' into Terraform state."
+              exit "$import_exit"
+            fi
+
+            echo "$import_output"
+          done
+
+          echo "Backend ACA app state reconciliation complete."
+
       # State adoption is no longer needed every run. Resources are now stable
       # in state. If a one-time import is needed, use declarative import blocks
       # in main.tf (Terraform >= 1.9) and remove them after the first apply.
