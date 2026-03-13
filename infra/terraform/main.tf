@@ -294,10 +294,12 @@ resource "azurerm_container_app" "backend_services" {
 
   template {
     container {
-      name   = each.key
-      image  = "mcr.microsoft.com/azuredocs/containerapps-helloworld:latest"
-      cpu    = 0.5
-      memory = "1Gi"
+      name    = each.key
+      image   = "mcr.microsoft.com/cbl-mariner/base/python:3.12"
+      command = ["python"]
+      args    = ["-m", "http.server", "8000"]
+      cpu     = 0.5
+      memory  = "1Gi"
     }
   }
 
