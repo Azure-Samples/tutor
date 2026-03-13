@@ -1,7 +1,6 @@
 locals {
-  normalized_prefix = lower(replace("${var.name_prefix}${var.environment}", "-", ""))
-  container_app_environment_name = var.existing_container_app_environment_name != "" ? var.existing_container_app_environment_name : "${var.name_prefix}-${var.environment}-acae"
-  container_app_environment_id   = var.reuse_existing_container_app_environment ? data.azurerm_container_app_environment.main[0].id : azurerm_container_app_environment.main[0].id
+  normalized_prefix              = lower(replace("${var.name_prefix}${var.environment}", "-", ""))
+  container_app_environment_name = "${var.name_prefix}-${var.environment}-acae"
   backend_service_names = [
     "avatar",
     "configuration",
@@ -150,14 +149,14 @@ resource "azurerm_private_dns_zone_virtual_network_link" "cosmos" {
   virtual_network_id    = azurerm_virtual_network.aca[0].id
 }
 
-data "azurerm_container_app_environment" "main" {
-  count               = var.reuse_existing_container_app_environment ? 1 : 0
-  name                = local.container_app_environment_name
-  resource_group_name = azurerm_resource_group.main.name
+# One-time migration: moves the indexed resource to a non-indexed address.
+# After first successful apply, remove this moved block and the data source below.
+moved {
+  from = azurerm_container_app_environment.main[0]
+  to   = azurerm_container_app_environment.main
 }
 
 resource "azurerm_container_app_environment" "main" {
-  count                      = var.reuse_existing_container_app_environment ? 0 : 1
   name                       = local.container_app_environment_name
   location                   = azurerm_resource_group.main.location
   resource_group_name        = azurerm_resource_group.main.name
@@ -271,7 +270,7 @@ resource "azurerm_container_app" "backend_services" {
   for_each = toset(local.backend_service_names)
 
   name                         = "${var.name_prefix}-${each.key}-${var.environment}"
-  container_app_environment_id = local.container_app_environment_id
+  container_app_environment_id = azurerm_container_app_environment.main.id
   resource_group_name          = azurerm_resource_group.main.name
   revision_mode                = "Single"
 
@@ -309,9 +308,17 @@ resource "azurerm_container_app" "backend_services" {
     "azd-service-name" = each.key
   }
 
-  # Runtime app revisions are owned by application deploys, not foundation provisioning.
+  # Infrastructure fields (env, identity, registry, ingress, tags) remain Terraform-managed.
+  # Only runtime-mutable fields are ignored so app deploys don't cause drift.
   lifecycle {
-    ignore_changes = all
+    ignore_changes = [
+      template[0].container[0].image,
+      template[0].container[0].env,
+      template[0].min_replicas,
+      template[0].max_replicas,
+      template[0].revision_suffix,
+      secret,
+    ]
   }
 }
 
@@ -396,6 +403,15 @@ resource "azurerm_role_assignment" "container_app_acr_pull" {
   principal_id         = each.value.identity[0].principal_id
 }
 
+# RC1 fix: AI Foundry role assignments extracted from AVM module to avoid
+# Invalid for_each when container app identities are unknown at plan time.
+resource "azurerm_role_assignment" "container_app_cognitive_services" {
+  for_each             = azurerm_container_app.backend_services
+  scope                = module.ai_foundry.ai_foundry_id
+  role_definition_name = "Cognitive Services User"
+  principal_id         = each.value.identity[0].principal_id
+}
+
 resource "azurerm_static_web_app" "frontend" {
   name                = "${var.name_prefix}-${var.environment}-frontend"
   resource_group_name = azurerm_resource_group.main.name
@@ -430,15 +446,6 @@ module "ai_foundry" {
     name                    = "${local.normalized_prefix}${random_string.suffix.result}ai"
     create_ai_agent_service = false
     disable_local_auth      = false
-
-    role_assignments = {
-      for key, ca in azurerm_container_app.backend_services :
-      "ca-${key}" => {
-        role_definition_id_or_name = "Cognitive Services User"
-        principal_id               = ca.identity[0].principal_id
-        principal_type             = "ServicePrincipal"
-      }
-    }
   }
 
   ai_model_deployments = {
@@ -489,3 +496,4 @@ module "ai_foundry" {
   create_private_endpoints = false
   enable_telemetry         = false
 }
+

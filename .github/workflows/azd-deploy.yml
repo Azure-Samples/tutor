@@ -152,8 +152,8 @@ jobs:
                 infra/terraform/stacks/frontend/*)
                   changed_frontend_infra=true
                   ;;
-                azure.yaml|infra/terraform/*|.github/workflows/azd-deploy.yml)
-                  if [[ "$file" != infra/terraform/stacks/* ]]; then
+                azure.yaml|infra/terraform/**|.github/workflows/azd-deploy.yml)
+                  if [[ "$file" != infra/terraform/stacks/services/* ]]; then
                     provision_required=true
                     selected_services=("${all_services[@]}")
                     selected_service_infra=("${all_services[@]}")
@@ -228,8 +228,6 @@ jobs:
       ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
       TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
-      TF_VAR_existing_container_app_environment_name: ${{ needs.resolve-release.outputs.release_tier == 'prod' && needs.resolve-release.outputs.aca_environment_name || '' }}
-      TF_VAR_reuse_existing_container_app_environment: ${{ needs.resolve-release.outputs.release_tier == 'prod' && 'true' || 'false' }}
 
     steps:
       - name: Checkout
@@ -338,121 +336,8 @@ jobs:
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
 
-      - name: Resolve ACA environment ownership mode
-        run: |
-          set -euo pipefail
-
-          if [ "$RELEASE_TIER" != "prod" ]; then
-            echo "Non-prod release tier detected; keeping Terraform-managed ACA mode."
-            echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
-            echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
-            azd env set TF_VAR_existing_container_app_environment_name ""
-            azd env set TF_VAR_reuse_existing_container_app_environment "false"
-            exit 0
-          fi
-
-          RG_NAME="tutor-${AZURE_ENV_NAME}"
-          ACA_NAME="tutor-${AZURE_ENV_NAME}-acae"
-
-          check_aca_exists() {
-            if timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" >/dev/null 2>&1; then
-              return 0
-            fi
-
-            local status=$?
-            if [ "$status" -eq 124 ]; then
-              echo "Timed out while checking ACA environment ${ACA_NAME}."
-            fi
-            return "$status"
-          }
-
-          check_aca_exists
-          aca_exists_status=$?
-
-          if [ "$aca_exists_status" -eq 0 ]; then
-            aca_state="$(timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
-            if [ -z "$aca_state" ] || [ "$aca_state" = "null" ]; then
-              aca_state="$(timeout 45s az containerapp env show --resource-group "$RG_NAME" --name "$ACA_NAME" --query 'provisioningState' -o tsv 2>/dev/null || true)"
-            fi
-            if [ -z "$aca_state" ] || [ "$aca_state" = "null" ]; then
-              echo "Unable to resolve provisioning state for ${ACA_NAME}; defaulting to Terraform-managed creation mode."
-              echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
-              echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
-              azd env set TF_VAR_existing_container_app_environment_name ""
-              azd env set TF_VAR_reuse_existing_container_app_environment "false"
-              exit 0
-            fi
-
-            if [ "$aca_state" = "Succeeded" ]; then
-              echo "Detected healthy ACA environment ${ACA_NAME}; Terraform will reference it."
-              echo "TF_VAR_existing_container_app_environment_name=${ACA_NAME}" >> "$GITHUB_ENV"
-              echo "TF_VAR_reuse_existing_container_app_environment=true" >> "$GITHUB_ENV"
-              azd env set TF_VAR_existing_container_app_environment_name "$ACA_NAME"
-              azd env set TF_VAR_reuse_existing_container_app_environment "true"
-            else
-              echo "Detected ACA environment ${ACA_NAME} with provisioningState='${aca_state:-unknown}'."
-              echo "Deleting failed/unhealthy ACA environment so Terraform can recreate it cleanly."
-              timeout 60s az containerapp env delete --resource-group "$RG_NAME" --name "$ACA_NAME" --yes --no-wait
-
-              max_wait_attempts=30
-              wait_attempt=1
-              while [ "$wait_attempt" -le "$max_wait_attempts" ]; do
-                check_aca_exists
-                aca_exists_status=$?
-
-                if [ "$aca_exists_status" -eq 0 ]; then
-                  echo "Waiting for ACA environment deletion (${wait_attempt}/${max_wait_attempts})..."
-                  sleep 20
-                  wait_attempt=$((wait_attempt + 1))
-                  continue
-                fi
-
-                if [ "$aca_exists_status" -eq 124 ]; then
-                  echo "Timed out while waiting for ACA environment deletion."
-                  exit 1
-                fi
-
-                echo "Failed/unhealthy ACA environment removed. Terraform will create a new managed environment."
-                break
-              done
-
-              check_aca_exists
-              aca_exists_status=$?
-              if [ "$aca_exists_status" -eq 0 ]; then
-                echo "ACA environment ${ACA_NAME} still exists after wait window; continuing in Terraform creation mode."
-              elif [ "$aca_exists_status" -eq 124 ]; then
-                echo "Timed out in final ACA existence check; continuing in Terraform creation mode."
-              fi
-
-              echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
-              echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
-              azd env set TF_VAR_existing_container_app_environment_name ""
-              azd env set TF_VAR_reuse_existing_container_app_environment "false"
-            fi
-          elif [ "$aca_exists_status" -eq 124 ]; then
-            echo "Timed out while querying ACA environment ${ACA_NAME}; aborting deployment."
-            exit 1
-          else
-            echo "No existing ACA environment detected; Terraform will create managed environment ${ACA_NAME}."
-            echo "TF_VAR_existing_container_app_environment_name=" >> "$GITHUB_ENV"
-            echo "TF_VAR_reuse_existing_container_app_environment=false" >> "$GITHUB_ENV"
-            azd env set TF_VAR_existing_container_app_environment_name ""
-            azd env set TF_VAR_reuse_existing_container_app_environment "false"
-          fi
-
-      - name: Refresh Azure Login after ACA reconciliation
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: true
-
-      - name: Refresh Azure Developer CLI Login after ACA reconciliation
-        env:
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: azd auth login --federated-credential-provider github --client-id "$AZURE_CLIENT_ID" --tenant-id "$AZURE_TENANT_ID"
+      # ACA environment is now always Terraform-managed (no data-source toggle).
+      # The moved block in main.tf handles the count[0] -> no-count migration.
 
       - name: Ensure Terraform state account is reachable from GitHub runners
         env:
@@ -564,44 +449,6 @@ jobs:
             attempt=$((attempt + 1))
           done
 
-      - name: Break stale Terraform state lease (best effort)
-        env:
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-          TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
-        run: |
-          set -euo pipefail
-
-          state_key="$TFSTATE_KEY"
-          if [ "$AZURE_ENV_NAME" != "prod" ] || [ -z "$state_key" ]; then
-            state_key="tutor-${AZURE_ENV_NAME}.tfstate"
-          fi
-
-          lease_state="$(az storage blob show \
-            --auth-mode login \
-            --account-name "$TFSTATE_STORAGE_ACCOUNT" \
-            --container-name "$TFSTATE_CONTAINER" \
-            --name "$state_key" \
-            --query 'properties.lease.state' \
-            -o tsv 2>/dev/null || true)"
-
-          if [ -z "$lease_state" ] || [ "$lease_state" = "null" ]; then
-            echo "State blob lease state unavailable; continuing without lease break."
-            exit 0
-          fi
-
-          echo "Current state blob lease state: $lease_state"
-          if [ "$lease_state" = "leased" ]; then
-            echo "Breaking stale lease for state blob $state_key"
-            az storage blob lease break \
-              --auth-mode login \
-              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
-              --container-name "$TFSTATE_CONTAINER" \
-              --blob-name "$state_key" \
-              --output none || true
-            sleep 5
-          fi
-
       - name: Build Terraform backend config
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
@@ -633,93 +480,22 @@ jobs:
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
         run: |
-          set +e
+          set -euo pipefail
           cd infra/terraform
-          terraform init -reconfigure -backend-config=backend.hcl
-          init_exit=$?
-          if [ "$init_exit" -ne 0 ]; then
-            echo "WARNING: Terraform init with remote backend failed. Continuing with backend service deployment path."
-            exit 0
-          fi
 
-          terraform state pull >/dev/null
-          state_exit=$?
-          if [ "$state_exit" -ne 0 ]; then
-            echo "WARNING: Terraform state pull failed. Continuing with backend service deployment path."
+          if ! terraform init -reconfigure -backend-config=backend.hcl; then
+            echo "WARNING: Terraform init with remote backend failed; validation skipped. azd provision will retry."
             exit 0
           fi
 
           terraform validate
-          validate_exit=$?
-          if [ "$validate_exit" -ne 0 ]; then
-            echo "WARNING: Terraform validate failed. Continuing with backend service deployment path."
-            exit 0
-          fi
 
-      - name: Adopt pre-existing resources into state
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        run: |
-          set -euo pipefail
+      # State adoption is no longer needed every run. Resources are now stable
+      # in state. If a one-time import is needed, use declarative import blocks
+      # in main.tf (Terraform >= 1.9) and remove them after the first apply.
 
-          RG_NAME="tutor-${AZURE_ENV_NAME}"
-          APIM_NAME="tutor-${AZURE_ENV_NAME}-apim"
-
-          cd infra/terraform
-          if ! terraform init -reconfigure -backend-config=backend.hcl; then
-            echo "WARNING: Terraform init failed during state adoption; skipping imports and continuing."
-            exit 0
-          fi
-
-          terraform import azurerm_api_management.main "/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.ApiManagement/service/${APIM_NAME}" || true
-
-          cosmos_account_id="$(az cosmosdb list -g "$RG_NAME" --query '[0].id' -o tsv 2>/dev/null || true)"
-          if [ -n "$cosmos_account_id" ]; then
-            terraform import 'azurerm_cosmosdb_sql_container.containers["upskilling_plans"]' "${cosmos_account_id}/sqlDatabases/tutor/containers/upskilling_plans" || true
-          else
-            echo "No Cosmos account discovered in ${RG_NAME}; skipping upskilling_plans import."
-          fi
-
-          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
-          for service in "${services[@]}"; do
-            app_id="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/tutor-${service}-${AZURE_ENV_NAME}"
-            if az containerapp show --resource-group "$RG_NAME" --name "tutor-${service}-${AZURE_ENV_NAME}" >/dev/null 2>&1; then
-              terraform import "azurerm_container_app.backend_services[\"${service}\"]" "$app_id" || true
-            else
-              terraform state rm "azurerm_container_app.backend_services[\"${service}\"]" || true
-            fi
-          done
-
-      - name: Detach APIM service-edge resources from foundation state
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-        run: |
-          set -euo pipefail
-
-          cd infra/terraform
-          if ! terraform init -reconfigure -backend-config=backend.hcl; then
-            echo "WARNING: Terraform init failed while detaching APIM service-edge resources from foundation state."
-            exit 0
-          fi
-
-          apim_edge_state_entries="$(terraform state list | grep -E '^azurerm_api_management_api\.backend_services\[|^azurerm_api_management_api_policy\.backend_services_hardening\[|^azurerm_api_management_api_operation\.backend_catch_all\[' || true)"
-
-          if [ -z "$apim_edge_state_entries" ]; then
-            echo "No APIM service-edge resources currently tracked in foundation state."
-            exit 0
-          fi
-
-          while IFS= read -r entry; do
-            [ -z "$entry" ] && continue
-            terraform state rm "$entry" || true
-          done <<< "$apim_edge_state_entries"
+      # APIM service-edge resources are now managed by per-service stacks
+      # via moved blocks. No runtime state surgery needed.
 
       - name: Provision infrastructure
         env:
@@ -744,47 +520,17 @@ jobs:
           fi
           export RS_KEY
 
-          max_attempts=6
+          max_attempts=3
           attempt=1
 
           while [ "$attempt" -le "$max_attempts" ]; do
-            echo "Provision attempt $attempt/$max_attempts"
-
-            if ! az storage blob list \
-              --account-name "$RS_STORAGE_ACCOUNT" \
-              --container-name "$RS_CONTAINER_NAME" \
-              --auth-mode login \
-              --num-results 1 \
-              --only-show-errors >/dev/null 2>&1; then
-              if [ "$attempt" -eq "$max_attempts" ]; then
-                echo "Terraform state data-plane access is still unavailable after $max_attempts attempts."
-                exit 1
-              fi
-
-              sleep_seconds=$((attempt * 60))
-              echo "State data-plane access not ready yet. Waiting ${sleep_seconds}s before retry."
-              sleep "$sleep_seconds"
-              attempt=$((attempt + 1))
-              continue
-            fi
+            echo "=== Provision attempt $attempt/$max_attempts ==="
 
             set +e
             provision_log="azd-provision-attempt-${attempt}.log"
-            timeout --signal=TERM --kill-after=2m 45m azd provision --no-prompt --debug >"$provision_log" 2>&1 &
-            provision_pid=$!
-
-            while kill -0 "$provision_pid" 2>/dev/null; do
-              echo "Provision attempt $attempt/$max_attempts is still running..."
-              tail -n 20 "$provision_log" 2>/dev/null || true
-              sleep 30
-            done
-
-            wait "$provision_pid"
-            provision_exit=$?
+            azd provision --no-prompt 2>&1 | tee "$provision_log"
+            provision_exit=${PIPESTATUS[0]}
             set -e
-
-            echo "===== azd provision output (attempt $attempt/$max_attempts) ====="
-            tail -n 400 "$provision_log" || true
 
             if [ "$provision_exit" -eq 0 ]; then
               echo "Provision succeeded on attempt $attempt"
@@ -792,20 +538,18 @@ jobs:
             fi
 
             if [ "$attempt" -eq "$max_attempts" ]; then
-              echo "Provision did not fully converge after $max_attempts attempts; failing workflow."
+              echo "Provision failed after $max_attempts attempts."
               exit 1
             fi
 
-            if [ "$provision_exit" -eq 124 ]; then
-              echo "Provision attempt timed out after 45 minutes. Failing fast to avoid prolonged stalled runs."
-              exit 1
-            elif ! grep -Eq 'RequestConflict|Failed to create/update resource|ContainerAppOperationInProgress|Operation expired|AuthorizationFailure|Failed to get existing workspaces|listing blobs|terraform init failed' "$provision_log"; then
-              echo "Provision failed with a non-transient error; not retrying further."
+            # Only retry on known transient Azure control-plane conflicts
+            if ! grep -Eq 'RequestConflict|ContainerAppOperationInProgress|Operation expired|LeaseIdMissing' "$provision_log"; then
+              echo "Provision failed with non-transient error; not retrying."
               exit "$provision_exit"
             fi
 
-            sleep_seconds=$((attempt * 90))
-            echo "Provision failed due to transient control-plane conflict. Retrying in ${sleep_seconds}s..."
+            sleep_seconds=$((attempt * 60))
+            echo "Transient conflict detected. Retrying in ${sleep_seconds}s..."
             sleep "$sleep_seconds"
             attempt=$((attempt + 1))
           done
@@ -862,7 +606,6 @@ jobs:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
 
     steps:
       - name: Checkout
@@ -889,6 +632,8 @@ jobs:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
+          TF_VAR_name_prefix: tutor
         run: |
           set -euo pipefail
 
@@ -937,7 +682,6 @@ jobs:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
 
     steps:
       - name: Checkout
@@ -963,6 +707,8 @@ jobs:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
+          TF_VAR_name_prefix: tutor
         run: |
           set -euo pipefail
 
@@ -997,6 +743,7 @@ jobs:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
 
     steps:
@@ -1335,6 +1082,7 @@ jobs:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
       STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
 
     steps:
       - name: Checkout
