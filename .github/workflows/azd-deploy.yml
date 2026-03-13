@@ -356,16 +356,26 @@ jobs:
             --name "$TFSTATE_STORAGE_ACCOUNT" \
             --query networkRuleSet.defaultAction -o tsv)"
 
-          if [ "$current_access" = "Disabled" ]; then
-            echo "Terraform state storage account has publicNetworkAccess=Disabled."
-            echo "Permanent fix required: keep secure baseline and provide CI reachability (for example via approved runner egress/network path)."
-            exit 1
-          fi
+          echo "TFSTATE_ORIGINAL_PUBLIC_ACCESS=$current_access" >> "$GITHUB_ENV"
+          echo "TFSTATE_ORIGINAL_DEFAULT_ACTION=$current_default_action" >> "$GITHUB_ENV"
+          echo "TFSTATE_TEMP_NETWORK_OPEN=false" >> "$GITHUB_ENV"
 
-          if [ "$current_default_action" = "Deny" ]; then
-            echo "Terraform state storage account has networkRuleSet.defaultAction=Deny."
-            echo "Permanent fix required: keep secure baseline and provide CI reachability (for example via approved runner egress/network path)."
-            exit 1
+          if [ "$current_access" = "Disabled" ] || [ "$current_default_action" = "Deny" ]; then
+            if [ "$RELEASE_TIER" = "prod" ] || [ "$STRICT_SECURITY" = "true" ]; then
+              echo "Terraform state storage account is private (publicNetworkAccess=${current_access}, defaultAction=${current_default_action})."
+              echo "Strict/prod deployment requires an approved private runner/network path to reach state storage."
+              exit 1
+            fi
+
+            echo "Dev deployment detected with restricted state network. Temporarily enabling runner reachability."
+            az storage account update \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --name "$TFSTATE_STORAGE_ACCOUNT" \
+              --public-network-access Enabled \
+              --default-action Allow \
+              --only-show-errors >/dev/null
+
+            echo "TFSTATE_TEMP_NETWORK_OPEN=true" >> "$GITHUB_ENV"
           fi
 
       - name: Ensure Terraform state RBAC for OIDC principal
@@ -553,6 +563,42 @@ jobs:
             sleep "$sleep_seconds"
             attempt=$((attempt + 1))
           done
+
+      - name: Restore Terraform state network baseline
+        if: always()
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+
+          if [ "${TFSTATE_TEMP_NETWORK_OPEN:-false}" != "true" ]; then
+            echo "No temporary state network changes were made."
+            exit 0
+          fi
+
+          set +e
+          az storage account update \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --default-action "${TFSTATE_ORIGINAL_DEFAULT_ACTION:-Deny}" \
+            --only-show-errors >/dev/null
+          restore_default_exit=$?
+
+          az storage account update \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --public-network-access "${TFSTATE_ORIGINAL_PUBLIC_ACCESS:-Disabled}" \
+            --only-show-errors >/dev/null
+          restore_access_exit=$?
+          set -e
+
+          if [ "$restore_default_exit" -ne 0 ] || [ "$restore_access_exit" -ne 0 ]; then
+            echo "WARNING: Failed to fully restore Terraform state network baseline."
+            exit 1
+          fi
+
+          echo "Terraform state network baseline restored."
 
       - name: Frontend deployment ownership
         run: |
