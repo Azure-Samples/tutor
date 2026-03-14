@@ -683,7 +683,6 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
-          TF_CLI_ARGS_apply: -parallelism=4
           RS_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           RS_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           RS_CONTAINER_NAME: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
@@ -706,6 +705,14 @@ jobs:
           azd env set RS_STORAGE_ACCOUNT "$RS_STORAGE_ACCOUNT"
           azd env set RS_CONTAINER_NAME "$RS_CONTAINER_NAME"
           azd env set RS_KEY "$RS_KEY"
+
+          if [ "$AZURE_ENV_NAME" = "dev" ]; then
+            export TF_CLI_ARGS_apply="-parallelism=1"
+            echo "Dev mode: applying Terraform with serialized parallelism (${TF_CLI_ARGS_apply})."
+          else
+            export TF_CLI_ARGS_apply="-parallelism=4"
+            echo "Non-dev mode: applying Terraform with default parallelism (${TF_CLI_ARGS_apply})."
+          fi
 
           max_attempts=3
           max_attempt_minutes=45
