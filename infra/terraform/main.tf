@@ -295,7 +295,7 @@ resource "azurerm_container_app" "backend_services" {
   template {
     container {
       name    = each.key
-      image   = "mcr.microsoft.com/cbl-mariner/base/python:3.12"
+      image   = "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye"
       command = ["python"]
       args    = ["-m", "http.server", "8000"]
       cpu     = 0.5
