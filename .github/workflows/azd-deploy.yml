@@ -152,12 +152,15 @@ jobs:
                 infra/terraform/stacks/frontend/*)
                   changed_frontend_infra=true
                   ;;
-                azure.yaml|infra/terraform/**|.github/workflows/azd-deploy.yml)
+                azure.yaml|infra/terraform/**)
                   if [[ "$file" != infra/terraform/stacks/services/* ]]; then
                     provision_required=true
                     selected_services=("${all_services[@]}")
                     selected_service_infra=("${all_services[@]}")
                   fi
+                  ;;
+                .github/workflows/azd-deploy.yml)
+                  echo "Workflow-only change detected. Skipping full infrastructure reprovision trigger."
                   ;;
                 lib/*)
                   selected_services=("${all_services[@]}")
