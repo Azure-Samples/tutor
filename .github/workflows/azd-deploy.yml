@@ -708,7 +708,7 @@ jobs:
           azd env set RS_KEY "$RS_KEY"
 
           max_attempts=3
-          max_attempt_minutes=20
+          max_attempt_minutes=45
           attempt=1
           previous_transient_signature=""
 
