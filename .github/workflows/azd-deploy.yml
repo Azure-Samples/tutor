@@ -683,7 +683,7 @@ jobs:
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           ARM_USE_OIDC: true
-          TF_CLI_ARGS_apply: -parallelism=1
+          TF_CLI_ARGS_apply: -parallelism=4
           RS_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           RS_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           RS_CONTAINER_NAME: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
