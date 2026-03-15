@@ -569,6 +569,18 @@ jobs:
 
           RG_NAME="tutor-${AZURE_ENV_NAME}"
           services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          quarantine_detected=false
+          quarantine_dir="aca-quarantine"
+          mkdir -p "$quarantine_dir/apps"
+          : > "$quarantine_dir/report.jsonl"
+          {
+            echo "# ACA Quarantine Summary"
+            echo ""
+            echo "- Resource group: $RG_NAME"
+            echo "- Environment: $AZURE_ENV_NAME"
+            echo "- Trigger: non-succeeded Container App provisioning state"
+            echo ""
+          } > "$quarantine_dir/summary.md"
 
           for service in "${services[@]}"; do
             app_name="tutor-${service}-${AZURE_ENV_NAME}"
@@ -581,21 +593,30 @@ jobs:
 
             provisioning_state="$(az containerapp show --resource-group "$RG_NAME" --name "$app_name" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
             if [ "$provisioning_state" != "Succeeded" ]; then
-              echo "Container App '$app_name' is in provisioning state '$provisioning_state'. Deleting to allow clean Terraform recreate..."
-              az containerapp delete --resource-group "$RG_NAME" --name "$app_name" --yes --only-show-errors >/dev/null
+              quarantine_detected=true
+              echo "::error::Container App '$app_name' is in provisioning state '$provisioning_state'. Quarantining deployment (non-destructive)."
 
-              for _ in $(seq 1 30); do
-                if ! az containerapp show --resource-group "$RG_NAME" --name "$app_name" --only-show-errors >/dev/null 2>&1; then
-                  echo "Container App '$app_name' deletion confirmed."
-                  break
-                fi
-                sleep 10
-              done
+              app_dir="$quarantine_dir/apps/$service"
+              mkdir -p "$app_dir"
 
-              if az containerapp show --resource-group "$RG_NAME" --name "$app_name" --only-show-errors >/dev/null 2>&1; then
-                echo "Container App '$app_name' did not delete within the expected window."
-                exit 1
-              fi
+              az containerapp show --resource-group "$RG_NAME" --name "$app_name" -o json > "$app_dir/app.json" 2>/dev/null || true
+              app_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/${app_name}"
+              az monitor activity-log list \
+                --resource-id "$app_id" \
+                --status Failed \
+                --offset 24h \
+                --max-events 100 \
+                --query '[].{eventTimestamp:eventTimestamp,operationName:operationName.value,correlationId:correlationId,statusMessage:properties.statusMessage}' \
+                -o json > "$app_dir/activity-failures.json" 2>/dev/null || true
+              az containerapp logs show --resource-group "$RG_NAME" --name "$app_name" --type system --tail 200 > "$app_dir/system.log" 2>&1 || true
+
+              printf '{"service":"%s","appName":"%s","provisioningState":"%s"}\n' "$service" "$app_name" "$provisioning_state" >> "$quarantine_dir/report.jsonl"
+              {
+                echo "- Service: $service"
+                echo "  - App: $app_name"
+                echo "  - State: $provisioning_state"
+                echo "  - Diagnostics: $app_dir"
+              } >> "$quarantine_dir/summary.md"
 
               continue
             fi
@@ -628,7 +649,33 @@ jobs:
             echo "$import_output"
           done
 
+          if [ "$quarantine_detected" = true ]; then
+            {
+              echo "### ACA quarantine detected"
+              echo "One or more backend Container Apps were not in Succeeded state."
+              echo "Automatic delete/recreate has been disabled."
+              echo ""
+              echo "#### Next actions"
+              echo "1. Download quarantine diagnostics from workflow artifacts."
+              echo "2. Fix app-level configuration/image/revision issue in place."
+              echo "3. Re-run deployment after services return to Succeeded."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            cat "$quarantine_dir/summary.md"
+            exit 1
+          fi
+
           echo "Backend ACA app state reconciliation complete."
+
+      - name: Upload ACA quarantine diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aca-quarantine-${{ needs.resolve-release.outputs.azure_env_name }}-${{ github.run_id }}
+          path: aca-quarantine/
+          retention-days: 14
+          if-no-files-found: warn
 
       # State adoption is no longer needed every run. Resources are now stable
       # in state. If a one-time import is needed, use declarative import blocks
