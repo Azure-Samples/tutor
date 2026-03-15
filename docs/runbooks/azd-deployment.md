@@ -218,3 +218,20 @@ Capture for each incident:
 - Error signature
 - Mitigation performed
 - Follow-up action item
+
+## Non-Destructive ACA Quarantine (Issue #88)
+
+`azd-deploy.yml` no longer deletes backend Container Apps that are in non-`Succeeded` provisioning states during reconciliation.
+
+Current behavior:
+
+- Detect non-`Succeeded` backend Container Apps and quarantine the run (fail fast before `azd provision`).
+- Capture diagnostics to artifact `aca-quarantine-<env>-<run_id>`.
+- Preserve resources in place for safe investigation and controlled recovery.
+
+Operator remediation sequence:
+
+1. Download quarantine artifact and identify impacted service(s).
+2. Review app state, Activity Log failure records, and system logs from the artifact.
+3. Correct app-level root cause (image/config/secret/revision) without automatic deletion.
+4. Re-run the deployment workflow once impacted apps return to `Succeeded`.
