@@ -28,7 +28,7 @@ permissions:
 jobs:
   recover:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 180
     env:
       AZURE_ENV_NAME: ${{ github.event.inputs.environment }}
       SERVICES_CSV: ${{ github.event.inputs.services }}
