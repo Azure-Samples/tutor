@@ -1,0 +1,178 @@
+name: ACA Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Azure environment name"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - prod
+      services:
+        description: "Comma-separated backend services"
+        required: true
+        default: "configuration,essays,lms-gateway,questions,upskilling"
+        type: string
+
+concurrency:
+  group: aca-recovery-${{ github.ref }}-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AZURE_ENV_NAME: ${{ github.event.inputs.environment }}
+      SERVICES_CSV: ${{ github.event.inputs.services }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          allow-no-subscriptions: true
+
+      - name: Recover ACA services sequentially
+        id: recover
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rg_name="tutor-${AZURE_ENV_NAME}"
+          diag_dir="aca-recovery"
+          mkdir -p "$diag_dir/apps"
+          failures=0
+
+          {
+            echo "# ACA Recovery Summary"
+            echo ""
+            echo "- Resource group: $rg_name"
+            echo "- Environment: $AZURE_ENV_NAME"
+            echo "- Services input: $SERVICES_CSV"
+            echo ""
+          } > "$diag_dir/summary.md"
+
+          IFS=',' read -r -a services <<< "$SERVICES_CSV"
+          for raw_service in "${services[@]}"; do
+            service="$(echo "$raw_service" | xargs)"
+            [ -z "$service" ] && continue
+
+            app_name="tutor-${service}-${AZURE_ENV_NAME}"
+            app_dir="$diag_dir/apps/$service"
+            mkdir -p "$app_dir"
+
+            if ! az containerapp show --resource-group "$rg_name" --name "$app_name" --only-show-errors -o json > "$app_dir/before.json" 2>/dev/null; then
+              failures=$((failures + 1))
+              {
+                echo "- Service: $service"
+                echo "  - App: $app_name"
+                echo "  - Result: Missing"
+              } >> "$diag_dir/summary.md"
+              continue
+            fi
+
+            az containerapp revision list --resource-group "$rg_name" --name "$app_name" -o json > "$app_dir/revisions-before.json" 2>/dev/null || true
+            az containerapp logs show --resource-group "$rg_name" --name "$app_name" --type system --tail 200 > "$app_dir/system-before.log" 2>&1 || true
+
+            provisioning_state="$(jq -r '.properties.provisioningState // ""' "$app_dir/before.json")"
+            running_status="$(jq -r '.properties.runningStatus // ""' "$app_dir/before.json")"
+
+            echo "Recovering $app_name (provisioningState=$provisioning_state, runningStatus=$running_status)"
+
+            heal_token="$(date -u +%Y%m%dT%H%M%SZ)"
+            if ! az containerapp update \
+              --resource-group "$rg_name" \
+              --name "$app_name" \
+              --set-env-vars ACA_HEAL_TS="$heal_token" \
+              --only-show-errors \
+              -o json > "$app_dir/update.json" 2>&1; then
+              failures=$((failures + 1))
+              {
+                echo "- Service: $service"
+                echo "  - App: $app_name"
+                echo "  - Result: UpdateFailed"
+              } >> "$diag_dir/summary.md"
+              continue
+            fi
+
+            healed="false"
+            for attempt in $(seq 1 30); do
+              az containerapp show --resource-group "$rg_name" --name "$app_name" --only-show-errors -o json > "$app_dir/poll.json"
+
+              state_now="$(jq -r '.properties.provisioningState // ""' "$app_dir/poll.json")"
+              fqdn_now="$(jq -r '.properties.latestRevisionFqdn // ""' "$app_dir/poll.json")"
+
+              if [ "$state_now" = "Succeeded" ] && [ -n "$fqdn_now" ]; then
+                healed="true"
+                break
+              fi
+
+              sleep 20
+            done
+
+            mv "$app_dir/poll.json" "$app_dir/after.json"
+            az containerapp revision list --resource-group "$rg_name" --name "$app_name" -o json > "$app_dir/revisions-after.json" 2>/dev/null || true
+            az containerapp logs show --resource-group "$rg_name" --name "$app_name" --type system --tail 200 > "$app_dir/system-after.log" 2>&1 || true
+
+            app_id="/subscriptions/${{ secrets.AZURE_SUBSCRIPTION_ID }}/resourceGroups/${rg_name}/providers/Microsoft.App/containerApps/${app_name}"
+            az monitor activity-log list \
+              --resource-id "$app_id" \
+              --status Failed \
+              --offset 24h \
+              --max-events 100 \
+              --query '[].{eventTimestamp:eventTimestamp,operationName:operationName.value,correlationId:correlationId,statusMessage:properties.statusMessage}' \
+              -o json > "$app_dir/activity-failures.json" 2>/dev/null || true
+
+            if [ "$healed" = "true" ]; then
+              result="Recovered"
+            else
+              result="NotRecovered"
+              failures=$((failures + 1))
+            fi
+
+            state_after="$(jq -r '.properties.provisioningState // ""' "$app_dir/after.json")"
+            fqdn_after="$(jq -r '.properties.latestRevisionFqdn // ""' "$app_dir/after.json")"
+
+            {
+              echo "- Service: $service"
+              echo "  - App: $app_name"
+              echo "  - State before: $provisioning_state"
+              echo "  - State after: $state_after"
+              echo "  - Latest revision FQDN: ${fqdn_after:-<empty>}"
+              echo "  - Result: $result"
+            } >> "$diag_dir/summary.md"
+          done
+
+          {
+            echo ""
+            echo "## Outcome"
+            echo "- Failures: $failures"
+          } >> "$diag_dir/summary.md"
+
+          cat "$diag_dir/summary.md"
+
+          if [ "$failures" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Upload ACA recovery diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aca-recovery-${{ github.event.inputs.environment }}-${{ github.run_id }}
+          path: aca-recovery/
+          retention-days: 14
+          if-no-files-found: warn
