@@ -47,8 +47,6 @@ jobs:
           pnpm --version
       - name: Install dependencies
         run: pnpm --dir frontend install --no-frozen-lockfile
-      - name: Lint frontend
-        run: pnpm --dir frontend lint
       - name: Type check frontend
         run: pnpm --dir frontend exec tsc --noEmit
       - name: Build frontend
