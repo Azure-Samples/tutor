@@ -298,6 +298,7 @@ jobs:
       - name: Azure Login (retry)
         id: azure_login_retry
         if: steps.azure_login_primary.outcome == 'failure'
+        continue-on-error: true
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -759,13 +760,14 @@ jobs:
           if [ "$AZURE_ENV_NAME" = "dev" ]; then
             export TF_CLI_ARGS_apply="-parallelism=1"
             echo "Dev mode: applying Terraform with serialized parallelism (${TF_CLI_ARGS_apply})."
+            max_attempt_minutes=90
           else
             export TF_CLI_ARGS_apply="-parallelism=4"
             echo "Non-dev mode: applying Terraform with default parallelism (${TF_CLI_ARGS_apply})."
+            max_attempt_minutes=60
           fi
 
           max_attempts=3
-          max_attempt_minutes=45
           attempt=1
           previous_transient_signature=""
 
@@ -798,8 +800,16 @@ jobs:
             fi
 
             if [ "$provision_exit" -eq 124 ]; then
-              echo "Provision stopped: attempt exceeded ${max_attempt_minutes}m timeout."
-              echo "Failing fast to avoid long-running hangs."
+              if grep -Eq 'Still creating\.\.\.|Still modifying\.\.\.' "$provision_log"; then
+                sleep_seconds=$((attempt * 60))
+                echo "Provision reached ${max_attempt_minutes}m while Terraform was still making resource progress."
+                echo "Retrying in ${sleep_seconds}s to continue from partial completion..."
+                sleep "$sleep_seconds"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              echo "Provision stopped: attempt exceeded ${max_attempt_minutes}m timeout without progress indicators."
               exit 1
             fi
 
