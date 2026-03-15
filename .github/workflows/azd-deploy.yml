@@ -783,6 +783,116 @@ jobs:
             attempt=$((attempt + 1))
           done
 
+      - name: Capture ACA provisioning diagnostics
+        if: failure()
+        continue-on-error: true
+        run: |
+          set +e
+
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          ACA_ENV_NAME="${ACA_ENVIRONMENT_NAME}"
+          DIAG_DIR="diagnostics"
+          SERVICES=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+
+          mkdir -p "$DIAG_DIR"/{meta,env,apps,activity,logs,deployments}
+
+          {
+            echo "timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "resource_group=$RG_NAME"
+            echo "aca_environment=$ACA_ENV_NAME"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+          } > "$DIAG_DIR/meta/context.txt"
+
+          az version > "$DIAG_DIR/meta/az-version.json" 2>/dev/null || true
+          az account show -o json > "$DIAG_DIR/meta/account.json" 2>/dev/null || true
+
+          az containerapp env show -g "$RG_NAME" -n "$ACA_ENV_NAME" \
+            --query '{id:id,name:name,location:location,provisioningState:properties.provisioningState,defaultDomain:properties.defaultDomain,staticIp:properties.staticIp,zoneRedundant:properties.zoneRedundant}' \
+            -o json > "$DIAG_DIR/env/aca-environment.json" 2>/dev/null || true
+
+          ACA_ENV_ID="$(az containerapp env show -g "$RG_NAME" -n "$ACA_ENV_NAME" --query id -o tsv 2>/dev/null || true)"
+          if [ -n "$ACA_ENV_ID" ]; then
+            az monitor activity-log list \
+              --resource-id "$ACA_ENV_ID" \
+              --status Failed \
+              --offset 24h \
+              --max-events 200 \
+              --query '[].{eventTimestamp:eventTimestamp,operationName:operationName.value,status:status.value,subStatus:subStatus.value,correlationId:correlationId,statusMessage:properties.statusMessage}' \
+              -o json > "$DIAG_DIR/env/aca-environment.activity-failures.json" 2>/dev/null || true
+          fi
+
+          az monitor activity-log list \
+            --resource-group "$RG_NAME" \
+            --status Failed \
+            --offset 24h \
+            --max-events 500 \
+            --query '[].{eventTimestamp:eventTimestamp,resourceId:resourceId,operationName:operationName.value,status:status.value,subStatus:subStatus.value,correlationId:correlationId,statusMessage:properties.statusMessage}' \
+            -o json > "$DIAG_DIR/activity/resource-group.activity-failures.json" 2>/dev/null || true
+
+          az deployment group list -g "$RG_NAME" \
+            --query '[?properties.provisioningState==`Failed`].{name:name,timestamp:properties.timestamp,correlationId:properties.correlationId,provisioningState:properties.provisioningState}' \
+            -o json > "$DIAG_DIR/deployments/failed-deployments.json" 2>/dev/null || true
+
+          FAILED_DEPLOYMENTS=$(az deployment group list -g "$RG_NAME" --query '[?properties.provisioningState==`Failed`].name' -o tsv 2>/dev/null || true)
+          for DEPLOYMENT in $FAILED_DEPLOYMENTS; do
+            [ -z "$DEPLOYMENT" ] && continue
+            mkdir -p "$DIAG_DIR/deployments/$DEPLOYMENT"
+            az deployment operation group list -g "$RG_NAME" -n "$DEPLOYMENT" \
+              --query '[].{operationId:operationId,provisioningState:properties.provisioningState,statusCode:properties.statusCode,statusMessage:properties.statusMessage,targetResource:properties.targetResource.resourceName}' \
+              -o json > "$DIAG_DIR/deployments/$DEPLOYMENT/operations.json" 2>/dev/null || true
+          done
+
+          for SERVICE in "${SERVICES[@]}"; do
+            APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
+            APP_DIR="$DIAG_DIR/apps/$SERVICE"
+            mkdir -p "$APP_DIR"
+
+            az containerapp show -g "$RG_NAME" -n "$APP_NAME" \
+              --query '{id:id,name:name,environmentId:properties.environmentId,provisioningState:properties.provisioningState,runningStatus:properties.runningStatus,latestRevisionName:properties.latestRevisionName,latestReadyRevisionName:properties.latestReadyRevisionName,ingressFqdn:properties.configuration.ingress.fqdn}' \
+              -o json > "$APP_DIR/app.json" 2>/dev/null || true
+
+            APP_ID="$(az containerapp show -g "$RG_NAME" -n "$APP_NAME" --query id -o tsv 2>/dev/null || true)"
+            LATEST_REVISION="$(az containerapp show -g "$RG_NAME" -n "$APP_NAME" --query properties.latestRevisionName -o tsv 2>/dev/null || true)"
+
+            if [ -n "$LATEST_REVISION" ]; then
+              az containerapp revision show -g "$RG_NAME" -n "$APP_NAME" --revision "$LATEST_REVISION" \
+                --query '{name:name,createdTime:properties.createdTime,active:properties.active,healthState:properties.healthState,runningState:properties.runningState,provisioningState:properties.provisioningState,replicas:properties.replicas,trafficWeight:properties.trafficWeight}' \
+                -o json > "$APP_DIR/latest-revision.json" 2>/dev/null || true
+            fi
+
+            if [ -n "$APP_ID" ]; then
+              az monitor activity-log list \
+                --resource-id "$APP_ID" \
+                --status Failed \
+                --offset 24h \
+                --max-events 200 \
+                --query '[].{eventTimestamp:eventTimestamp,operationName:operationName.value,status:status.value,subStatus:subStatus.value,correlationId:correlationId,statusMessage:properties.statusMessage}' \
+                -o json > "$APP_DIR/activity-failures.json" 2>/dev/null || true
+            fi
+
+            az containerapp logs show -g "$RG_NAME" -n "$APP_NAME" --type system --tail 200 > "$DIAG_DIR/logs/${SERVICE}.system.log" 2>&1 || true
+          done
+
+          FAILED_EVENT_COUNT=$(jq 'length' "$DIAG_DIR/activity/resource-group.activity-failures.json" 2>/dev/null || echo 0)
+          {
+            echo "### ACA provisioning diagnostics captured"
+            echo "- Resource group: $RG_NAME"
+            echo "- ACA environment: $ACA_ENV_NAME"
+            echo "- Failed activity events (24h): $FAILED_EVENT_COUNT"
+            echo "- Artifact path: diagnostics/"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload ACA provisioning diagnostics
+        if: failure()
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: aca-provision-diagnostics-${{ needs.resolve-release.outputs.azure_env_name }}-${{ github.run_id }}
+          path: diagnostics/
+          retention-days: 14
+          if-no-files-found: warn
+
       - name: Restore Terraform state network baseline
         if: always()
         env:

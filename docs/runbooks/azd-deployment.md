@@ -174,6 +174,23 @@ After deployment:
 4. Validate APIM endpoint and critical backend APIs through APIM paths.
 5. Validate frontend endpoint after the SWA workflow completes.
 
+## Provision Failure Diagnostics (Issue #87)
+
+When `.github/workflows/azd-deploy.yml` fails in the `provision` job (`Provision infrastructure`), the workflow now captures Azure Container Apps diagnostics and uploads an artifact named:
+
+- `aca-provision-diagnostics-<env>-<run_id>`
+
+The artifact includes:
+
+- ACA environment provisioning state and recent failed activity events
+- Per-service Container App state for backend services (`avatar`, `chat`, `configuration`, `essays`, `evaluation`, `lms-gateway`, `questions`, `upskilling`)
+- Latest revision status (when present) per service
+- Resource-group failed activity events with correlation IDs and status messages
+- Failed ARM deployment operations (if any)
+- Recent system logs (`--type system`) per service
+
+Use this artifact as the first triage source before re-running deployments.
+
 ## Rollback
 
 - Re-run deployment from a known-good commit on `main`.
