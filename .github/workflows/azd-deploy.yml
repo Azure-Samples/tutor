@@ -674,7 +674,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: aca-quarantine-${{ needs.resolve-release.outputs.azure_env_name }}-${{ github.run_id }}
-          path: aca-quarantine/
+          path: infra/terraform/aca-quarantine/
           retention-days: 14
           if-no-files-found: warn
 
