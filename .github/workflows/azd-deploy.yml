@@ -380,6 +380,37 @@ jobs:
       # ACA environment is now always Terraform-managed (no data-source toggle).
       # The moved block in main.tf handles the count[0] -> no-count migration.
 
+      - name: Bootstrap Terraform state backend if missing
+        env:
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+        run: |
+          set -euo pipefail
+
+          if ! az group show --name "$TFSTATE_RESOURCE_GROUP" --query name -o tsv >/dev/null 2>&1; then
+            echo "Terraform state resource group not found. Creating '$TFSTATE_RESOURCE_GROUP' in '$AZURE_LOCATION'."
+            az group create --name "$TFSTATE_RESOURCE_GROUP" --location "$AZURE_LOCATION" --only-show-errors >/dev/null
+          fi
+
+          if ! az storage account show --resource-group "$TFSTATE_RESOURCE_GROUP" --name "$TFSTATE_STORAGE_ACCOUNT" --query name -o tsv >/dev/null 2>&1; then
+            echo "Terraform state storage account not found. Creating '$TFSTATE_STORAGE_ACCOUNT'."
+            az storage account create \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --name "$TFSTATE_STORAGE_ACCOUNT" \
+              --location "$AZURE_LOCATION" \
+              --sku Standard_LRS \
+              --min-tls-version TLS1_2 \
+              --allow-blob-public-access false \
+              --only-show-errors >/dev/null
+          fi
+
+          az storage container create \
+            --name "$TFSTATE_CONTAINER" \
+            --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+            --auth-mode login \
+            --only-show-errors >/dev/null
+
       - name: Ensure Terraform state account is reachable from GitHub runners
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
