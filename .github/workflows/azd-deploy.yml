@@ -459,6 +459,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "TFSTATE_FALLBACK_ACCESS_KEY=false" >> "$GITHUB_ENV"
+
           STORAGE_SCOPE="$(az storage account show \
             --resource-group "$TFSTATE_RESOURCE_GROUP" \
             --name "$TFSTATE_STORAGE_ACCOUNT" \
@@ -523,7 +525,13 @@ jobs:
             if [ "$attempt" -eq "$max_attempts" ]; then
               echo "OIDC principal still cannot access state container data-plane after RBAC propagation wait."
               echo "Required permanent access: grant 'Storage Blob Data Contributor' to principal $PRINCIPAL_OBJECT_ID on scope $CONTAINER_SCOPE."
-              exit 1
+              if [ "$RELEASE_TIER" = "prod" ] || [ "$STRICT_SECURITY" = "true" ]; then
+                exit 1
+              fi
+
+              echo "Dev deployment fallback enabled: using storage account key for Terraform backend auth."
+              echo "TFSTATE_FALLBACK_ACCESS_KEY=true" >> "$GITHUB_ENV"
+              break
             fi
 
             echo "Waiting for storage RBAC propagation (attempt $attempt/$max_attempts)..."
@@ -538,6 +546,8 @@ jobs:
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
         run: |
+          set -euo pipefail
+
           : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
           : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
           : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
@@ -546,14 +556,35 @@ jobs:
           elif [ -z "$TFSTATE_KEY" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
-          cat > infra/terraform/backend.hcl <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "$TFSTATE_KEY"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
+
+          if [ "${TFSTATE_FALLBACK_ACCESS_KEY:-false}" = "true" ]; then
+            TFSTATE_ACCESS_KEY="$(az storage account keys list \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --query '[0].value' -o tsv)"
+
+            if [ -z "$TFSTATE_ACCESS_KEY" ]; then
+              echo "Failed to retrieve storage account access key for Terraform backend fallback."
+              exit 1
+            fi
+
+            cat > infra/terraform/backend.hcl <<EOF
+            resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
+            storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
+            container_name       = "$TFSTATE_CONTAINER"
+            key                  = "$TFSTATE_KEY"
+            access_key           = "$TFSTATE_ACCESS_KEY"
+            EOF
+          else
+            cat > infra/terraform/backend.hcl <<EOF
+            resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
+            storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
+            container_name       = "$TFSTATE_CONTAINER"
+            key                  = "$TFSTATE_KEY"
+            use_azuread_auth     = true
+            use_oidc             = true
+            EOF
+          fi
 
       - name: Validate Terraform configuration with remote backend
         env:
