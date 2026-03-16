@@ -568,22 +568,22 @@ jobs:
               exit 1
             fi
 
-            cat > infra/terraform/backend.hcl <<EOF
-            resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-            storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-            container_name       = "$TFSTATE_CONTAINER"
-            key                  = "$TFSTATE_KEY"
-            access_key           = "$TFSTATE_ACCESS_KEY"
-            EOF
+            {
+              echo "resource_group_name  = \"$TFSTATE_RESOURCE_GROUP\""
+              echo "storage_account_name = \"$TFSTATE_STORAGE_ACCOUNT\""
+              echo "container_name       = \"$TFSTATE_CONTAINER\""
+              echo "key                  = \"$TFSTATE_KEY\""
+              echo "access_key           = \"$TFSTATE_ACCESS_KEY\""
+            } > infra/terraform/backend.hcl
           else
-            cat > infra/terraform/backend.hcl <<EOF
-            resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-            storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-            container_name       = "$TFSTATE_CONTAINER"
-            key                  = "$TFSTATE_KEY"
-            use_azuread_auth     = true
-            use_oidc             = true
-            EOF
+            {
+              echo "resource_group_name  = \"$TFSTATE_RESOURCE_GROUP\""
+              echo "storage_account_name = \"$TFSTATE_STORAGE_ACCOUNT\""
+              echo "container_name       = \"$TFSTATE_CONTAINER\""
+              echo "key                  = \"$TFSTATE_KEY\""
+              echo "use_azuread_auth     = true"
+              echo "use_oidc             = true"
+            } > infra/terraform/backend.hcl
           fi
 
       - name: Validate Terraform configuration with remote backend
