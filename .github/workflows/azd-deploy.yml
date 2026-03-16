@@ -1055,7 +1055,8 @@ jobs:
       - resolve-release
       - detect-changes
       - provision-foundation
-    if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success')
+      - deploy-backend-services
+    if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success') && needs.deploy-backend-services.result == 'success'
     strategy:
       fail-fast: false
       matrix:
@@ -1202,7 +1203,6 @@ jobs:
       - resolve-release
       - detect-changes
       - provision-foundation
-      - provision-service-infra
     if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success')
     strategy:
       fail-fast: false
