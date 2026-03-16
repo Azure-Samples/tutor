@@ -1070,6 +1070,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
@@ -1082,7 +1084,38 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           allow-no-subscriptions: true
 
+      - name: Check for infra changes since last deploy
+        id: infra_diff
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+
+          APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
+          current_aca_image="$(az containerapp show --resource-group "tutor-${AZURE_ENV_NAME}" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
+          deployed_sha="${current_aca_image##*:}"
+          infra_changed="true"
+
+          if [ -n "$deployed_sha" ] && [ "$deployed_sha" != "$GITHUB_SHA" ] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
+            changes="$(git diff --name-only "$deployed_sha" "$GITHUB_SHA" -- "infra/terraform/stacks/services/${SERVICE}/" "infra/terraform/modules/service-edge-apim/" 2>/dev/null || true)"
+            if [ -z "$changes" ]; then
+              infra_changed="false"
+              echo "No infra changes for service-edge '${SERVICE}' between ${deployed_sha:0:8} and ${GITHUB_SHA:0:8}."
+            else
+              echo "Infra changes detected for '${SERVICE}':"
+              echo "$changes"
+            fi
+          elif [ "$deployed_sha" = "$GITHUB_SHA" ]; then
+            infra_changed="false"
+            echo "Deployed SHA matches current SHA. No infra changes."
+          else
+            echo "Cannot resolve deployed SHA (first deploy or pruned history). Will run terraform apply."
+          fi
+
+          echo "infra_changed=$infra_changed" >> "$GITHUB_OUTPUT"
+
       - name: Apply changed service-edge stack
+        if: steps.infra_diff.outputs.infra_changed != 'false'
         env:
           SERVICE: ${{ matrix.service }}
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
