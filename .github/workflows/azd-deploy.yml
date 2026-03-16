@@ -1502,6 +1502,21 @@ jobs:
 
           wait_for_container_app_ready
 
+          # Clear placeholder command/args so the Dockerfile CMD is used.
+          # Terraform bootstraps containers with "python -m http.server 8000";
+          # this must be cleared on first real deploy so uvicorn starts.
+          current_cmd="$(az containerapp show \
+            --resource-group "$RG" --name "$APP_NAME" \
+            --query 'properties.template.containers[0].command[0]' -o tsv 2>/dev/null || true)"
+          if [ -n "$current_cmd" ] && [ "$current_cmd" != "None" ]; then
+            echo "Clearing placeholder command override on '$APP_NAME'."
+            RID="$(az containerapp show -g "$RG" -n "$APP_NAME" --query id -o tsv)"
+            az containerapp show -g "$RG" -n "$APP_NAME" -o json \
+              | jq '{properties:{template:{containers:[.properties.template.containers[0] | .command=[] | .args=[]]}}}' \
+              | az rest --method patch --url "${RID}?api-version=2024-03-01" --body @- --output none 2>&1 || \
+                echo "WARN: Could not clear command override; continuing with deploy."
+          fi
+
           max_update_attempts=6
           update_attempt=1
           while [ "$update_attempt" -le "$max_update_attempts" ]; do

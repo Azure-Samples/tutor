@@ -210,7 +210,7 @@ resource "azurerm_container_app" "backend_services" {
       name    = each.key
       image   = "mcr.microsoft.com/azurelinux/base/python:3.12"
       command = ["python"]
-      args    = ["-m", "http.server", "8000"]
+      args    = ["-m", "http.server", "8000"] # bootstrap-only; Dockerfile CMD takes over after first CI/CD deploy
       cpu     = 0.5
       memory  = "1Gi"
 
@@ -227,7 +227,7 @@ resource "azurerm_container_app" "backend_services" {
         path                    = "/health"
         port                    = 8000
         failure_count_threshold = 30
-        interval_seconds        = 2
+        interval_seconds        = 10
       }
     }
   }
@@ -253,6 +253,8 @@ resource "azurerm_container_app" "backend_services" {
       registry,
       template[0].container[0].image,
       template[0].container[0].env,
+      template[0].container[0].command,
+      template[0].container[0].args,
       template[0].min_replicas,
       template[0].max_replicas,
       template[0].revision_suffix,
