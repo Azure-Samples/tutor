@@ -186,15 +186,10 @@ jobs:
                 frontend/*)
                   changed_frontend_ui=true
                   ;;
-                infra/terraform/stacks/frontend/*)
-                  changed_frontend_infra=true
-                  ;;
                 azure.yaml|infra/terraform/**)
-                  if [[ "$file" != infra/terraform/stacks/services/* ]]; then
-                    provision_required=true
-                    selected_services=("${all_services[@]}")
-                    selected_service_infra=("${all_services[@]}")
-                  fi
+                  provision_required=true
+                  selected_services=("${all_services[@]}")
+                  selected_service_infra=("${all_services[@]}")
                   ;;
                 .github/workflows/azd-deploy.yml)
                   echo "Workflow-only change detected. Skipping full infrastructure reprovision trigger."
@@ -255,7 +250,7 @@ jobs:
 
   provision-foundation:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs:
       - resolve-release
       - detect-changes
@@ -669,10 +664,6 @@ jobs:
 
           echo "Successfully imported ACA environment into Terraform state."
 
-      # Backend ACA apps are now managed by infra/terraform/stacks/aca-apps/
-      # (ADR-013 Phase 2a). State reconciliation for ACA apps happens in the
-      # provision-aca-apps job, not here.
-
       # APIM service-edge resources are now managed by per-service stacks
       # via moved blocks. No runtime state surgery needed.
 
@@ -750,11 +741,11 @@ jobs:
 
           if [ "$RELEASE_TIER" = "dev" ]; then
             export TF_CLI_ARGS_apply="-parallelism=4"
-            echo "Dev mode: applying foundation Terraform with parallelism 4 (ACA apps now in separate stack)."
+            echo "Applying all infrastructure via azd provision (single root)."
             max_attempt_minutes=30
           else
             export TF_CLI_ARGS_apply="-parallelism=4"
-            echo "Non-dev mode: applying Terraform with default parallelism (${TF_CLI_ARGS_apply})."
+            echo "Applying all infrastructure via azd provision (single root)."
             max_attempt_minutes=30
           fi
 
@@ -976,429 +967,13 @@ jobs:
           echo "Frontend SWA is deployed by .github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
           echo "azd-deploy.yml intentionally deploys infrastructure and backend services only."
 
-  # ── Phase 2a: Provision ACA stub apps (ADR-013) ──────────────────────────
-  provision-aca-apps:
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    needs:
-      - resolve-release
-      - detect-changes
-      - provision-foundation
-    if: needs.provision-foundation.result == 'success'
-
-    env:
-      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: true
-
-      - name: Read foundation outputs
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-        run: |
-          set -euo pipefail
-          cd infra/terraform
-
-          if [ "$AZURE_ENV_NAME" != "prod" ]; then
-            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          else
-            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          fi
-
-          cat > backend.hcl <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "$TFSTATE_KEY"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform init -reconfigure -backend-config=backend.hcl
-
-          {
-            echo "TF_VAR_resource_group_name=$(terraform output -raw resource_group_name)"
-            echo "TF_VAR_container_app_environment_id=$(terraform output -raw container_app_environment_id)"
-            echo "TF_VAR_acr_id=$(terraform output -raw acr_id)"
-          } >> "$GITHUB_ENV"
-
-      - name: Apply ACA apps stack
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-          TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
-          TF_VAR_name_prefix: tutor
-        run: |
-          set -euo pipefail
-
-          STACK_DIR="infra/terraform/stacks/aca-apps"
-
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-aca-apps.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
-          terraform -chdir="$STACK_DIR" apply -auto-approve
-
-      - name: Reconcile ACA apps in stack state
-        if: failure()
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-        run: |
-          set -euo pipefail
-          STACK_DIR="infra/terraform/stacks/aca-apps"
-          RG_NAME="tutor-${AZURE_ENV_NAME}"
-          services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
-
-          cd "$STACK_DIR"
-          terraform init -reconfigure -backend-config=backend.hcl
-
-          for service in "${services[@]}"; do
-            app_name="tutor-${service}-${AZURE_ENV_NAME}"
-            tf_addr="azurerm_container_app.backend_services[\"${service}\"]"
-
-            if ! az containerapp show --resource-group "$RG_NAME" --name "$app_name" --only-show-errors >/dev/null 2>&1; then
-              continue
-            fi
-
-            if terraform state show "$tf_addr" >/dev/null 2>&1; then
-              continue
-            fi
-
-            app_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/${app_name}"
-            terraform import "$tf_addr" "$app_id" || echo "::warning::State import failed for ${app_name}"
-          done
-
-  # ── Phase 2b: Provision data + AI resources (ADR-013) ─────────────────────
-  provision-data-ai:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    needs:
-      - resolve-release
-      - detect-changes
-      - provision-foundation
-    if: needs.provision-foundation.result == 'success'
-
-    env:
-      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: true
-
-      - name: Read foundation outputs
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-        run: |
-          set -euo pipefail
-          cd infra/terraform
-
-          if [ "$AZURE_ENV_NAME" != "prod" ]; then
-            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          else
-            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          fi
-
-          cat > backend.hcl <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "$TFSTATE_KEY"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform init -reconfigure -backend-config=backend.hcl
-
-          {
-            echo "TF_VAR_resource_group_name=$(terraform output -raw resource_group_name)"
-            echo "TF_VAR_resource_group_id=$(terraform output -raw resource_group_id)"
-            echo "TF_VAR_location=$(terraform output -raw azure_location)"
-            echo "TF_VAR_random_suffix=$(terraform output -raw random_suffix)"
-            echo "TF_VAR_normalized_prefix=$(terraform output -raw normalized_prefix)"
-            echo "TF_VAR_storage_account_id=$(terraform output -raw storage_account_id)"
-            echo "TF_VAR_cosmos_pe_subnet_id=$(terraform output -raw cosmos_pe_subnet_id)"
-          } >> "$GITHUB_ENV"
-
-          # cosmos_dns_zone_ids is a list — capture as JSON for tfvars
-          COSMOS_DNS_ZONE_IDS="$(terraform output -json cosmos_dns_zone_ids)"
-          echo "COSMOS_DNS_ZONE_IDS_JSON=$COSMOS_DNS_ZONE_IDS" >> "$GITHUB_ENV"
-
-      - name: Apply data-ai stack
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-          TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
-          TF_VAR_name_prefix: tutor
-        run: |
-          set -euo pipefail
-
-          STACK_DIR="infra/terraform/stacks/data-ai"
-
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-data-ai.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          # Pass list variable via -var flag
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
-          terraform -chdir="$STACK_DIR" apply -auto-approve \
-            -var="cosmos_dns_zone_ids=${COSMOS_DNS_ZONE_IDS_JSON}"
-
-  # ── Phase 2c: Provision gateway + RBAC (ADR-013) ─────────────────────────
-  provision-gateway-rbac:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs:
-      - resolve-release
-      - detect-changes
-      - provision-foundation
-      - provision-aca-apps
-      - provision-data-ai
-    if: needs.provision-foundation.result == 'success' && needs.provision-aca-apps.result == 'success' && needs.provision-data-ai.result == 'success'
-
-    env:
-      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: true
-
-      - name: Read foundation outputs
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-        run: |
-          set -euo pipefail
-          cd infra/terraform
-
-          if [ "$AZURE_ENV_NAME" != "prod" ]; then
-            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          else
-            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          fi
-
-          cat > backend.hcl <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "$TFSTATE_KEY"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform init -reconfigure -backend-config=backend.hcl
-
-          {
-            echo "TF_VAR_resource_group_name=$(terraform output -raw resource_group_name)"
-            echo "TF_VAR_location=$(terraform output -raw azure_location)"
-            echo "TF_VAR_storage_account_id=$(terraform output -raw storage_account_id)"
-            echo "TF_VAR_acr_id=$(terraform output -raw acr_id)"
-            echo "TF_VAR_frontend_default_hostname=$(terraform output -raw frontend_default_hostname)"
-          } >> "$GITHUB_ENV"
-
-      - name: Read aca-apps outputs
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-        run: |
-          set -euo pipefail
-          STACK_DIR="infra/terraform/stacks/aca-apps"
-
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-aca-apps.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
-
-          # principal_ids is a map — capture as JSON
-          PRINCIPAL_IDS_JSON="$(terraform -chdir="$STACK_DIR" output -json principal_ids)"
-          echo "ACA_PRINCIPAL_IDS_JSON=$PRINCIPAL_IDS_JSON" >> "$GITHUB_ENV"
-
-      - name: Read data-ai outputs
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-        run: |
-          set -euo pipefail
-          STACK_DIR="infra/terraform/stacks/data-ai"
-
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-data-ai.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
-
-          {
-            echo "TF_VAR_ai_foundry_id=$(terraform -chdir="$STACK_DIR" output -raw ai_foundry_id)"
-            echo "TF_VAR_cosmos_account_id=$(terraform -chdir="$STACK_DIR" output -raw cosmos_account_id)"
-          } >> "$GITHUB_ENV"
-
-      - name: Apply gateway-rbac stack
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-          TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
-          TF_VAR_name_prefix: tutor
-        run: |
-          set -euo pipefail
-
-          STACK_DIR="infra/terraform/stacks/gateway-rbac"
-
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-gateway-rbac.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
-          terraform -chdir="$STACK_DIR" apply -auto-approve \
-            -var="container_app_principal_ids=${ACA_PRINCIPAL_IDS_JSON}"
-
-  stack-routing-summary:
-    runs-on: ubuntu-latest
-    needs:
-      - resolve-release
-      - detect-changes
-      - provision-foundation
-      - provision-data-ai
-      - provision-gateway-rbac
-    if: always()
-    steps:
-      - name: Print stack routing summary
-        run: |
-          echo "release_tier=${{ needs.resolve-release.outputs.release_tier }}"
-          echo "strict_security=${{ needs.resolve-release.outputs.strict_security }}"
-          echo "azure_env_name=${{ needs.resolve-release.outputs.azure_env_name }}"
-          echo "provision_required=${{ needs.detect-changes.outputs.provision_required }}"
-          echo "services_json=${{ needs.detect-changes.outputs.services_json }}"
-          echo "service_infra_json=${{ needs.detect-changes.outputs.service_infra_json }}"
-          echo "changed_frontend_ui=${{ needs.detect-changes.outputs.changed_frontend_ui }}"
-          echo "changed_frontend_infra=${{ needs.detect-changes.outputs.changed_frontend_infra }}"
-
-      - name: Service stack migration notice
-        if: needs.detect-changes.outputs.service_infra_count != '0'
-        run: |
-          echo "Service infra path changes detected."
-          echo "Per-service stack apply jobs are enabled and will run for changed service stack roots."
-
-      - name: Frontend infra ownership notice
-        if: needs.detect-changes.outputs.changed_frontend_infra == 'true'
-        run: |
-          echo "Frontend infra change detected under infra/terraform/stacks/frontend/."
-          echo "Frontend infra stack apply job is enabled."
-
   provision-service-infra:
     runs-on: ubuntu-latest
     needs:
       - resolve-release
       - detect-changes
       - provision-foundation
-      - provision-aca-apps
-      - provision-data-ai
-      - provision-gateway-rbac
-    if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || (needs.provision-foundation.result == 'success' && needs.provision-aca-apps.result == 'success' && needs.provision-gateway-rbac.result == 'success'))
+    if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success')
     strategy:
       fail-fast: false
       matrix:
@@ -1534,11 +1109,8 @@ jobs:
       - resolve-release
       - detect-changes
       - provision-foundation
-      - provision-aca-apps
-      - provision-data-ai
-      - provision-gateway-rbac
       - provision-service-infra
-    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || (needs.provision-foundation.result == 'success' && needs.provision-aca-apps.result == 'success' && needs.provision-gateway-rbac.result == 'success')) && (needs.provision-service-infra.result == 'success' || needs.provision-service-infra.result == 'skipped')
+    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success') && (needs.provision-service-infra.result == 'success' || needs.provision-service-infra.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
