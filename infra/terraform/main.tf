@@ -337,7 +337,7 @@ resource "azurerm_cosmosdb_sql_container" "containers" {
 
 module "ai_foundry" {
   source  = "Azure/avm-ptn-aiml-ai-foundry/azurerm"
-  version = "0.10.0"
+  version = "0.10.1"
 
   base_name                  = substr("${local.normalized_prefix}${random_string.suffix.result}", 0, 9)
   location                   = var.foundry_location

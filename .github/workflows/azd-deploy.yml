@@ -761,6 +761,37 @@ jobs:
             exit 1
           fi
 
+      # Pre-seed first AI model deployment to avoid 409 RequestConflict.
+      # The AVM module deploys all models in parallel via for_each, but Azure
+      # Cognitive Services rejects concurrent deployment operations on the same
+      # account. This step creates the first model (and its transitive
+      # dependencies: resource group, AI Foundry account) so the subsequent
+      # full provision only needs to create the second model.
+      - name: Pre-seed AI model deployment (serialize Cognitive Services ops)
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+          TF_VAR_location: ${{ needs.resolve-release.outputs.azure_location }}
+        run: |
+          set -euo pipefail
+          cd infra/terraform
+
+          terraform init -reconfigure -backend-config=backend.hcl
+
+          # Skip pre-seed if the first model already exists in state (idempotent).
+          if terraform state show 'module.ai_foundry.azapi_resource.ai_model_deployment["gpt-5-nano"]' >/dev/null 2>&1; then
+            echo "First model deployment already in state. Skipping pre-seed."
+            exit 0
+          fi
+
+          echo "Pre-seeding first model deployment to serialize Cognitive Services operations..."
+          terraform apply -auto-approve -parallelism=4 \
+            -target='module.ai_foundry.azapi_resource.ai_model_deployment["gpt-5-nano"]'
+
+          echo "Pre-seed complete. Full provision will create the remaining model."
+
       - name: Provision infrastructure
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
