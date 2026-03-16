@@ -345,6 +345,57 @@ jobs:
             exit 1
           fi
 
+      - name: Validate RBAC permissions for provisioning
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+
+          SP_OID="$(az ad signed-in-user show --query id -o tsv 2>/dev/null || az account show --query user.name -o tsv 2>/dev/null || true)"
+          if [ -z "$SP_OID" ]; then
+            SP_OID="$(az rest --method GET --url 'https://graph.microsoft.com/v1.0/me' --query id -o tsv 2>/dev/null || true)"
+          fi
+
+          echo "Checking RBAC for principal: ${SP_OID:-unknown}"
+
+          REQUIRED_ACTIONS=(
+            "Microsoft.Authorization/roleAssignments/write"
+            "Microsoft.Resources/subscriptions/resourceGroups/write"
+          )
+
+          missing=0
+          for action in "${REQUIRED_ACTIONS[@]}"; do
+            has_permission="$(az rest \
+              --method POST \
+              --url "https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/providers/Microsoft.Authorization/permissions?api-version=2022-04-01" \
+              2>/dev/null | jq -r --arg act "$action" '.value[]? | select(.actions[]? == $act or .actions[]? == "*") | .actions[0]' 2>/dev/null | head -1 || true)"
+
+            if [ -z "$has_permission" ]; then
+              echo "::warning::May be missing permission: $action"
+              echo "  This is needed to create role assignments (AcrPull, Cognitive Services User, etc.)"
+              echo "  Fix: assign 'Role Based Access Control Administrator' to the OIDC SP at subscription scope."
+              missing=$((missing + 1))
+            fi
+          done
+
+          # Practical check: try a dry-run role assignment probe
+          PROBE_RESULT="$(az role assignment list \
+            --scope "/subscriptions/${AZURE_SUBSCRIPTION_ID}" \
+            --query "[?principalId=='00000000-0000-0000-0000-000000000000'].id" \
+            -o tsv 2>&1 || true)"
+
+          if echo "$PROBE_RESULT" | grep -qi "AuthorizationFailed\|does not have authorization"; then
+            echo "::error::OIDC SP cannot read role assignments. It likely lacks 'Role Based Access Control Administrator' or 'User Access Administrator'."
+            echo "Fix: az role assignment create --assignee <SP_OID> --role 'Role Based Access Control Administrator' --scope /subscriptions/${AZURE_SUBSCRIPTION_ID}"
+            exit 1
+          fi
+
+          if [ "$missing" -gt 0 ]; then
+            echo "::warning::${missing} permission(s) may be missing. Proceeding — Terraform will fail clearly if they are actually absent."
+          else
+            echo "RBAC permissions look good."
+          fi
+
       - name: Azure Developer CLI Login
         env:
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
