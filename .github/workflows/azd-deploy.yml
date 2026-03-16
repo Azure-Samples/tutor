@@ -694,7 +694,7 @@ jobs:
             provisioning_state="$(az containerapp show --resource-group "$RG_NAME" --name "$app_name" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
             if [ "$provisioning_state" != "Succeeded" ]; then
               quarantine_detected=true
-              echo "::error::Container App '$app_name' is in provisioning state '$provisioning_state'. Quarantining deployment (non-destructive)."
+              echo "::warning::Container App '$app_name' is in provisioning state '$provisioning_state'. Capturing diagnostics and proceeding with state adoption."
 
               app_dir="$quarantine_dir/apps/$service"
               mkdir -p "$app_dir"
@@ -717,8 +717,6 @@ jobs:
                 echo "  - State: $provisioning_state"
                 echo "  - Diagnostics: $app_dir"
               } >> "$quarantine_dir/summary.md"
-
-              continue
             fi
 
             app_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG_NAME}/providers/Microsoft.App/containerApps/${app_name}"
@@ -751,18 +749,11 @@ jobs:
 
           if [ "$quarantine_detected" = true ]; then
             {
-              echo "### ACA quarantine detected"
+              echo "### ACA diagnostics captured during state reconciliation"
               echo "One or more backend Container Apps were not in Succeeded state."
-              echo "Automatic delete/recreate has been disabled."
-              echo ""
-              echo "#### Next actions"
-              echo "1. Download quarantine diagnostics from workflow artifacts."
-              echo "2. Fix app-level configuration/image/revision issue in place."
-              echo "3. Re-run deployment after services return to Succeeded."
+              echo "State adoption continued to prevent already-exists conflicts in Terraform apply."
+              echo "Diagnostics were captured under infra/terraform/aca-quarantine/."
             } >> "$GITHUB_STEP_SUMMARY"
-
-            cat "$quarantine_dir/summary.md"
-            exit 1
           fi
 
           echo "Backend ACA app state reconciliation complete."
@@ -856,7 +847,7 @@ jobs:
           azd env set RS_CONTAINER_NAME "$RS_CONTAINER_NAME"
           azd env set RS_KEY "$RS_KEY"
 
-          if [ "$AZURE_ENV_NAME" = "dev" ]; then
+          if [ "$RELEASE_TIER" = "dev" ]; then
             export TF_CLI_ARGS_apply="-parallelism=1"
             echo "Dev mode: applying Terraform with serialized parallelism (${TF_CLI_ARGS_apply})."
             max_attempt_minutes=90
