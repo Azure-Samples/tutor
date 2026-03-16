@@ -1113,18 +1113,29 @@ jobs:
 
           terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
 
+          # Helper: only import if not already in state
+          safe_import() {
+            local addr="$1" id="$2"
+            if terraform -chdir="$STACK_DIR" state show "$addr" >/dev/null 2>&1; then
+              echo "Already in state: $addr — skipping import."
+            else
+              echo "Importing $addr ..."
+              terraform -chdir="$STACK_DIR" import "$addr" "$id" || echo "Import failed for $addr (resource may not exist in Azure yet)."
+            fi
+          }
+
           API_ID="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/tutor-${AZURE_ENV_NAME}/providers/Microsoft.ApiManagement/service/tutor-${AZURE_ENV_NAME}-apim/apis/${SERVICE}-api;rev=1"
           POLICY_ID="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/tutor-${AZURE_ENV_NAME}/providers/Microsoft.ApiManagement/service/tutor-${AZURE_ENV_NAME}-apim/apis/${SERVICE}-api"
 
-          terraform -chdir="$STACK_DIR" import module.service_edge.azurerm_api_management_api.service "$API_ID" || true
-          terraform -chdir="$STACK_DIR" import module.service_edge.azurerm_api_management_api_policy.service "$POLICY_ID" || true
+          safe_import "module.service_edge.azurerm_api_management_api.service" "$API_ID"
+          safe_import "module.service_edge.azurerm_api_management_api_policy.service" "$POLICY_ID"
 
           methods=(get post put patch delete options head)
           for method in "${methods[@]}"; do
             operation_id="${SERVICE}-${method}"
             operation_id="${operation_id//-/}"
             operation_resource_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/tutor-${AZURE_ENV_NAME}/providers/Microsoft.ApiManagement/service/tutor-${AZURE_ENV_NAME}-apim/apis/${SERVICE}-api/operations/${operation_id}"
-            terraform -chdir="$STACK_DIR" import "module.service_edge.azurerm_api_management_api_operation.catch_all[\"${method}\"]" "$operation_resource_id" || true
+            safe_import "module.service_edge.azurerm_api_management_api_operation.catch_all[\"${method}\"]" "$operation_resource_id"
           done
 
           terraform -chdir="$STACK_DIR" apply -auto-approve
