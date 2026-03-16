@@ -1551,7 +1551,8 @@ jobs:
       - resolve-release
       - detect-changes
       - deploy-backend-services
-    if: always() && needs.detect-changes.outputs.service_count != '0' && needs.deploy-backend-services.result == 'success'
+      - provision-service-infra
+    if: always() && needs.detect-changes.outputs.service_count != '0' && needs.deploy-backend-services.result == 'success' && needs.provision-service-infra.result == 'success'
     strategy:
       fail-fast: false
       matrix:
