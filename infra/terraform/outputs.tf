@@ -95,12 +95,12 @@ output "blob_endpoint" {
 
 output "cosmos_account_name" {
   description = "Cosmos DB account name."
-  value       = data.azurerm_cosmosdb_account.main.name
+  value       = local.cosmos_account_name
 }
 
 output "cosmos_endpoint" {
   description = "Cosmos DB endpoint."
-  value       = data.azurerm_cosmosdb_account.main.endpoint
+  value       = local.cosmos_endpoint
 }
 
 output "cosmos_database_name" {
@@ -110,7 +110,7 @@ output "cosmos_database_name" {
 
 output "COSMOS_ENDPOINT" {
   description = "Cosmos DB endpoint for backend services."
-  value       = data.azurerm_cosmosdb_account.main.endpoint
+  value       = local.cosmos_endpoint
 }
 
 output "COSMOS_DATABASE" {
@@ -195,7 +195,7 @@ output "COSMOS_LOCKOUT_RISK" {
 
 output "COSMOS_BREAK_GLASS_COMMAND" {
   description = "Emergency command to re-enable Cosmos public access."
-  value       = "az cosmosdb update -g ${azurerm_resource_group.main.name} -n ${data.azurerm_cosmosdb_account.main.name} --public-network-access Enabled"
+  value       = "az cosmosdb update -g ${azurerm_resource_group.main.name} -n ${local.cosmos_account_name} --public-network-access Enabled"
 }
 
 output "COSMOS_AVATAR_CASE_TABLE" {
@@ -216,12 +216,12 @@ output "BLOB_CONTAINER_NAME" {
 
 output "PROJECT_ENDPOINT" {
   description = "Azure AI Foundry project endpoint (AVM module, ADR-012)."
-  value       = "https://${data.azurerm_cognitive_account.ai_services.name}.services.ai.azure.com/api/projects/${var.name_prefix}-${var.environment}-ai-project"
+  value       = "https://${local.ai_services_name}.services.ai.azure.com/api/projects/${var.name_prefix}-${var.environment}-ai-project"
 }
 
 output "AI_SERVICES_ENDPOINT" {
   description = "Azure AI Services endpoint for Foundry agents."
-  value       = "https://${data.azurerm_cognitive_account.ai_services.name}.cognitiveservices.azure.com/"
+  value       = "https://${local.ai_services_name}.cognitiveservices.azure.com/"
 }
 
 output "MODEL_DEPLOYMENT_NAME" {
@@ -235,8 +235,8 @@ output "MODEL_REASONING_DEPLOYMENT" {
 }
 
 output "ai_foundry_id" {
-  description = "Resource ID of the AI Foundry (AI Services) account."
-  value       = data.azurerm_cognitive_account.ai_services.id
+  description = "Resource ID of the AI Foundry (AI Services) account (computed, not queried)."
+  value       = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${azurerm_resource_group.main.name}/providers/Microsoft.CognitiveServices/accounts/${local.ai_services_name}"
 }
 
 output "ENTRA_TENANT_ID" {
@@ -281,44 +281,48 @@ output "STUDENT_SECRET_SALT" {
   sensitive   = true
 }
 
+# Service resource IDs and base URLs are empty from foundation.
+# On ground-zero, ACA apps don't exist yet — the aca-apps stack creates them.
+# The deploy-backend-services job discovers resource IDs at runtime via az CLI.
+
 output "SERVICE_AVATAR_RESOURCE_ID" {
   description = "Resource ID for avatar service target."
-  value       = try(data.azurerm_container_app.backend_services["avatar"].id, "")
+  value       = ""
 }
 
 output "SERVICE_CONFIGURATION_RESOURCE_ID" {
   description = "Resource ID for configuration service target."
-  value       = try(data.azurerm_container_app.backend_services["configuration"].id, "")
+  value       = ""
 }
 
 output "SERVICE_ESSAYS_RESOURCE_ID" {
   description = "Resource ID for essays service target."
-  value       = try(data.azurerm_container_app.backend_services["essays"].id, "")
+  value       = ""
 }
 
 output "SERVICE_QUESTIONS_RESOURCE_ID" {
   description = "Resource ID for questions service target."
-  value       = try(data.azurerm_container_app.backend_services["questions"].id, "")
+  value       = ""
 }
 
 output "SERVICE_UPSKILLING_RESOURCE_ID" {
   description = "Resource ID for upskilling service target."
-  value       = try(data.azurerm_container_app.backend_services["upskilling"].id, "")
+  value       = ""
 }
 
 output "SERVICE_CHAT_RESOURCE_ID" {
   description = "Resource ID for chat service target."
-  value       = try(data.azurerm_container_app.backend_services["chat"].id, "")
+  value       = ""
 }
 
 output "SERVICE_EVALUATION_RESOURCE_ID" {
   description = "Resource ID for evaluation service target."
-  value       = try(data.azurerm_container_app.backend_services["evaluation"].id, "")
+  value       = ""
 }
 
 output "SERVICE_LMS_GATEWAY_RESOURCE_ID" {
   description = "Resource ID for lms-gateway service target."
-  value       = try(data.azurerm_container_app.backend_services["lms-gateway"].id, "")
+  value       = ""
 }
 
 output "SERVICE_FRONTEND_RESOURCE_ID" {
@@ -328,45 +332,45 @@ output "SERVICE_FRONTEND_RESOURCE_ID" {
 
 output "APIM_BASE_URL" {
   description = "Base URL for Azure API Management gateway."
-  value       = data.azurerm_api_management.main.gateway_url
+  value       = local.apim_gateway_url
 }
 
 output "NEXT_PUBLIC_APIM_BASE_URL" {
   description = "Frontend APIM gateway base URL."
-  value       = data.azurerm_api_management.main.gateway_url
+  value       = local.apim_gateway_url
 }
 
 output "AVATAR_APP_BASE_URL" {
   description = "Public base URL for avatar backend service."
-  value       = try(data.azurerm_container_app.backend_services["avatar"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["avatar"].ingress[0].fqdn}" : ""
+  value       = ""
 }
 
 output "CONFIGURATION_APP_BASE_URL" {
   description = "Public base URL for configuration backend service."
-  value       = try(data.azurerm_container_app.backend_services["configuration"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["configuration"].ingress[0].fqdn}" : ""
+  value       = ""
 }
 
 output "ESSAYS_APP_BASE_URL" {
   description = "Public base URL for essays backend service."
-  value       = try(data.azurerm_container_app.backend_services["essays"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["essays"].ingress[0].fqdn}" : ""
+  value       = ""
 }
 
 output "QUESTIONS_APP_BASE_URL" {
   description = "Public base URL for questions backend service."
-  value       = try(data.azurerm_container_app.backend_services["questions"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["questions"].ingress[0].fqdn}" : ""
+  value       = ""
 }
 
 output "UPSKILLING_APP_BASE_URL" {
   description = "Public base URL for upskilling backend service."
-  value       = try(data.azurerm_container_app.backend_services["upskilling"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["upskilling"].ingress[0].fqdn}" : ""
+  value       = ""
 }
 
 output "WEB_APP_BASE_URL" {
   description = "Public base URL for chat backend service."
-  value       = try(data.azurerm_container_app.backend_services["chat"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["chat"].ingress[0].fqdn}" : ""
+  value       = ""
 }
 
 output "TRANSCRIPTION_APP_BASE_URL" {
   description = "Public base URL for transcription backend service."
-  value       = try(data.azurerm_container_app.backend_services["questions"].ingress[0].fqdn, "") != "" ? "https://${data.azurerm_container_app.backend_services["questions"].ingress[0].fqdn}" : ""
+  value       = ""
 }

@@ -11,6 +11,14 @@ locals {
     "evaluation",
     "lms-gateway",
   ]
+
+  # Computed names for resources managed by downstream stacks.
+  # Using deterministic naming avoids data source lookups that fail on ground-zero.
+  cosmos_account_name = "${local.normalized_prefix}${random_string.suffix.result}cosmos"
+  cosmos_endpoint     = "https://${local.cosmos_account_name}.documents.azure.com:443/"
+  apim_name           = "${var.name_prefix}-${var.environment}-apim"
+  apim_gateway_url    = "https://${local.apim_name}.azure-api.net"
+  ai_services_name    = "${local.normalized_prefix}${random_string.suffix.result}ai"
 }
 
 data "azurerm_client_config" "current" {}
@@ -180,11 +188,8 @@ removed {
   }
 }
 
-# Data sources to look up Cosmos DB resources managed by the data-ai stack.
-data "azurerm_cosmosdb_account" "main" {
-  name                = "${local.normalized_prefix}${random_string.suffix.result}cosmos"
-  resource_group_name = azurerm_resource_group.main.name
-}
+# Cosmos DB values are computed from deterministic naming (no data source lookup).
+# This enables ground-zero deployments where the Cosmos account doesn't exist yet.
 
 # ── Backend Container Apps (moved to stacks/aca-apps/ per ADR-013) ──────────
 # Resources are now managed by infra/terraform/stacks/aca-apps/.
@@ -198,14 +203,8 @@ removed {
   }
 }
 
-# Data sources to look up ACA apps managed by the aca-apps stack.
-# These provide resource IDs and FQDNs for outputs and downstream references.
-data "azurerm_container_app" "backend_services" {
-  for_each = toset(local.backend_service_names)
-
-  name                = "${var.name_prefix}-${each.key}-${var.environment}"
-  resource_group_name = azurerm_resource_group.main.name
-}
+# ACA app values are computed from deterministic naming (no data source lookup).
+# This enables ground-zero deployments where the apps don't exist yet.
 
 # ── APIM (moved to stacks/gateway-rbac/ per ADR-013) ───────────────────────
 # Resources are now managed by infra/terraform/stacks/gateway-rbac/.
@@ -238,11 +237,8 @@ removed {
   }
 }
 
-# Data source to look up APIM managed by the gateway-rbac stack.
-data "azurerm_api_management" "main" {
-  name                = "${var.name_prefix}-${var.environment}-apim"
-  resource_group_name = azurerm_resource_group.main.name
-}
+# APIM values are computed from deterministic naming (no data source lookup).
+# This enables ground-zero deployments where APIM doesn't exist yet.
 
 # ── RBAC (moved to stacks/gateway-rbac/ per ADR-013) ───────────────────────
 
@@ -277,11 +273,8 @@ removed {
   }
 }
 
-# Data source to look up AI Services account managed by the data-ai stack.
-data "azurerm_cognitive_account" "ai_services" {
-  name                = "${local.normalized_prefix}${random_string.suffix.result}ai"
-  resource_group_name = azurerm_resource_group.main.name
-}
+# AI Services values are computed from deterministic naming (no data source lookup).
+# This enables ground-zero deployments where the AI Services account doesn't exist yet.
 
 resource "azurerm_static_web_app" "frontend" {
   name                = "${var.name_prefix}-${var.environment}-frontend"
