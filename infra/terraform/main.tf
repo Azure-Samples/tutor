@@ -210,7 +210,7 @@ resource "azurerm_container_app" "backend_services" {
     container {
       name    = each.key
       image   = "mcr.microsoft.com/azurelinux/base/python:3.12"
-      command = ["python"]
+      command = ["python3"]
       args    = ["-m", "http.server", "8000"] # bootstrap-only; Dockerfile CMD takes over after first CI/CD deploy
       cpu     = 0.5
       memory  = "1Gi"

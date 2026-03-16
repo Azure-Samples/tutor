@@ -813,7 +813,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# lib/ removed — the project's shared library lives at lib/src/tutor_lib.
+# Use more specific patterns to avoid hiding new source files.
+lib/__pycache__/
+lib/*.egg-info/
 lib64/
 parts/
 sdist/

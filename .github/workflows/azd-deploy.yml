@@ -1362,17 +1362,28 @@ jobs:
           rollback_to_latest_ready_revision() {
             local latest_revision=""
             local latest_ready_revision=""
+            local revision_mode=""
 
             latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
             latest_ready_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv 2>/dev/null || true)"
+            revision_mode="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.configuration.activeRevisionsMode' -o tsv 2>/dev/null || true)"
 
             if [ -n "$latest_ready_revision" ] && [ "$latest_ready_revision" != "$latest_revision" ]; then
-              echo "Attempting rollback traffic to latest ready revision '$latest_ready_revision' for '$APP_NAME'."
-              az containerapp ingress traffic set \
-                --resource-group "$RG" \
-                --name "$APP_NAME" \
-                --revision-weight "${latest_ready_revision}=100" \
-                --output none || true
+              if [ "$revision_mode" = "Single" ]; then
+                echo "Single revision mode: deactivating failed revision '$latest_revision' so '$latest_ready_revision' can serve traffic."
+                az containerapp revision deactivate \
+                  --resource-group "$RG" \
+                  --name "$APP_NAME" \
+                  --revision "$latest_revision" \
+                  --output none || true
+              else
+                echo "Attempting rollback traffic to latest ready revision '$latest_ready_revision' for '$APP_NAME'."
+                az containerapp ingress traffic set \
+                  --resource-group "$RG" \
+                  --name "$APP_NAME" \
+                  --revision-weight "${latest_ready_revision}=100" \
+                  --output none || true
+              fi
             fi
           }
 
@@ -1501,6 +1512,29 @@ jobs:
             --identity system
 
           wait_for_container_app_ready
+
+          # --- Pre-deploy cleanup: deactivate any old ActivationFailed revisions ---
+          # In Single revision mode, a zombie revision (Active=True + ActivationFailed)
+          # blocks activation of subsequent revisions. Deactivating it clears the
+          # control-plane deadlock so the new revision can schedule replicas.
+          LATEST_REVISION="$(az containerapp show -g "$RG" -n "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
+          OLD_FAILED_REVISIONS="$(az containerapp revision list \
+            -g "$RG" -n "$APP_NAME" \
+            --query "[?properties.active==\`true\` && (properties.runningState=='ActivationFailed' || properties.runningState=='Activating')].name" \
+            -o tsv 2>/dev/null || true)"
+
+          if [ -n "$OLD_FAILED_REVISIONS" ]; then
+            echo "Deactivating old failed/activating revisions for '$APP_NAME' before deploy:"
+            for old_rev in $OLD_FAILED_REVISIONS; do
+              echo "  Deactivating: $old_rev"
+              az containerapp revision deactivate \
+                -g "$RG" -n "$APP_NAME" \
+                --revision "$old_rev" || true
+            done
+            # Wait for deactivation to settle
+            sleep 10
+            wait_for_container_app_ready
+          fi
 
           # --- Atomic deploy: image + env vars + probes + clear command ---
           # Uses ARM REST PATCH to set the container spec in a single operation.
