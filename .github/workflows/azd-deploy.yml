@@ -1536,13 +1536,15 @@ jobs:
                         type: "Readiness",
                         httpGet: { path: "/health", port: 8000 },
                         failureThreshold: 3,
-                        periodSeconds: 10
+                        periodSeconds: 10,
+                        timeoutSeconds: 5
                       },
                       {
                         type: "Startup",
                         httpGet: { path: "/health", port: 8000 },
                         failureThreshold: 30,
-                        periodSeconds: 10
+                        periodSeconds: 10,
+                        timeoutSeconds: 5
                       }
                     ]
                   }]
