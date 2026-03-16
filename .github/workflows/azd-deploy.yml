@@ -504,7 +504,8 @@ jobs:
 
           # Role assignment visibility does not guarantee immediate data-plane access.
           # Probe the blob API with AAD auth and wait for RBAC propagation.
-          max_attempts=20
+          # Ground-zero deployments may need up to 10 minutes for propagation.
+          max_attempts=40
           attempt=1
           while [ "$attempt" -le "$max_attempts" ]; do
             if az storage container show \
@@ -526,6 +527,19 @@ jobs:
               echo "OIDC principal still cannot access state container data-plane after RBAC propagation wait."
               echo "Required permanent access: grant 'Storage Blob Data Contributor' to principal $PRINCIPAL_OBJECT_ID on scope $CONTAINER_SCOPE."
               if [ "$RELEASE_TIER" = "prod" ] || [ "$STRICT_SECURITY" = "true" ]; then
+                exit 1
+              fi
+
+              # Check whether key-based fallback is even possible on this account.
+              shared_key_access="$(az storage account show \
+                --resource-group "$TFSTATE_RESOURCE_GROUP" \
+                --name "$TFSTATE_STORAGE_ACCOUNT" \
+                --query allowSharedKeyAccess -o tsv 2>/dev/null || echo "true")"
+
+              if [ "$shared_key_access" = "false" ]; then
+                echo "Storage account '$TFSTATE_STORAGE_ACCOUNT' has shared key access disabled."
+                echo "Key-based fallback is not possible. Pre-assign 'Storage Blob Data Contributor' to the OIDC principal:"
+                echo "  az role assignment create --assignee-object-id $PRINCIPAL_OBJECT_ID --assignee-principal-type ServicePrincipal --role 'Storage Blob Data Contributor' --scope $CONTAINER_SCOPE"
                 exit 1
               fi
 
