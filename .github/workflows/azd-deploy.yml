@@ -870,8 +870,49 @@ jobs:
               | tr '\n' '|' || true
           }
 
+          reconcile_backend_aca_state() {
+            local rg_name="tutor-${AZURE_ENV_NAME}"
+            local services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+
+            echo "Reconciling backend ACA Terraform state in '${rg_name}' before provision attempt..."
+
+            (
+              set -euo pipefail
+              cd infra/terraform
+              terraform init -reconfigure -backend-config=backend.hcl >/dev/null
+
+              for service in "${services[@]}"; do
+                local app_name="tutor-${service}-${AZURE_ENV_NAME}"
+                local tf_addr="azurerm_container_app.backend_services[\"${service}\"]"
+
+                if ! az containerapp show --resource-group "$rg_name" --name "$app_name" --only-show-errors >/dev/null 2>&1; then
+                  continue
+                fi
+
+                if terraform state show "$tf_addr" >/dev/null 2>&1; then
+                  continue
+                fi
+
+                local app_id="/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${rg_name}/providers/Microsoft.App/containerApps/${app_name}"
+                set +e
+                import_output="$(terraform import "$tf_addr" "$app_id" 2>&1)"
+                import_exit=$?
+                set -e
+
+                if [ "$import_exit" -ne 0 ]; then
+                  echo "::warning::Pre-attempt state import failed for ${app_name}; proceeding to provision retry."
+                  echo "$import_output"
+                else
+                  echo "State import succeeded for ${app_name}."
+                fi
+              done
+            )
+          }
+
           while [ "$attempt" -le "$max_attempts" ]; do
             echo "=== Provision attempt $attempt/$max_attempts ==="
+
+            reconcile_backend_aca_state
 
             set +e
             provision_log="azd-provision-attempt-${attempt}.log"
@@ -911,15 +952,9 @@ jobs:
 
             current_transient_signature="$(extract_transient_signature "$provision_log")"
             if [ -n "$previous_transient_signature" ]; then
-              if [ "$current_transient_signature" = "$previous_transient_signature" ]; then
-                echo "Provision stopped: transient errors persisted across attempts (no recovery trend)."
-                exit "$provision_exit"
-              fi
-
-              echo "Provision stopped: new transient error signature detected compared to previous attempt."
+              echo "Transient signature changed between attempts."
               echo "Previous: ${previous_transient_signature}"
               echo "Current : ${current_transient_signature}"
-              exit "$provision_exit"
             fi
 
             previous_transient_signature="$current_transient_signature"
