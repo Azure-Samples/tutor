@@ -141,7 +141,6 @@ jobs:
       service_count: ${{ steps.detect.outputs.service_count }}
       provision_required: ${{ steps.detect.outputs.provision_required }}
       changed_frontend_ui: ${{ steps.detect.outputs.changed_frontend_ui }}
-      changed_frontend_infra: ${{ steps.detect.outputs.changed_frontend_infra }}
       service_infra_json: ${{ steps.detect.outputs.service_infra_json }}
       service_infra_count: ${{ steps.detect.outputs.service_infra_count }}
 
@@ -165,7 +164,6 @@ jobs:
           selected_service_infra=()
           provision_required=false
           changed_frontend_ui=false
-          changed_frontend_infra=false
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             selected_services=("${all_services[@]}")
@@ -241,12 +239,10 @@ jobs:
           echo "service_infra_count=$service_infra_count" >> "$GITHUB_OUTPUT"
           echo "provision_required=$provision_required" >> "$GITHUB_OUTPUT"
           echo "changed_frontend_ui=$changed_frontend_ui" >> "$GITHUB_OUTPUT"
-          echo "changed_frontend_infra=$changed_frontend_infra" >> "$GITHUB_OUTPUT"
           echo "Selected services matrix: $services_json"
           echo "Selected service-infra matrix: $service_infra_json"
           echo "Provision required: $provision_required"
           echo "Frontend UI changed: $changed_frontend_ui"
-          echo "Frontend infra changed: $changed_frontend_infra"
 
   provision-foundation:
     runs-on: ubuntu-latest
@@ -1172,62 +1168,6 @@ jobs:
             safe_import "module.service_edge.azurerm_api_management_api_operation.catch_all[\"${method}\"]" "$operation_resource_id"
           done
 
-          terraform -chdir="$STACK_DIR" apply -auto-approve
-
-  provision-frontend-infra:
-    runs-on: ubuntu-latest
-    needs:
-      - resolve-release
-      - detect-changes
-      - provision-foundation
-    if: always() && needs.detect-changes.outputs.changed_frontend_infra == 'true' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success')
-
-    env:
-      RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
-      STRICT_SECURITY: ${{ needs.resolve-release.outputs.strict_security }}
-      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          allow-no-subscriptions: true
-
-      - name: Apply frontend infra stack
-        env:
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
-          TF_VAR_environment: ${{ needs.resolve-release.outputs.azure_env_name }}
-          TF_VAR_name_prefix: tutor
-        run: |
-          set -euo pipefail
-
-          STACK_DIR="infra/terraform/stacks/frontend"
-
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-frontend-infra.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
           terraform -chdir="$STACK_DIR" apply -auto-approve
 
   deploy-backend-services:
