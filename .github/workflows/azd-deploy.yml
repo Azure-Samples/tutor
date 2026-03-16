@@ -1503,65 +1503,63 @@ jobs:
           wait_for_container_app_ready
 
           # --- Atomic deploy: image + env vars + probes + clear command ---
-          # We use `az containerapp update --yaml` to set everything in a single
-          # revision-creating operation. This:
-          #   1. Sets the new container image
-          #   2. Injects all environment variables
-          #   3. Installs HTTP health probes (readiness + startup)
-          #   4. Clears command/args (removes Terraform's placeholder http.server)
-          # The YAML approach is the only way to set probes + clear command/args
-          # atomically — the CLI flags don't expose probe configuration.
+          # Uses ARM REST PATCH to set the container spec in a single operation.
+          # The containers array is replaced entirely (ARM array semantics),
+          # so omitting command/args clears Terraform's placeholder http.server.
+          # This is the only reliable way to clear command overrides — the CLI
+          # flags and --yaml merge don't support removing existing values.
 
-          # Build the env vars as YAML list entries (indented to nest under containers[0].env)
-          ENV_YAML=""
+          # Build env vars as JSON array for jq
+          ENV_JSON="[]"
           for ev in "${ENV_VARS[@]}"; do
             ev_name="${ev%%=*}"
             ev_value="${ev#*=}"
-            ENV_YAML="${ENV_YAML}
-                - name: ${ev_name}
-                  value: \"${ev_value}\""
+            ENV_JSON=$(echo "$ENV_JSON" | jq --arg n "$ev_name" --arg v "$ev_value" '. + [{"name": $n, "value": $v}]')
           done
 
-          # Generate the update YAML with probes.
-          # All lines are indented 10 spaces to satisfy GHA run:| block scalar.
-          # GHA strips 10 spaces; bash sees content at column 0+.
-          UPDATE_YAML="$(mktemp)"
-          trap 'rm -f "$UPDATE_YAML"' EXIT
-          cat > "$UPDATE_YAML" <<EOYAML
-          properties:
-            template:
-              containers:
-              - image: ${IMAGE}
-                name: ${SERVICE}
-                command: []
-                args: []
-                env:${ENV_YAML}
-                probes:
-                - type: Readiness
-                  httpGet:
-                    path: /health
-                    port: 8000
-                  failureThreshold: 3
-                  periodSeconds: 10
-                - type: Startup
-                  httpGet:
-                    path: /health
-                    port: 8000
-                  failureThreshold: 30
-                  periodSeconds: 10
-          EOYAML
+          # Build the PATCH body: image, env, probes — no command/args
+          RID="$(az containerapp show -g "$RG" -n "$APP_NAME" --query id -o tsv)"
+          PATCH_BODY=$(jq -n \
+            --arg img "$IMAGE" \
+            --arg name "$SERVICE" \
+            --argjson env "$ENV_JSON" \
+            '{
+              properties: {
+                template: {
+                  containers: [{
+                    name: $name,
+                    image: $img,
+                    env: $env,
+                    resources: { cpu: 0.5, memory: "1Gi" },
+                    probes: [
+                      {
+                        type: "Readiness",
+                        httpGet: { path: "/health", port: 8000 },
+                        failureThreshold: 3,
+                        periodSeconds: 10
+                      },
+                      {
+                        type: "Startup",
+                        httpGet: { path: "/health", port: 8000 },
+                        failureThreshold: 30,
+                        periodSeconds: 10
+                      }
+                    ]
+                  }]
+                }
+              }
+            }')
 
-          echo "Deploying ${SERVICE} with image, env vars, and health probes (atomic YAML update)."
+          echo "Deploying ${SERVICE} with image, env vars, and health probes (ARM REST PATCH)."
 
           max_update_attempts=6
           update_attempt=1
           while [ "$update_attempt" -le "$max_update_attempts" ]; do
             set +e
-            update_output="$(az containerapp update \
-              --resource-group "$RG" \
-              --name "$APP_NAME" \
-              --yaml "$UPDATE_YAML" \
-              --no-wait \
+            update_output="$(az rest \
+              --method patch \
+              --url "https://management.azure.com${RID}?api-version=2024-03-01" \
+              --body "$PATCH_BODY" \
               --output none 2>&1)"
             update_exit=$?
             set -e
