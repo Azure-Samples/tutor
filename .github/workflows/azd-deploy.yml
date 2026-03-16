@@ -12,6 +12,11 @@ on:
           - auto
           - dev
           - prod
+      azure_env_name_override:
+        description: "Optional env name override for dev tier (for example: 178dev)"
+        required: false
+        default: ""
+        type: string
   push:
     branches:
       - main
@@ -44,6 +49,7 @@ jobs:
         id: resolve
         env:
           INPUT_RELEASE_TIER: ${{ github.event.inputs.release_tier }}
+          INPUT_AZURE_ENV_NAME_OVERRIDE: ${{ github.event.inputs.azure_env_name_override }}
           GITHUB_REF: ${{ github.ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
@@ -65,6 +71,8 @@ jobs:
             release_tier="$requested_tier"
           fi
 
+          azure_env_name_override="${INPUT_AZURE_ENV_NAME_OVERRIDE:-}"
+
           if [ "$release_tier" = "prod" ] && [ "$is_stable_tag" != "true" ]; then
             echo "Prod releases are allowed only from stable tags. Current ref '$GITHUB_REF_NAME' is not stable-tagged."
             exit 1
@@ -84,6 +92,35 @@ jobs:
               exit 1
               ;;
           esac
+
+          if [ -n "$azure_env_name_override" ]; then
+            if [ "$release_tier" != "dev" ]; then
+              echo "azure_env_name_override is only supported for dev release tier"
+              exit 1
+            fi
+
+            if [[ ! "$azure_env_name_override" =~ ^[a-z0-9]+$ ]]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'. Use lowercase letters and digits only."
+              exit 1
+            fi
+
+            if [[ ! "$azure_env_name_override" =~ dev$ ]]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'. Value must end with 'dev'."
+              exit 1
+            fi
+
+            if [ ${#azure_env_name_override} -gt 13 ]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'. Maximum length is 13 characters."
+              exit 1
+            fi
+
+            if [ "$azure_env_name_override" = "prod" ]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'."
+              exit 1
+            fi
+
+            azure_env_name="$azure_env_name_override"
+          fi
 
           azure_location="eastus2"
           aca_environment_name="tutor-${azure_env_name}-acae"
