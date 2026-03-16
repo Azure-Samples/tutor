@@ -1161,7 +1161,7 @@ jobs:
       - detect-changes
       - provision-foundation
       - provision-service-infra
-    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success') && (needs.provision-service-infra.result == 'success' || needs.provision-service-infra.result == 'skipped')
+    if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success')
     strategy:
       fail-fast: false
       matrix:
