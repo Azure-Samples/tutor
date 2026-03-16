@@ -1613,7 +1613,7 @@ jobs:
       - detect-changes
       - deploy-backend-services
       - provision-service-infra
-    if: always() && needs.detect-changes.outputs.service_count != '0' && needs.deploy-backend-services.result == 'success' && needs.provision-service-infra.result == 'success'
+    if: always() && needs.detect-changes.outputs.service_count != '0' && needs.deploy-backend-services.result == 'success' && (needs.provision-service-infra.result == 'success' || needs.provision-service-infra.result == 'skipped')
     strategy:
       fail-fast: false
       matrix:
@@ -1627,7 +1627,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3

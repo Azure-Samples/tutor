@@ -213,6 +213,22 @@ resource "azurerm_container_app" "backend_services" {
       args    = ["-m", "http.server", "8000"]
       cpu     = 0.5
       memory  = "1Gi"
+
+      readiness_probe {
+        transport               = "HTTP"
+        path                    = "/health"
+        port                    = 8000
+        failure_count_threshold = 3
+        period_seconds          = 10
+      }
+
+      startup_probe {
+        transport               = "HTTP"
+        path                    = "/health"
+        port                    = 8000
+        failure_count_threshold = 30
+        period_seconds          = 2
+      }
     }
   }
 
