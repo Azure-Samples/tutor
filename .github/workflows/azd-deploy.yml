@@ -1656,18 +1656,17 @@ jobs:
           set -euo pipefail
 
           echo "=== APIM route integrity check :: ${API_ID} ==="
-          api_json="$(az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" -o json)"
-          api_path="$(jq -r '.path' <<<"$api_json")"
-          subscription_required="$(jq -r '.subscriptionRequired' <<<"$api_json")"
-          protocols_ok="$(jq -r '(.protocols|length==1 and .protocols[0]=="https")' <<<"$api_json")"
+          api_path="$(az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" --query 'path' -o tsv)"
+          subscription_required="$(az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" --query 'subscriptionRequired' -o tsv)"
+          protocols="$(az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" --query 'protocols' -o tsv)"
+          actual_service_url="$(az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" --query 'serviceUrl' -o tsv)"
 
           app_fqdn="$(az containerapp show -g "$RG" -n "$APP_NAME" --query 'properties.configuration.ingress.fqdn' -o tsv)"
           expected_service_url="https://${app_fqdn}"
-          actual_service_url="$(jq -r '.serviceUrl' <<<"$api_json")"
 
           [ "$api_path" = "$EXPECTED_PATH" ] || { echo "APIM path drift: expected=$EXPECTED_PATH actual=$api_path"; exit 1; }
           [ "$subscription_required" = "false" ] || { echo "APIM subscriptionRequired drift: $subscription_required"; exit 1; }
-          [ "$protocols_ok" = "true" ] || { echo "APIM protocol drift: expected https only"; exit 1; }
+          [ "$protocols" = "https" ] || { echo "APIM protocol drift: expected https, got=$protocols"; exit 1; }
           [ "$actual_service_url" = "$expected_service_url" ] || { echo "APIM serviceUrl drift: expected=$expected_service_url actual=$actual_service_url"; exit 1; }
 
       - name: Validate APIM policy and remediate drift (non-prod)
