@@ -214,21 +214,10 @@ resource "azurerm_container_app" "backend_services" {
       cpu     = 0.5
       memory  = "1Gi"
 
-      readiness_probe {
-        transport               = "HTTP"
-        path                    = "/health"
-        port                    = 8000
-        failure_count_threshold = 3
-        interval_seconds        = 10
-      }
-
-      startup_probe {
-        transport               = "HTTP"
-        path                    = "/health"
-        port                    = 8000
-        failure_count_threshold = 30
-        interval_seconds        = 10
-      }
+      # Probes intentionally omitted from Terraform.
+      # The placeholder image cannot serve /health; CI/CD installs HTTP
+      # readiness + startup probes atomically when deploying the real image.
+      # See azd-deploy.yml atomic YAML update block.
     }
   }
 
@@ -255,6 +244,8 @@ resource "azurerm_container_app" "backend_services" {
       template[0].container[0].env,
       template[0].container[0].command,
       template[0].container[0].args,
+      template[0].container[0].readiness_probe,
+      template[0].container[0].startup_probe,
       template[0].min_replicas,
       template[0].max_replicas,
       template[0].revision_suffix,

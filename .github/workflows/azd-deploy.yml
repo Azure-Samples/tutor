@@ -1502,20 +1502,56 @@ jobs:
 
           wait_for_container_app_ready
 
-          # Clear placeholder command/args so the Dockerfile CMD is used.
-          # Terraform bootstraps containers with "python -m http.server 8000";
-          # this must be cleared on first real deploy so uvicorn starts.
-          current_cmd="$(az containerapp show \
-            --resource-group "$RG" --name "$APP_NAME" \
-            --query 'properties.template.containers[0].command[0]' -o tsv 2>/dev/null || true)"
-          if [ -n "$current_cmd" ] && [ "$current_cmd" != "None" ]; then
-            echo "Clearing placeholder command override on '$APP_NAME'."
-            RID="$(az containerapp show -g "$RG" -n "$APP_NAME" --query id -o tsv)"
-            az containerapp show -g "$RG" -n "$APP_NAME" -o json \
-              | jq '{properties:{template:{containers:[.properties.template.containers[0] | .command=[] | .args=[]]}}}' \
-              | az rest --method patch --url "${RID}?api-version=2024-03-01" --body @- --output none 2>&1 || \
-                echo "WARN: Could not clear command override; continuing with deploy."
-          fi
+          # --- Atomic deploy: image + env vars + probes + clear command ---
+          # We use `az containerapp update --yaml` to set everything in a single
+          # revision-creating operation. This:
+          #   1. Sets the new container image
+          #   2. Injects all environment variables
+          #   3. Installs HTTP health probes (readiness + startup)
+          #   4. Clears command/args (removes Terraform's placeholder http.server)
+          # The YAML approach is the only way to set probes + clear command/args
+          # atomically — the CLI flags don't expose probe configuration.
+
+          # Build the env vars as YAML list entries (indented to nest under containers[0].env)
+          ENV_YAML=""
+          for ev in "${ENV_VARS[@]}"; do
+            ev_name="${ev%%=*}"
+            ev_value="${ev#*=}"
+            ENV_YAML="${ENV_YAML}
+                - name: ${ev_name}
+                  value: \"${ev_value}\""
+          done
+
+          # Generate the update YAML with probes.
+          # All lines are indented 10 spaces to satisfy GHA run:| block scalar.
+          # GHA strips 10 spaces; bash sees content at column 0+.
+          UPDATE_YAML="$(mktemp)"
+          trap 'rm -f "$UPDATE_YAML"' EXIT
+          cat > "$UPDATE_YAML" <<EOYAML
+          properties:
+            template:
+              containers:
+              - image: ${IMAGE}
+                name: ${SERVICE}
+                command: []
+                args: []
+                env:${ENV_YAML}
+                probes:
+                - type: Readiness
+                  httpGet:
+                    path: /health
+                    port: 8000
+                  failureThreshold: 3
+                  periodSeconds: 10
+                - type: Startup
+                  httpGet:
+                    path: /health
+                    port: 8000
+                  failureThreshold: 30
+                  periodSeconds: 10
+          EOYAML
+
+          echo "Deploying ${SERVICE} with image, env vars, and health probes (atomic YAML update)."
 
           max_update_attempts=6
           update_attempt=1
@@ -1524,8 +1560,7 @@ jobs:
             update_output="$(az containerapp update \
               --resource-group "$RG" \
               --name "$APP_NAME" \
-              --image "$IMAGE" \
-              --set-env-vars "${ENV_VARS[@]}" \
+              --yaml "$UPDATE_YAML" \
               --no-wait \
               --output none 2>&1)"
             update_exit=$?
