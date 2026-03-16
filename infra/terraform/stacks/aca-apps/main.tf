@@ -10,10 +10,9 @@ resource "azurerm_container_app" "backend_services" {
     type = "SystemAssigned"
   }
 
-  registry {
-    server   = var.acr_login_server
-    identity = "system"
-  }
+  # Registry is configured by the deploy step via `az containerapp registry set`
+  # to avoid chicken-and-egg: system MI needs AcrPull before registry validation,
+  # but AcrPull needs the principal_id that only exists after creation.
 
   template {
     container {
@@ -46,6 +45,7 @@ resource "azurerm_container_app" "backend_services" {
   # Only runtime-mutable fields are ignored so app deploys don't cause drift.
   lifecycle {
     ignore_changes = [
+      registry,
       template[0].container[0].image,
       template[0].container[0].env,
       template[0].min_replicas,

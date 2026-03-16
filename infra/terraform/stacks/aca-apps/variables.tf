@@ -20,11 +20,6 @@ variable "container_app_environment_id" {
   type        = string
 }
 
-variable "acr_login_server" {
-  description = "Azure Container Registry login server (e.g. myacr.azurecr.io)."
-  type        = string
-}
-
 variable "acr_id" {
   description = "Resource ID of the Azure Container Registry."
   type        = string

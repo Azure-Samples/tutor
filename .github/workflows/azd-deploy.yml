@@ -979,7 +979,7 @@ jobs:
   # ── Phase 2a: Provision ACA stub apps (ADR-013) ──────────────────────────
   provision-aca-apps:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     needs:
       - resolve-release
       - detect-changes
@@ -1037,7 +1037,6 @@ jobs:
           {
             echo "TF_VAR_resource_group_name=$(terraform output -raw resource_group_name)"
             echo "TF_VAR_container_app_environment_id=$(terraform output -raw container_app_environment_id)"
-            echo "TF_VAR_acr_login_server=$(terraform output -raw acr_login_server)"
             echo "TF_VAR_acr_id=$(terraform output -raw acr_id)"
           } >> "$GITHUB_ENV"
 
@@ -1815,6 +1814,15 @@ jobs:
           az acr login --name "$ACR_NAME"
           docker build -f "$DOCKERFILE" -t "$IMAGE" .
           docker push "$IMAGE"
+
+          # Ensure ACR registry is configured with managed identity auth.
+          # On ground-zero deploys, Terraform creates ACA apps without a registry
+          # block to avoid chicken-and-egg with AcrPull role assignment.
+          az containerapp registry set \
+            --name "$APP_NAME" \
+            --resource-group "$RG" \
+            --server "$ACR_SERVER" \
+            --identity system
 
           wait_for_container_app_ready
 
