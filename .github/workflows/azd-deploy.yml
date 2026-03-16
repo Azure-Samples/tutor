@@ -1219,6 +1219,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Azure Developer CLI
         uses: Azure/setup-azd@v2
@@ -1436,27 +1438,37 @@ jobs:
           DOCKERFILE="apps/${SERVICE}/dockerfile"
           REPO_NAME="tutor/${SERVICE}-${AZURE_ENV_NAME}"
 
-          # --- Skip-if-unchanged: check if image already exists AND ACA is running it ---
-          image_exists_in_acr="false"
+          # --- Skip-if-unchanged: compare deployed SHA vs current SHA ---
           current_aca_image="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
+          deployed_sha="${current_aca_image##*:}"
+          source_changed="true"
 
-          existing_tags="$(az acr repository show-tags --name "$ACR_NAME" --repository "$REPO_NAME" --filter "${GITHUB_SHA}" --output tsv 2>/dev/null || true)"
-          if [ -n "$existing_tags" ]; then
-            image_exists_in_acr="true"
+          if [ -n "$deployed_sha" ] && [ "$deployed_sha" != "$GITHUB_SHA" ] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
+            changes="$(git diff --name-only "$deployed_sha" "$GITHUB_SHA" -- "apps/${SERVICE}/" "lib/" 2>/dev/null || true)"
+            if [ -z "$changes" ]; then
+              source_changed="false"
+              echo "No source changes in apps/${SERVICE}/ or lib/ between deployed SHA ${deployed_sha:0:8} and current SHA ${GITHUB_SHA:0:8}."
+            else
+              echo "Source changes detected since deployed SHA ${deployed_sha:0:8}:"
+              echo "$changes"
+            fi
+          elif [ "$deployed_sha" = "$GITHUB_SHA" ]; then
+            source_changed="false"
+            echo "ACA is already running image tagged with current SHA ${GITHUB_SHA:0:8}."
           fi
 
-          if [ "$image_exists_in_acr" = "true" ] && [ "$current_aca_image" = "$IMAGE" ]; then
+          if [ "$source_changed" = "false" ]; then
             aca_state="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
             latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
             latest_ready="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv 2>/dev/null || true)"
             running_state="$(az containerapp revision show --resource-group "$RG" --name "$APP_NAME" --revision "$latest_revision" --query 'properties.runningState' -o tsv 2>/dev/null || true)"
 
             if [ "$aca_state" = "Succeeded" ] && [ "$latest_revision" = "$latest_ready" ] && [ "$running_state" = "Running" ]; then
-              echo "::notice::Image '$IMAGE' already exists in ACR and ACA '$APP_NAME' is running it with healthy revision. Skipping build/push/deploy."
+              echo "::notice::No source changes for '${SERVICE}' and ACA revision is healthy. Skipping build/push/deploy."
               echo "DEPLOY_SKIPPED=true" >> "$GITHUB_ENV"
               exit 0
             fi
-            echo "Image exists in ACR but ACA is not fully healthy (state=$aca_state, running=$running_state). Proceeding with deploy."
+            echo "No source changes but ACA is not fully healthy (state=$aca_state, running=$running_state). Proceeding with deploy."
           fi
 
           echo "DEPLOY_SKIPPED=false" >> "$GITHUB_ENV"
@@ -1503,14 +1515,8 @@ jobs:
           fi
 
           az acr login --name "$ACR_NAME"
-
-          # Only build and push if image does not already exist in ACR
-          if [ "$image_exists_in_acr" = "true" ]; then
-            echo "Image tag '${GITHUB_SHA}' already exists in ACR. Skipping build/push."
-          else
-            docker build -f "$DOCKERFILE" -t "$IMAGE" .
-            docker push "$IMAGE"
-          fi
+          docker build -f "$DOCKERFILE" -t "$IMAGE" .
+          docker push "$IMAGE"
 
           # Ensure ACR registry is configured with managed identity auth.
           # On ground-zero deploys, Terraform creates ACA apps without a registry
