@@ -219,7 +219,7 @@ resource "azurerm_container_app" "backend_services" {
         path                    = "/health"
         port                    = 8000
         failure_count_threshold = 3
-        period_seconds          = 10
+        interval_seconds        = 10
       }
 
       startup_probe {
@@ -227,7 +227,7 @@ resource "azurerm_container_app" "backend_services" {
         path                    = "/health"
         port                    = 8000
         failure_count_threshold = 30
-        period_seconds          = 2
+        interval_seconds        = 2
       }
     }
   }
