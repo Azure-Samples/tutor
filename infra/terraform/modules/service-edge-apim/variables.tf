@@ -17,3 +17,9 @@ variable "api_path" {
 variable "container_app_name" {
   type = string
 }
+
+variable "allowed_origins" {
+  type        = list(string)
+  default     = []
+  description = "Additional CORS allowed origins (e.g. SWA hostname). Must be full URLs with scheme, host, and optional port."
+}

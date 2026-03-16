@@ -1681,9 +1681,9 @@ jobs:
 
           echo "=== APIM policy drift check :: ${API_ID} ==="
           policy_url="https://management.azure.com/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG}/providers/Microsoft.ApiManagement/service/${APIM_NAME}/apis/${API_ID}/policies/policy?api-version=2022-08-01"
-          live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
+          live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv 2>/dev/null || echo '')"
 
-          if ! grep -q 'set-variable name="allowed-origin"' <<<"$live_policy"; then
+          if [ -z "$live_policy" ] || ! grep -q '<cors' <<<"$live_policy"; then
             if [ "$STRICT_SECURITY" = "true" ]; then
               echo "APIM policy drift detected for ${API_ID}. Strict mode enabled; remediation disabled."
               exit 1
@@ -1704,7 +1704,7 @@ jobs:
             terraform -chdir="$STACK_DIR" apply -auto-approve
 
             live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
-            if ! grep -q 'set-variable name="allowed-origin"' <<<"$live_policy"; then
+            if ! grep -q '<cors' <<<"$live_policy"; then
               echo "APIM policy remediation failed for ${API_ID}."
               exit 1
             fi
