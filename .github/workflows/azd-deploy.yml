@@ -1434,6 +1434,32 @@ jobs:
 
           IMAGE="${ACR_SERVER}/tutor/${SERVICE}-${AZURE_ENV_NAME}:${GITHUB_SHA}"
           DOCKERFILE="apps/${SERVICE}/dockerfile"
+          REPO_NAME="tutor/${SERVICE}-${AZURE_ENV_NAME}"
+
+          # --- Skip-if-unchanged: check if image already exists AND ACA is running it ---
+          image_exists_in_acr="false"
+          current_aca_image="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
+
+          existing_tags="$(az acr repository show-tags --name "$ACR_NAME" --repository "$REPO_NAME" --filter "${GITHUB_SHA}" --output tsv 2>/dev/null || true)"
+          if [ -n "$existing_tags" ]; then
+            image_exists_in_acr="true"
+          fi
+
+          if [ "$image_exists_in_acr" = "true" ] && [ "$current_aca_image" = "$IMAGE" ]; then
+            aca_state="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.provisioningState' -o tsv 2>/dev/null || true)"
+            latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
+            latest_ready="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv 2>/dev/null || true)"
+            running_state="$(az containerapp revision show --resource-group "$RG" --name "$APP_NAME" --revision "$latest_revision" --query 'properties.runningState' -o tsv 2>/dev/null || true)"
+
+            if [ "$aca_state" = "Succeeded" ] && [ "$latest_revision" = "$latest_ready" ] && [ "$running_state" = "Running" ]; then
+              echo "::notice::Image '$IMAGE' already exists in ACR and ACA '$APP_NAME' is running it with healthy revision. Skipping build/push/deploy."
+              echo "DEPLOY_SKIPPED=true" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Image exists in ACR but ACA is not fully healthy (state=$aca_state, running=$running_state). Proceeding with deploy."
+          fi
+
+          echo "DEPLOY_SKIPPED=false" >> "$GITHUB_ENV"
 
           eval "$(azd env get-values | sed -E 's/^([^=]+)=(.*)$/export \1=\2/')"
 
@@ -1477,8 +1503,14 @@ jobs:
           fi
 
           az acr login --name "$ACR_NAME"
-          docker build -f "$DOCKERFILE" -t "$IMAGE" .
-          docker push "$IMAGE"
+
+          # Only build and push if image does not already exist in ACR
+          if [ "$image_exists_in_acr" = "true" ]; then
+            echo "Image tag '${GITHUB_SHA}' already exists in ACR. Skipping build/push."
+          else
+            docker build -f "$DOCKERFILE" -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
 
           # Ensure ACR registry is configured with managed identity auth.
           # On ground-zero deploys, Terraform creates ACA apps without a registry
@@ -1544,6 +1576,49 @@ jobs:
             echo "Container app '$APP_NAME' update did not succeed after $max_update_attempts attempts."
             exit 1
           fi
+
+      - name: Validate backend health
+        env:
+          SERVICE: ${{ matrix.service }}
+        run: |
+          set -euo pipefail
+
+          APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
+          RG="$(az resource list --resource-type Microsoft.App/containerApps --name "$APP_NAME" --query 'sort_by(@, &id)[0].resourceGroup' -o tsv 2>/dev/null || true)"
+          FQDN="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null || true)"
+
+          if [ -z "$FQDN" ]; then
+            echo "::warning::Could not resolve FQDN for '$APP_NAME'. Skipping direct health check."
+            exit 0
+          fi
+
+          HEALTH_URL="https://${FQDN}/health"
+          echo "=== Backend health check :: ${APP_NAME} → ${HEALTH_URL} ==="
+
+          max_attempts=12
+          attempt=1
+          while [ "$attempt" -le "$max_attempts" ]; do
+            status_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_URL" 2>/dev/null || echo 000)"
+
+            if [ "$status_code" = "200" ]; then
+              echo "Health check passed for '$APP_NAME' (HTTP $status_code)."
+              exit 0
+            fi
+
+            echo "Health check attempt $attempt/$max_attempts: HTTP $status_code (expected 200). Retrying in 10s..."
+            sleep 10
+            attempt=$((attempt + 1))
+          done
+
+          echo "::error::Backend health check failed for '$APP_NAME' after $max_attempts attempts (last HTTP $status_code)."
+
+          # Dump diagnostics on failure
+          latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
+          if [ -n "$latest_revision" ]; then
+            echo "--- System logs for revision '$latest_revision' ---"
+            az containerapp logs show --resource-group "$RG" --name "$APP_NAME" --type system --revision "$latest_revision" --tail 60 || true
+          fi
+          exit 1
 
   post-deploy-guardrails:
     runs-on: ubuntu-latest
