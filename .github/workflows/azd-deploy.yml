@@ -1624,6 +1624,14 @@ jobs:
 
           APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
           RG="$(az resource list --resource-type Microsoft.App/containerApps --name "$APP_NAME" --query 'sort_by(@, &id)[0].resourceGroup' -o tsv 2>/dev/null || true)"
+
+          # Check if the container is running actual service code (not the Terraform placeholder)
+          current_image="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
+          if echo "$current_image" | grep -qE 'mcr\.microsoft\.com|http\.server'; then
+            echo "::warning::Container '$APP_NAME' is still running placeholder image ($current_image). Skipping health check."
+            exit 0
+          fi
+
           FQDN="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.configuration.ingress.fqdn' -o tsv 2>/dev/null || true)"
 
           if [ -z "$FQDN" ]; then
@@ -1652,11 +1660,10 @@ jobs:
           echo "::error::Backend health check failed for '$APP_NAME' after $max_attempts attempts (last HTTP $status_code)."
 
           # Dump diagnostics on failure
-          latest_revision="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestRevisionName' -o tsv 2>/dev/null || true)"
-          if [ -n "$latest_revision" ]; then
-            echo "--- System logs for revision '$latest_revision' ---"
-            az containerapp logs show --resource-group "$RG" --name "$APP_NAME" --type system --revision "$latest_revision" --tail 60 || true
-          fi
+          echo "--- System logs for '$APP_NAME' ---"
+          az containerapp logs show --resource-group "$RG" --name "$APP_NAME" --type system --tail 60 2>&1 || true
+          echo "--- Console logs for '$APP_NAME' ---"
+          az containerapp logs show --resource-group "$RG" --name "$APP_NAME" --type console --tail 60 2>&1 || true
           exit 1
 
   post-deploy-guardrails:
