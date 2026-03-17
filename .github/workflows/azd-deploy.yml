@@ -447,16 +447,32 @@ jobs:
               --only-show-errors >/dev/null
           fi
 
-          az storage container create \
-            --name "$TFSTATE_CONTAINER" \
-            --account-name "$TFSTATE_STORAGE_ACCOUNT" \
-            --auth-mode login \
-            --only-show-errors >/dev/null
+          # Skip container creation if the storage account has restrictive network rules.
+          # The "Ensure reachable" step below will open the network and create the container.
+          _STORAGE_PUBLIC=$(az storage account show \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --query publicNetworkAccess -o tsv 2>/dev/null || echo 'Enabled')
+          _STORAGE_DEFAULT=$(az storage account show \
+            --resource-group "$TFSTATE_RESOURCE_GROUP" \
+            --name "$TFSTATE_STORAGE_ACCOUNT" \
+            --query networkRuleSet.defaultAction -o tsv 2>/dev/null || echo 'Allow')
+
+          if [ "$_STORAGE_PUBLIC" = "Disabled" ] || [ "$_STORAGE_DEFAULT" = "Deny" ]; then
+            echo "Storage network rules restrict data-plane access. Container creation deferred to network-open step."
+          else
+            az storage container create \
+              --name "$TFSTATE_CONTAINER" \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --auth-mode login \
+              --only-show-errors >/dev/null
+          fi
 
       - name: Ensure Terraform state account is reachable from GitHub runners
         env:
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
         run: |
           set -euo pipefail
 
@@ -490,6 +506,14 @@ jobs:
               --only-show-errors >/dev/null
 
             echo "TFSTATE_TEMP_NETWORK_OPEN=true" >> "$GITHUB_ENV"
+
+            # Network was restricted; create the state container now that it is open.
+            sleep 5
+            az storage container create \
+              --name "$TFSTATE_CONTAINER" \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --auth-mode login \
+              --only-show-errors >/dev/null
           fi
 
       - name: Ensure Terraform state RBAC for OIDC principal

@@ -1,0 +1,23 @@
+# Ignore everything by default then explicitly allow what dockerfiles need
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/*.egg-info/
+.git/
+.github/
+.venv/
+.env*
+docs/
+tests/
+scripts/
+infra/
+frontend/
+run23112747736_artifacts/
+14f8635a-bdcd-4399-a500-3aaf23465501-swa-oryx/
+*.md
+*.log
+.tmp/
+node_modules/
