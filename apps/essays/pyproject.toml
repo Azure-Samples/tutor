@@ -39,6 +39,7 @@ dependencies = [
     "rapidfuzz>=3.10.0",
     "azure-ai-vision-imageanalysis>=1.0.0",
     "pypdf>=4.2.0",
+    "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
