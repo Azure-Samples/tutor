@@ -448,7 +448,8 @@ jobs:
           fi
 
           # Skip container creation if the storage account has restrictive network rules.
-          # The "Ensure reachable" step below will open the network and create the container.
+          # For existing environments the container already exists; RBAC propagation in the
+          # next step will allow Terraform to reach it once the network is opened.
           _STORAGE_PUBLIC=$(az storage account show \
             --resource-group "$TFSTATE_RESOURCE_GROUP" \
             --name "$TFSTATE_STORAGE_ACCOUNT" \
@@ -506,14 +507,6 @@ jobs:
               --only-show-errors >/dev/null
 
             echo "TFSTATE_TEMP_NETWORK_OPEN=true" >> "$GITHUB_ENV"
-
-            # Network was restricted; create the state container now that it is open.
-            sleep 5
-            az storage container create \
-              --name "$TFSTATE_CONTAINER" \
-              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
-              --auth-mode login \
-              --only-show-errors >/dev/null
           fi
 
       - name: Ensure Terraform state RBAC for OIDC principal
