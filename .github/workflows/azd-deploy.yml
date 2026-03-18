@@ -1231,16 +1231,7 @@ jobs:
           export TF_VAR_allowed_origins
           echo "Resolved APIM required origins for ${SERVICE}: ${TF_VAR_allowed_origins}"
 
-          cat > "$STACK_DIR/backend.hcl" <<EOF
-          resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
-          storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
-          container_name       = "$TFSTATE_CONTAINER"
-          key                  = "tutor-${AZURE_ENV_NAME}-service-edge-${SERVICE}.tfstate"
-          use_azuread_auth     = true
-          use_oidc             = true
-          EOF
-
-          terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
+          terraform -chdir="$STACK_DIR" init -backend=false -input=false
 
           # Helper: only import if not already in state
           safe_import() {
@@ -2014,17 +2005,8 @@ jobs:
 
             echo "APIM policy drift detected for ${API_ID}. Applying one-shot Terraform remediation in ${RELEASE_TIER}."
 
-            {
-              echo "resource_group_name  = \"$TFSTATE_RESOURCE_GROUP\""
-              echo "storage_account_name = \"$TFSTATE_STORAGE_ACCOUNT\""
-              echo "container_name       = \"$TFSTATE_CONTAINER\""
-              echo "key                  = \"tutor-${AZURE_ENV_NAME}-service-edge-${SERVICE}.tfstate\""
-              echo "use_azuread_auth     = true"
-              echo "use_oidc             = true"
-            } > "$STACK_DIR/backend.hcl"
-
             export TF_VAR_allowed_origins="$REQUIRED_CORS_ORIGINS_JSON"
-            terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
+            terraform -chdir="$STACK_DIR" init -backend=false -input=false
             terraform -chdir="$STACK_DIR" apply -auto-approve
 
             live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
