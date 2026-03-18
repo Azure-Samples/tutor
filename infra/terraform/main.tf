@@ -243,6 +243,7 @@ resource "azurerm_container_app" "backend_services" {
   lifecycle {
     ignore_changes = [
       registry,
+      template,
       template[0].container[0].image,
       template[0].container[0].env,
       template[0].container[0].command,
