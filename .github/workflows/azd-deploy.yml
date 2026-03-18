@@ -1206,6 +1206,31 @@ jobs:
             exit 1
           fi
 
+          SWA_NAME="tutor-${AZURE_ENV_NAME}-frontend"
+          SWA_DEFAULT_HOST="$(az staticwebapp show --name "$SWA_NAME" --resource-group "tutor-${AZURE_ENV_NAME}" --query 'defaultHostname' -o tsv 2>/dev/null || true)"
+          if [ -z "$SWA_DEFAULT_HOST" ]; then
+            echo "Unable to resolve default SWA hostname for '$SWA_NAME'."
+            exit 1
+          fi
+
+          mapfile -t SWA_CUSTOM_HOSTS < <(
+            az staticwebapp hostname list \
+              --name "$SWA_NAME" \
+              --resource-group "tutor-${AZURE_ENV_NAME}" \
+              --query "[?name!='${SWA_DEFAULT_HOST}'].name" \
+              -o tsv 2>/dev/null || true
+          )
+
+          REQUIRED_ORIGINS=("https://${SWA_DEFAULT_HOST}")
+          for custom_host in "${SWA_CUSTOM_HOSTS[@]}"; do
+            [ -n "$custom_host" ] || continue
+            REQUIRED_ORIGINS+=("https://${custom_host}")
+          done
+
+          TF_VAR_allowed_origins="$(printf '%s\n' "${REQUIRED_ORIGINS[@]}" | awk 'NF' | python -c 'import json,sys; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))')"
+          export TF_VAR_allowed_origins
+          echo "Resolved APIM required origins for ${SERVICE}: ${TF_VAR_allowed_origins}"
+
           cat > "$STACK_DIR/backend.hcl" <<EOF
           resource_group_name  = "$TFSTATE_RESOURCE_GROUP"
           storage_account_name = "$TFSTATE_STORAGE_ACCOUNT"
@@ -1814,6 +1839,37 @@ jobs:
           echo "EXPECTED_PATH=api/${SERVICE}" >> "$GITHUB_ENV"
           echo "STACK_DIR=infra/terraform/stacks/services/${SERVICE}" >> "$GITHUB_ENV"
 
+      - name: Resolve required APIM CORS origins (SWA default + custom domains)
+        run: |
+          set -euo pipefail
+
+          swa_name="tutor-${AZURE_ENV_NAME}-frontend"
+          swa_default_host="$(az staticwebapp show --name "$swa_name" --resource-group "$RG" --query 'defaultHostname' -o tsv 2>/dev/null || true)"
+          if [ -z "$swa_default_host" ]; then
+            echo "Failed to resolve SWA default hostname for '$swa_name' in '$RG'."
+            exit 1
+          fi
+
+          mapfile -t swa_custom_hosts < <(
+            az staticwebapp hostname list \
+              --name "$swa_name" \
+              --resource-group "$RG" \
+              --query "[?name!='${swa_default_host}'].name" \
+              -o tsv 2>/dev/null || true
+          )
+
+          required_origins=("https://${swa_default_host}")
+          for custom_host in "${swa_custom_hosts[@]}"; do
+            [ -n "$custom_host" ] || continue
+            required_origins+=("https://${custom_host}")
+          done
+
+          required_origins_json="$(printf '%s\n' "${required_origins[@]}" | awk 'NF' | python -c 'import json,sys; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))')"
+
+          echo "SWA_DEFAULT_ORIGIN=https://${swa_default_host}" >> "$GITHUB_ENV"
+          echo "REQUIRED_CORS_ORIGINS_JSON=${required_origins_json}" >> "$GITHUB_ENV"
+          echo "Resolved required APIM CORS origins: ${required_origins_json}"
+
       - name: Enforce network baseline (VNet + Private Endpoint)
         run: |
           set -euo pipefail
@@ -1907,7 +1963,50 @@ jobs:
           policy_url="https://management.azure.com/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG}/providers/Microsoft.ApiManagement/service/${APIM_NAME}/apis/${API_ID}/policies/policy?api-version=2022-08-01"
           live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv 2>/dev/null || echo '')"
 
-          if [ -z "$live_policy" ] || ! grep -q '<cors' <<<"$live_policy"; then
+          mapfile -t required_origins < <(python -c "import json, os; [print(origin) for origin in json.loads(os.environ.get('REQUIRED_CORS_ORIGINS_JSON', '[]')) if origin]")
+
+          if [ "${#required_origins[@]}" -eq 0 ]; then
+            echo "No required CORS origins resolved; aborting guardrail check."
+            exit 1
+          fi
+
+          check_required_origins() {
+            local policy_content="$1"
+            missing_origins=()
+            for origin in "${required_origins[@]}"; do
+              if ! grep -Fq "<origin>${origin}</origin>" <<<"$policy_content"; then
+                missing_origins+=("$origin")
+              fi
+            done
+
+            if [ "${#missing_origins[@]}" -gt 0 ]; then
+              return 1
+            fi
+
+            return 0
+          }
+
+          has_cors="false"
+          if [ -n "$live_policy" ] && grep -q '<cors' <<<"$live_policy"; then
+            has_cors="true"
+          fi
+
+          origins_complete="true"
+          if ! check_required_origins "$live_policy"; then
+            origins_complete="false"
+          fi
+
+          if [ "$has_cors" != "true" ] || [ "$origins_complete" != "true" ]; then
+            echo "APIM CORS drift detected for ${API_ID}."
+            if [ "$has_cors" != "true" ]; then
+              echo "- Missing <cors> block in live APIM policy."
+            fi
+
+            echo "- Missing required origins:"
+            for origin in "${missing_origins[@]}"; do
+              echo "  - ${origin}"
+            done
+
             if [ "$STRICT_SECURITY" = "true" ]; then
               echo "APIM policy drift detected for ${API_ID}. Strict mode enabled; remediation disabled."
               exit 1
@@ -1924,15 +2023,54 @@ jobs:
               echo "use_oidc             = true"
             } > "$STACK_DIR/backend.hcl"
 
+            export TF_VAR_allowed_origins="$REQUIRED_CORS_ORIGINS_JSON"
             terraform -chdir="$STACK_DIR" init -reconfigure -backend-config=backend.hcl
             terraform -chdir="$STACK_DIR" apply -auto-approve
 
             live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
-            if ! grep -q '<cors' <<<"$live_policy"; then
+            if [ -z "$live_policy" ] || ! grep -q '<cors' <<<"$live_policy"; then
               echo "APIM policy remediation failed for ${API_ID}."
               exit 1
             fi
+
+            if ! check_required_origins "$live_policy"; then
+              echo "APIM policy remediation failed for ${API_ID}; required origins are still missing:"
+              for origin in "${missing_origins[@]}"; do
+                echo "  - ${origin}"
+              done
+              exit 1
+            fi
           fi
+
+      - name: Validate configuration API CORS preflight
+        if: matrix.service == 'configuration'
+        run: |
+          set -euo pipefail
+
+          preflight_url="https://${APIM_NAME}.azure-api.net/api/configuration/themes"
+          response_headers_file="$(mktemp)"
+
+          status_code="$(curl -sS -o /dev/null -D "$response_headers_file" -X OPTIONS \
+            -H "Origin: ${SWA_DEFAULT_ORIGIN}" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: content-type" \
+            --max-time 20 \
+            -w "%{http_code}" \
+            "$preflight_url" || echo 000)"
+
+          allow_origin="$(grep -i '^access-control-allow-origin:' "$response_headers_file" | tail -n 1 | cut -d':' -f2- | xargs || true)"
+
+          if [ "$status_code" = "000" ] || [ "$status_code" -ge 500 ]; then
+            echo "CORS preflight failed for ${preflight_url}: HTTP ${status_code}."
+            exit 1
+          fi
+
+          if [ "$allow_origin" != "${SWA_DEFAULT_ORIGIN}" ] && [ "$allow_origin" != "*" ]; then
+            echo "CORS preflight missing allow-origin for ${SWA_DEFAULT_ORIGIN}. Returned: '${allow_origin}'."
+            exit 1
+          fi
+
+          echo "CORS preflight passed for ${preflight_url} from origin ${SWA_DEFAULT_ORIGIN}."
 
       - name: APIM smoke check
         run: |

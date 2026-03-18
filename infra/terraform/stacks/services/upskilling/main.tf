@@ -26,8 +26,24 @@ variable "environment" {
   default = "prod"
 }
 
+variable "allowed_origins" {
+  type        = list(string)
+  default     = []
+  description = "Additional CORS origins allowed by APIM in this service-edge stack."
+}
+
+data "azurerm_static_web_app" "frontend" {
+  name                = "${var.name_prefix}-${var.environment}-frontend"
+  resource_group_name = "${var.name_prefix}-${var.environment}"
+}
+
 locals {
-  service_name = "upskilling"
+  service_name             = "upskilling"
+  swa_default_origin       = "https://${data.azurerm_static_web_app.frontend.default_host_name}"
+  effective_allowed_origins = distinct(compact(concat(
+    [local.swa_default_origin],
+    var.allowed_origins,
+  )))
 }
 
 # No-op change to trigger service-edge stack reconciliation in CI.
@@ -40,4 +56,5 @@ module "service_edge" {
   service_name        = local.service_name
   api_path            = "api/${local.service_name}"
   container_app_name  = "${var.name_prefix}-${local.service_name}-${var.environment}"
+  allowed_origins     = local.effective_allowed_origins
 }
