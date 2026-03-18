@@ -26,6 +26,25 @@ interface Submission {
   evaluation?: EssayEvaluationResult;
 }
 
+const isSubmissionResource = (resource: EssayResource): boolean => {
+  const objectives = Array.isArray(resource.objective)
+    ? resource.objective.map(item => String(item).toLowerCase())
+    : [];
+  if (objectives.includes("student_submission")) {
+    return true;
+  }
+
+  const metadata =
+    resource.metadata && typeof resource.metadata === "object"
+      ? (resource.metadata as Record<string, unknown>)
+      : null;
+  if (metadata && typeof metadata.uploaded_at === "string" && metadata.uploaded_at.trim().length > 0) {
+    return true;
+  }
+
+  return typeof resource.submittedAt === "string" && resource.submittedAt.trim().length > 0;
+};
+
 const asArray = <T,>(value: unknown): T[] => {
   const unwrapped = unwrapContent<unknown>(value);
   return Array.isArray(unwrapped) ? (unwrapped as T[]) : [];
@@ -215,7 +234,7 @@ const EssaySubmission: React.FC = () => {
       .then(res => {
         const content = asArray<any>(res.data);
         const grouped: Record<string, EssayResource[]> = {};
-        const mappedHistory: Submission[] = content.map((record: any) => {
+        const mappedHistory: Submission[] = content.flatMap((record: any) => {
           const objectives = Array.isArray(record.objective)
             ? record.objective
             : (record.objective ? [record.objective] : []);
@@ -241,13 +260,16 @@ const EssaySubmission: React.FC = () => {
           if (parsed.essay_id) {
             grouped[parsed.essay_id] = [...(grouped[parsed.essay_id] ?? []), parsed];
           }
+          if (!isSubmissionResource(parsed)) {
+            return [];
+          }
           const [tag, ...details] = objectives;
-          return {
+          return [{
             resource: parsed,
             description: (descriptionMeta || details.join(" ") || tag || "").trim(),
             submittedAt: uploadedAt,
             evaluation: parseEvaluationFromMetadata(metadata),
-          };
+          }];
         });
         setHistory(mappedHistory);
         setResourcesByEssay(grouped);
