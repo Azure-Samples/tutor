@@ -13,6 +13,19 @@ When a user asks to deploy, always guide them to merge into `main` (which auto-t
 
 Local `azd provision` and `azd deploy` are permitted **only** for first-time environment bootstrap per the [deployment runbook](docs/runbooks/azd-deployment.md).
 
+## Temporary Break-Glass Exception (time-boxed)
+
+For **Incident #139** and **demo readiness on environment `108dev` only**, direct live remediation commands are temporarily allowed as an exception to the mandatory workflow-only deployment policy.
+
+**Scope constraints:**
+- Environment: `108dev` only
+- Purpose: restore/validate demo-critical endpoint health
+- Window: valid only until 2026-03-19 03:00 UTC
+- Mandatory logging: every bypass action must be recorded in Issue #139 with command intent and verification result
+
+**Rollback requirement:**
+- Immediately after demo stabilization, revert this exception via PR `agent-update` and return to workflow-only deployment.
+
 <!-- managed:team-mapping-delegation:start -->
 ## Delegation Bootstrap
 - Before delegating, always read `.github/instructions/team-mapping.instructions.md`.
