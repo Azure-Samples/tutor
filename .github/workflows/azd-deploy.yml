@@ -1231,7 +1231,14 @@ jobs:
           export TF_VAR_allowed_origins
           echo "Resolved APIM required origins for ${SERVICE}: ${TF_VAR_allowed_origins}"
 
-          terraform -chdir="$STACK_DIR" init -backend=false -input=false
+          STACK_STATE_KEY="stacks/services/${SERVICE}-${AZURE_ENV_NAME}.tfstate"
+          terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
+            -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+            -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+            -backend-config="container_name=${TFSTATE_CONTAINER}" \
+            -backend-config="key=${STACK_STATE_KEY}" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
 
           # Helper: only import if not already in state
           safe_import() {
@@ -1943,7 +1950,10 @@ jobs:
       - name: Validate APIM policy and remediate drift (non-prod)
         env:
           SERVICE: ${{ matrix.service }}
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
           TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
           TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
@@ -2006,7 +2016,14 @@ jobs:
             echo "APIM policy drift detected for ${API_ID}. Applying one-shot Terraform remediation in ${RELEASE_TIER}."
 
             export TF_VAR_allowed_origins="$REQUIRED_CORS_ORIGINS_JSON"
-            terraform -chdir="$STACK_DIR" init -backend=false -input=false
+            STACK_STATE_KEY="stacks/services/${SERVICE}-${AZURE_ENV_NAME}.tfstate"
+            terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
+              -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+              -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+              -backend-config="container_name=${TFSTATE_CONTAINER}" \
+              -backend-config="key=${STACK_STATE_KEY}" \
+              -backend-config="use_azuread_auth=true" \
+              -backend-config="use_oidc=true"
             terraform -chdir="$STACK_DIR" apply -auto-approve
 
             live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
