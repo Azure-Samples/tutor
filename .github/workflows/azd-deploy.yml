@@ -1577,6 +1577,7 @@ jobs:
             '{
               properties: {
                 template: {
+                  scale: { minReplicas: 1 },
                   containers: [{
                     name: $name,
                     image: $img,

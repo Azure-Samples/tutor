@@ -207,6 +207,8 @@ resource "azurerm_container_app" "backend_services" {
   }
 
   template {
+    min_replicas = 1
+
     container {
       name    = each.key
       image   = "mcr.microsoft.com/azurelinux/base/python:3.12"
