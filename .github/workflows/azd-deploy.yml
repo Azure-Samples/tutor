@@ -809,6 +809,59 @@ jobs:
 
           echo "Pre-seed complete. Full provision will create the remaining model."
 
+      - name: Normalize ACA probe success thresholds
+        run: |
+          set -euo pipefail
+
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          SERVICES=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+
+          normalize_thresholds() {
+            jq '
+              .containers |= map(
+                if ((.probes // null) == null) then
+                  .
+                else
+                  .probes |= map(
+                    . + {
+                      successThreshold:
+                        (((.successThreshold // 1) | tonumber) as $s
+                        | if $s < 1 or $s > 10 then 1 else $s end)
+                    }
+                  )
+                end
+              )
+            '
+          }
+
+          for SERVICE in "${SERVICES[@]}"; do
+            APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
+            RID="$(az containerapp show -g "$RG_NAME" -n "$APP_NAME" --query id -o tsv 2>/dev/null || true)"
+
+            if [ -z "$RID" ]; then
+              echo "Container app '$APP_NAME' not found. Skipping threshold normalization."
+              continue
+            fi
+
+            current_template="$(az rest --method get --url "https://management.azure.com${RID}?api-version=2024-03-01" --query properties.template -o json)"
+            normalized_template="$(echo "$current_template" | normalize_thresholds)"
+
+            if [ "$(echo "$current_template" | jq -S .)" = "$(echo "$normalized_template" | jq -S .)" ]; then
+              echo "Probe thresholds already valid for '$APP_NAME'."
+              continue
+            fi
+
+            patch_body="$(jq -n --argjson template "$normalized_template" '{properties:{template:$template}}')"
+            echo "Patching probe thresholds for '$APP_NAME'..."
+            az rest \
+              --method patch \
+              --url "https://management.azure.com${RID}?api-version=2024-03-01" \
+              --body "$patch_body" \
+              --output none
+          done
+
+          echo "Probe threshold normalization complete."
+
       - name: Provision infrastructure
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -1591,6 +1644,7 @@ jobs:
                       {
                         type: "Readiness",
                         httpGet: { path: "/health", port: 8000 },
+                        successThreshold: 1,
                         failureThreshold: 3,
                         periodSeconds: 10,
                         timeoutSeconds: 5
@@ -1598,6 +1652,7 @@ jobs:
                       {
                         type: "Startup",
                         httpGet: { path: "/health", port: 8000 },
+                        successThreshold: 1,
                         failureThreshold: 30,
                         periodSeconds: 10,
                         timeoutSeconds: 5
