@@ -150,12 +150,12 @@ flowchart TD
 
 ## Data Ownership
 
-- **Canonical output path**: `myself/business/process-optimization/`
+- **Canonical output path**: `myself/business/process-optimization/` (when this path exists in the workspace)
 - **Scope boundary**: Process design and improvement only — workflow automation code belongs to language specialists (PythonDeveloper, TypeScriptDeveloper); operational monitoring belongs to OpsMonitor
 
 ## References
 
-- [`myself/knowledge/`](../../myself/knowledge/) — Operations management expertise
+- `myself/knowledge/` — Operations management expertise (if available in workspace)
 - [Theory of Constraints](https://www.tocico.org/) — Bottleneck identification
 - [Lean Six Sigma](https://www.isixsigma.com/) — Process improvement methodology
 - [Value Stream Mapping](https://www.lean.org/lexicon-terms/value-stream-mapping/) — Process visualisation
@@ -164,7 +164,7 @@ flowchart TD
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

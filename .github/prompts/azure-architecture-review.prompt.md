@@ -7,7 +7,9 @@ input: "Specify the Azure resource group, subscription, or architecture diagram 
 
 Coordinate a multi-specialist Azure architecture review:
 
-1. **Topology Discovery** — Invoke `system-architect` via `#runSubagent` to map:
+**Delegation compatibility**: If the workspace has `.github/agents/data/team-mapping.md`, resolve exact agent names from it before calling `#runSubagent`. Otherwise, use the canonical agent names in this prompt and fall back to current-agent execution if a specialist is unavailable.
+
+1. **Topology Discovery** — Invoke `SystemArchitect` via `#runSubagent` to map:
    - Resource dependency graph (what talks to what)
    - Data flow paths (ingress → processing → storage → egress)
    - Network topology (VNets, subnets, NSGs, private endpoints)
@@ -24,13 +26,13 @@ Coordinate a multi-specialist Azure architecture review:
    - `AzureRedisSpecialist` — Eviction policy, clustering, persistence, connection limits
    - `AzureStaticWebAppsSpecialist` — Custom domains, API routing, auth providers, staging environments
 
-3. **Cross-Cutting Assessment** — Invoke `platform-quality` via `#runSubagent` to check:
+3. **Cross-Cutting Assessment** — Invoke `PlatformEngineer` via `#runSubagent` to check:
    - IaC coverage (are all resources defined in Bicep/Terraform?)
    - Monitoring and alerting completeness (Azure Monitor, Application Insights)
    - Disaster recovery posture (RPO/RTO targets met?)
    - Secret management (Key Vault integration, no hardcoded credentials)
 
-4. **Cost Analysis** — Invoke `financial-modeling-agent` via `#runSubagent` to:
+4. **Cost Analysis** — Invoke `FinancialModeler` via `#runSubagent` to:
    - Estimate monthly cost by resource
    - Identify over-provisioned resources (SKU downgrades, reserved instances)
    - Compare current architecture cost vs optimized alternative

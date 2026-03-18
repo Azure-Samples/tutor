@@ -1,7 +1,7 @@
 ---
 title: "TypeScript: Review Code"
 description: "Review TypeScript/React code for type safety, accessibility, performance, and React best practices."
-mode: "typescript-specialist"
+mode: "TypeScriptDeveloper"
 input: "Provide the file(s) or component tree to review. Optionally specify focus (types, a11y, performance)."
 ---
 

@@ -17,7 +17,7 @@ Local `azd provision` and `azd deploy` are permitted **only** for first-time env
 ## Delegation Bootstrap
 - Before delegating, always read `.github/instructions/team-mapping.instructions.md`.
 - Use `.github/agents/data/team-mapping.md` as the canonical delegation registry.
-- Delegate only to agents that exist under `.github/agents/*.agent.md` in the current workspace.
+- Delegate only to agents that exist under `.github/agents/` (including subdirectories) in the current workspace.
 - Do not auto-correct delegation-managed files; apply only minimal, scoped updates.
 - Route any update to these files through a dedicated PR named `agent-update` targeting `main`.
 - Store temporary files only under `.tmp/`, remove them after related PRs complete, and never version them.

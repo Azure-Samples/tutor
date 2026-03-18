@@ -156,13 +156,13 @@ flowchart TD
 
 ## Data Ownership
 
-- **Canonical output path**: `myself/business/strategy/`
+- **Canonical output path**: `myself/business/strategy/` (when this path exists in the workspace)
 - **Aggregation role**: Synthesizes outputs from CompetitiveIntelAnalyst, FinancialModeler, RiskAnalyst, and ProcessImprover
 - **Scope boundary**: Business competitive strategy only — publishing strategy belongs to MarketAnalyzer/Scout; technical architecture belongs to SystemArchitect
 
 ## References
 
-- [`myself/knowledge/`](../../myself/knowledge/) — Domain expertise inventory
+- `myself/knowledge/` — Domain expertise inventory (if available in workspace)
 - [Porter's Five Forces](https://hbr.org/1979/03/how-competitive-forces-shape-strategy) — Competitive analysis framework
 - [Blue Ocean Strategy](https://www.blueoceanstrategy.com/) — Market creation framework
 
@@ -170,7 +170,7 @@ flowchart TD
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

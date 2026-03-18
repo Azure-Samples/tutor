@@ -181,13 +181,13 @@ Frontend-specific integration:
 - [TypeScript Documentation](https://www.typescriptlang.org/docs/)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/)
 - [Node.js Documentation](https://nodejs.org/docs/)
-- [`.github/instructions/paradigm-priority.instructions.md`](../../.github/instructions/paradigm-priority.instructions.md) — Paradigm selection rules
+- [`.github/instructions/paradigm-priority.instructions.md`](.github/instructions/paradigm-priority.instructions.md) — Paradigm selection rules
 
 ---
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

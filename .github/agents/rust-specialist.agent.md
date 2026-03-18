@@ -179,13 +179,13 @@ Follow <https://microsoft.github.io/rust-guidelines/> rigorously:
 - [The Rust Programming Language](https://doc.rust-lang.org/book/)
 - [Rust Standard Library](https://doc.rust-lang.org/std/)
 - [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
-- [`.github/instructions/paradigm-priority.instructions.md`](../../.github/instructions/paradigm-priority.instructions.md) — Paradigm selection rules
+- [`.github/instructions/paradigm-priority.instructions.md`](.github/instructions/paradigm-priority.instructions.md) — Paradigm selection rules
 
 ---
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

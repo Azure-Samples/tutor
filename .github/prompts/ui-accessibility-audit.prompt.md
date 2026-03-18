@@ -1,7 +1,7 @@
 ---
 title: "UI: Accessibility Audit"
 description: "Audit a UI component or page for WCAG 2.2 AA compliance, keyboard navigation, and screen reader compatibility."
-mode: "ui-agent"
+mode: "UIDesigner"
 input: "Specify the component, page, or URL to audit. Include the target platform (web, CLI, desktop)."
 ---
 

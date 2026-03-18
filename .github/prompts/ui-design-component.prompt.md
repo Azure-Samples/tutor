@@ -1,7 +1,7 @@
 ---
 title: "UI: Design Component"
 description: "Design and implement a responsive, accessible UI component with proper semantic HTML and design tokens."
-mode: "ui-agent"
+mode: "UIDesigner"
 input: "Describe the component (purpose, content, interactions). Specify platform: web (Tailwind), CLI (Ink), or desktop (Tauri)."
 ---
 

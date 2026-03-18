@@ -193,13 +193,13 @@ You own the **visual and structural layer** — delegate business logic and data
 - [WCAG 2.1 Guidelines](https://www.w3.org/WAI/WCAG21/quickref/)
 - [MDN Web Docs](https://developer.mozilla.org/)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
-- [`.github/instructions/paradigm-priority.instructions.md`](../../.github/instructions/paradigm-priority.instructions.md) — Paradigm selection rules
+- [`.github/instructions/paradigm-priority.instructions.md`](.github/instructions/paradigm-priority.instructions.md) — Paradigm selection rules
 
 ---
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

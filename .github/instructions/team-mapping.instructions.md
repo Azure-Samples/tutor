@@ -66,10 +66,29 @@ The following shared agent files are currently enabled for export by `repos/asse
 - `pr-evaluator.agent.md`
 - `process-management-agent.agent.md`
 - `python-specialist.agent.md`
-- `report-generator.agent.md`
 - `risk-analysis-agent.agent.md`
 - `rust-specialist.agent.md`
 - `system-architect.agent.md`
 - `tech-manager.agent.md`
 - `typescript-specialist.agent.md`
 - `ui-agent.agent.md`
+
+
+## Repo-Local Agents Discovered In This Workspace
+
+The following agent files were found under `.github/agents/` subdirectories and are available for delegation within this repository only:
+
+- `blog-post-agent.agent.md`
+- `book-writing-agent.agent.md`
+- `career-advocate.agent.md`
+- `competitive-analysis-agent.agent.md`
+- `course-writing-agent.agent.md`
+- `financial-treasurer.agent.md`
+- `follow-up-scheduler-agent.agent.md`
+- `market-analysis-agent.agent.md`
+- `operational-sentinel.agent.md`
+- `paper-writing-agent.agent.md`
+- `proposal-generator-agent.agent.md`
+- `publisher-research-agent.agent.md`
+- `publishing-agent.agent.md`
+- `submission-tracker-agent.agent.md`
