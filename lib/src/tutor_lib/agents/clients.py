@@ -188,7 +188,15 @@ class FoundryAgentService:
 
         async def _execute() -> Agent:
             async with self._client() as client:
-                return await client.create_agent(**payload)
+                create_method = getattr(client, "create_agent", None)
+                if callable(create_method):
+                    return await create_method(**payload)
+
+                create_method = getattr(client, "create", None)
+                if callable(create_method):
+                    return await create_method(**payload)
+
+                raise RuntimeError("AgentsClient does not expose create_agent/create operations.")
 
         try:
             return await self._with_retries("create_agent", _execute)
@@ -199,7 +207,17 @@ class FoundryAgentService:
     async def delete_agent(self, agent_id: str) -> None:
         async def _execute() -> None:
             async with self._client() as client:
-                await client.delete_agent(agent_id=agent_id)
+                delete_method = getattr(client, "delete_agent", None)
+                if callable(delete_method):
+                    await delete_method(agent_id=agent_id)
+                    return
+
+                delete_method = getattr(client, "delete", None)
+                if callable(delete_method):
+                    await delete_method(agent_id=agent_id)
+                    return
+
+                raise RuntimeError("AgentsClient does not expose delete_agent/delete operations.")
 
         await self._with_retries("delete_agent", _execute)
 
@@ -319,7 +337,15 @@ class FoundryAgentService:
     async def get_agent(self, agent_id: str) -> Agent:
         async def _execute() -> Agent:
             async with self._client() as client:
-                return await client.get_agent(agent_id=agent_id)
+                get_method = getattr(client, "get_agent", None)
+                if callable(get_method):
+                    return await get_method(agent_id=agent_id)
+
+                get_method = getattr(client, "get", None)
+                if callable(get_method):
+                    return await get_method(agent_id=agent_id)
+
+                raise RuntimeError("AgentsClient does not expose get_agent/get operations.")
 
         return await self._with_retries("get_agent", _execute)
 
