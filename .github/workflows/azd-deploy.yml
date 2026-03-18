@@ -1848,7 +1848,7 @@ jobs:
           replicas="$(az containerapp revision show -g "$RG" -n "$APP_NAME" --revision "$latest_revision" --query 'properties.replicas' -o tsv)"
 
           is_healthy="true"
-          if [ "$latest_revision" != "$latest_ready_revision" ] || [ "$running_state" != "Running" ] || [ "${replicas:-0}" = "0" ]; then
+          if [ "$latest_revision" != "$latest_ready_revision" ] || { [ "$running_state" != "Running" ] && [ "$running_state" != "ScaledToZero" ]; }; then
             is_healthy="false"
           fi
 
