@@ -50,6 +50,7 @@ jobs:
         env:
           INPUT_RELEASE_TIER: ${{ github.event.inputs.release_tier }}
           INPUT_AZURE_ENV_NAME_OVERRIDE: ${{ github.event.inputs.azure_env_name_override }}
+          REPO_AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
           GITHUB_REF: ${{ github.ref }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
@@ -72,6 +73,9 @@ jobs:
           fi
 
           azure_env_name_override="${INPUT_AZURE_ENV_NAME_OVERRIDE:-}"
+          if [ -z "$azure_env_name_override" ] && [ -n "${REPO_AZURE_ENV_NAME:-}" ] && [ "$release_tier" = "dev" ]; then
+            azure_env_name_override="$REPO_AZURE_ENV_NAME"
+          fi
 
           if [ "$release_tier" = "prod" ] && [ "$is_stable_tag" != "true" ]; then
             echo "Prod releases are allowed only from stable tags. Current ref '$GITHUB_REF_NAME' is not stable-tagged."

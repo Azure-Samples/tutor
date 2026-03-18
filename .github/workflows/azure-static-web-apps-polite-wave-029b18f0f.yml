@@ -12,6 +12,11 @@ on:
           - auto
           - dev
           - prod
+      azure_env_name_override:
+        description: "Optional env name override for dev tier (for example: 108dev)"
+        required: false
+        default: ""
+        type: string
   push:
     branches:
       - main
@@ -26,7 +31,101 @@ on:
       - "frontend/**"
       - ".github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
 
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
 jobs:
+  resolve-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tier: ${{ steps.resolve.outputs.release_tier }}
+      azure_env_name: ${{ steps.resolve.outputs.azure_env_name }}
+      swa_name: ${{ steps.resolve.outputs.swa_name }}
+      resource_group: ${{ steps.resolve.outputs.resource_group }}
+    steps:
+      - name: Resolve release profile
+        id: resolve
+        env:
+          INPUT_RELEASE_TIER: ${{ github.event.inputs.release_tier }}
+          INPUT_AZURE_ENV_NAME_OVERRIDE: ${{ github.event.inputs.azure_env_name_override }}
+          REPO_AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+          GITHUB_REF: ${{ github.ref }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          is_stable_tag="false"
+          if [[ "$GITHUB_REF" == refs/tags/* ]] && [[ "$GITHUB_REF_NAME" == *stable* ]]; then
+            is_stable_tag="true"
+          fi
+
+          requested_tier="${INPUT_RELEASE_TIER:-auto}"
+          if [ "$requested_tier" = "auto" ]; then
+            if [ "$is_stable_tag" = "true" ]; then
+              release_tier="prod"
+            else
+              release_tier="dev"
+            fi
+          else
+            release_tier="$requested_tier"
+          fi
+
+          if [ "$release_tier" = "prod" ] && [ "$is_stable_tag" != "true" ]; then
+            echo "Prod releases are allowed only from stable tags. Current ref '$GITHUB_REF_NAME' is not stable-tagged."
+            exit 1
+          fi
+
+          case "$release_tier" in
+            prod)
+              azure_env_name="prod"
+              ;;
+            dev)
+              azure_env_name="dev"
+              ;;
+            *)
+              echo "Unsupported release tier: $release_tier"
+              exit 1
+              ;;
+          esac
+
+          # Priority: workflow_dispatch input > repo variable > default
+          azure_env_name_override="${INPUT_AZURE_ENV_NAME_OVERRIDE:-}"
+          if [ -z "$azure_env_name_override" ] && [ -n "${REPO_AZURE_ENV_NAME:-}" ] && [ "$release_tier" = "dev" ]; then
+            azure_env_name_override="$REPO_AZURE_ENV_NAME"
+          fi
+
+          if [ -n "$azure_env_name_override" ]; then
+            if [ "$release_tier" != "dev" ]; then
+              echo "azure_env_name_override is only supported for dev release tier"
+              exit 1
+            fi
+            if [[ ! "$azure_env_name_override" =~ ^[a-z0-9]+$ ]]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'. Use lowercase letters and digits only."
+              exit 1
+            fi
+            if [[ ! "$azure_env_name_override" =~ dev$ ]]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'. Value must end with 'dev'."
+              exit 1
+            fi
+            if [ ${#azure_env_name_override} -gt 13 ]; then
+              echo "Invalid azure_env_name_override '$azure_env_name_override'. Maximum length is 13 characters."
+              exit 1
+            fi
+            azure_env_name="$azure_env_name_override"
+          fi
+
+          swa_name="tutor-${azure_env_name}-frontend"
+          resource_group="tutor-${azure_env_name}"
+
+          echo "release_tier=$release_tier" >> "$GITHUB_OUTPUT"
+          echo "azure_env_name=$azure_env_name" >> "$GITHUB_OUTPUT"
+          echo "swa_name=$swa_name" >> "$GITHUB_OUTPUT"
+          echo "resource_group=$resource_group" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved: tier=$release_tier env=$azure_env_name swa=$swa_name rg=$resource_group"
+
   frontend_pr_checks:
     if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -60,12 +159,33 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'prod' && startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, 'stable')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'auto' && startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, 'stable'))
     runs-on: ubuntu-latest
+    needs: resolve-release
     name: Build and Deploy Prod
+    env:
+      SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
+      RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: true
           lfs: false
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Resolve SWA deployment token
+        id: swa_token
+        run: |
+          set -euo pipefail
+          token="$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" -o tsv)"
+          if [ -z "$token" ]; then
+            echo "Failed to retrieve deployment token for SWA '$SWA_NAME' in resource group '$RESOURCE_GROUP'."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "api_token=$token" >> "$GITHUB_OUTPUT"
       - name: Validate APIM frontend env
         run: |
           if [ -z "${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}" ]; then
@@ -78,15 +198,12 @@ jobs:
         env:
           NEXT_PUBLIC_APIM_BASE_URL: ${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_WAVE_029B18F0F }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Used for Github integrations (i.e. PR comments)
+          azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.api_token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
-          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
-          app_location: "/frontend" # App source code path
-          api_location: "" # Must be empty for Next.js apps that are not statically exported
-          output_location: "" # For Next.js hybrid/App Router, let SWA/Oryx handle build output
-          ###### End of Repository/Build Configurations ######
+          app_location: "/frontend"
+          api_location: ""
+          output_location: ""
 
   build_and_deploy_dev:
     if: >-
@@ -94,12 +211,33 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'dev') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'auto' && (!startsWith(github.ref, 'refs/tags/') || !contains(github.ref_name, 'stable')))
     runs-on: ubuntu-latest
+    needs: resolve-release
     name: Build and Deploy Dev
+    env:
+      SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
+      RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: true
           lfs: false
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Resolve SWA deployment token
+        id: swa_token
+        run: |
+          set -euo pipefail
+          token="$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" -o tsv)"
+          if [ -z "$token" ]; then
+            echo "Failed to retrieve deployment token for SWA '$SWA_NAME' in resource group '$RESOURCE_GROUP'."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "api_token=$token" >> "$GITHUB_OUTPUT"
       - name: Validate APIM frontend env
         run: |
           if [ -z "${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}" ]; then
@@ -112,23 +250,44 @@ jobs:
         env:
           NEXT_PUBLIC_APIM_BASE_URL: ${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_WAVE_029B18F0F }}
+          azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.api_token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "/frontend"
           api_location: ""
           output_location: ""
 
-  close_pull_request_dev:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && (github.base_ref == 'dev' || github.base_ref == 'main')
+  close_pull_request:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.base_ref == 'main'
     runs-on: ubuntu-latest
-    name: Close Pull Request Dev
+    needs: resolve-release
+    name: Close Pull Request
+    env:
+      SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
+      RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Resolve SWA deployment token
+        id: swa_token
+        run: |
+          set -euo pipefail
+          token="$(az staticwebapp secrets list --name "$SWA_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.apiKey" -o tsv)"
+          if [ -z "$token" ]; then
+            echo "Failed to retrieve deployment token for SWA '$SWA_NAME' in resource group '$RESOURCE_GROUP'."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "api_token=$token" >> "$GITHUB_OUTPUT"
       - name: Close Pull Request
         id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_WAVE_029B18F0F }}
+          azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.api_token }}
           app_location: "/frontend"
           api_location: ""
           output_location: ""
