@@ -2057,19 +2057,20 @@ jobs:
             -w "%{http_code}" \
             "$preflight_url" || echo 000)"
 
-          allow_origin="$(grep -i '^access-control-allow-origin:' "$response_headers_file" | tail -n 1 | cut -d':' -f2- | xargs || true)"
+          expected_origin="$(printf '%s' "${SWA_DEFAULT_ORIGIN}" | tr -d '\r' | xargs || true)"
+          allow_origin="$(grep -i '^access-control-allow-origin:' "$response_headers_file" | tail -n 1 | cut -d':' -f2- | tr -d '\r' | xargs || true)"
 
           if [ "$status_code" = "000" ] || [ "$status_code" -ge 500 ]; then
             echo "CORS preflight failed for ${preflight_url}: HTTP ${status_code}."
             exit 1
           fi
 
-          if [ "$allow_origin" != "${SWA_DEFAULT_ORIGIN}" ] && [ "$allow_origin" != "*" ]; then
-            echo "CORS preflight missing allow-origin for ${SWA_DEFAULT_ORIGIN}. Returned: '${allow_origin}'."
+          if [ "$allow_origin" != "${expected_origin}" ] && [ "$allow_origin" != "*" ]; then
+            echo "CORS preflight missing allow-origin for ${expected_origin}. Returned: '${allow_origin}'."
             exit 1
           fi
 
-          echo "CORS preflight passed for ${preflight_url} from origin ${SWA_DEFAULT_ORIGIN}."
+          echo "CORS preflight passed for ${preflight_url} from origin ${expected_origin}."
 
       - name: APIM smoke check
         run: |
