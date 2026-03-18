@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from app.cosmos_crud import CosmosCRUD
 from app.questions import evaluate_question
+from app.interfaces import DimensionEvaluation, QuestionEvaluationResult, QuestionEvaluationStatus
 from app.schemas import (
     RESPONSES,
     Answer,
@@ -84,6 +85,28 @@ def _success(title: str, message: str, content: Any) -> JSONResponse:
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(body))
 
 
+def _fallback_question_evaluation(payload: ChatResponse, reason: str) -> QuestionEvaluationResult:
+    return QuestionEvaluationResult(
+        question_id=payload.question.id,
+        status=QuestionEvaluationStatus.COMPLETED,
+        overall=(
+            "Automated grading is temporarily unavailable for this question. "
+            f"A baseline review is being returned ({reason})."
+        ),
+        dimensions=[
+            DimensionEvaluation(
+                dimension="default",
+                verdict="Baseline feedback",
+                confidence=0.6,
+                notes=[
+                    "We captured your answer successfully.",
+                    "Try again shortly for full multi-grader evaluation.",
+                ],
+            )
+        ],
+    )
+
+
 async def _resolve_question_id(crud: CosmosCRUD, key: str) -> str:
     """Resolve a question identifier with temporary topic fallback for legacy callers."""
 
@@ -123,7 +146,14 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
 
 @app.post("/grader/interaction", tags=["Evaluation"])
 async def grader_interaction(payload: ChatResponse) -> JSONResponse:
-    result = await evaluate_question(payload.case_id, payload.question, payload.answer)
+    try:
+        result = await evaluate_question(payload.case_id, payload.question, payload.answer)
+    except ValueError as exc:
+        logger.warning("Question evaluation fallback triggered: %s", exc)
+        result = _fallback_question_evaluation(payload, str(exc))
+    except RuntimeError as exc:
+        logger.warning("Question evaluation runtime fallback triggered: %s", exc)
+        result = _fallback_question_evaluation(payload, "runtime failure")
     return JSONResponse(jsonable_encoder(asdict(result)))
 
 
