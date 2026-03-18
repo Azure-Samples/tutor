@@ -154,12 +154,12 @@ flowchart TD
 
 ## Data Ownership
 
-- **Canonical output path**: `myself/business/competitive-intelligence/`
+- **Canonical output path**: `myself/business/competitive-intelligence/` (when this path exists in the workspace)
 - **Scope boundary**: Business competitive intelligence only — publishing competition belongs to CompetitiveAnalyzer; market trend data for books belongs to MarketAnalyzer
 
 ## References
 
-- [`myself/knowledge/`](../../myself/knowledge/) — Domain expertise
+- `myself/knowledge/` — Domain expertise (if available in workspace)
 - [Crayon Competitive Intelligence](https://www.crayon.co/blog) — CI best practices
 - [SCIP Framework](https://www.scip.org/) — Strategic and competitive intelligence
 
@@ -167,7 +167,7 @@ flowchart TD
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

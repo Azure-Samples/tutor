@@ -21,15 +21,15 @@ Coordinate an enterprise integration audit:
    - Dead-letter handling for failed messages
 
 3. **Code Quality** — Invoke the relevant language specialist via `#runSubagent`:
-   - `python-specialist` / `rust-specialist` / `typescript-specialist` — Review connector code for error handling, type safety, test coverage
+   - `PythonDeveloper` / `RustDeveloper` / `TypeScriptDeveloper` — Review connector code for error handling, type safety, test coverage
 
-4. **Security & Compliance** — Invoke `risk-analysis-agent` via `#runSubagent` to check:
+4. **Security & Compliance** — Invoke `RiskAnalyst` via `#runSubagent` to check:
    - Credential rotation policy (are secrets expired or long-lived?)
    - Data handling compliance (PII masking, retention policies, GDPR/LGPD)
    - Audit trail completeness (can we trace every data exchange?)
    - Least-privilege access (are API scopes minimal?)
 
-5. **Operational Health** — Invoke `platform-quality` via `#runSubagent` to verify:
+5. **Operational Health** — Invoke `PlatformEngineer` via `#runSubagent` to verify:
    - Monitoring coverage (alerts on failure, latency, throughput drop)
    - Logging (structured, correlation IDs, no PII in logs)
    - Runbook exists for each integration failure scenario
@@ -40,3 +40,4 @@ Coordinate an enterprise integration audit:
    - Critical findings requiring immediate remediation
    - Improvement recommendations ranked by risk reduction
    - Suggested SLA definitions for each integration
+

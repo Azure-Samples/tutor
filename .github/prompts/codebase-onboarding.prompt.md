@@ -7,7 +7,7 @@ input: "Optionally specify focus areas (backend, frontend, infra, a specific ser
 
 Coordinate a multi-agent codebase onboarding scan:
 
-1. **Architecture Overview** — Invoke `system-architect` via `#runSubagent` to map:
+1. **Architecture Overview** — Invoke `SystemArchitect` via `#runSubagent` to map:
    - High-level architecture (services, databases, external dependencies)
    - Communication patterns (sync HTTP, async events, shared DB)
    - Entry points (API endpoints, CLI commands, event handlers, scheduled jobs)
@@ -15,17 +15,17 @@ Coordinate a multi-agent codebase onboarding scan:
    - Generate a Mermaid architecture diagram
 
 2. **Technology Stack** — Invoke the relevant language specialist(s) via `#runSubagent`:
-   - `python-specialist` — Python version, framework (FastAPI/Django/Flask), package manager, key libraries
-   - `rust-specialist` — Rust edition, workspace structure, key crates, build targets
-   - `typescript-specialist` — Node/Deno/Bun runtime, framework (Next.js/Express/Remix), bundler, key packages
+   - `PythonDeveloper` — Python version, framework (FastAPI/Django/Flask), package manager, key libraries
+   - `RustDeveloper` — Rust edition, workspace structure, key crates, build targets
+   - `TypeScriptDeveloper` — Node/Deno/Bun runtime, framework (Next.js/Express/Remix), bundler, key packages
 
-3. **Infrastructure & DevOps** — Invoke `platform-quality` via `#runSubagent` to document:
+3. **Infrastructure & DevOps** — Invoke `PlatformEngineer` via `#runSubagent` to document:
    - How to run locally (setup steps, env vars, prerequisites)
    - How to run tests (commands, fixtures, test databases)
    - How to deploy (CI/CD pipeline, manual steps, environments)
    - IaC overview (Bicep/Terraform/CDK — what manages what)
 
-4. **UI Layer** — If applicable, invoke `ui-agent` via `#runSubagent` to assess:
+4. **UI Layer** — If applicable, invoke `UIDesigner` via `#runSubagent` to assess:
    - Component structure and design system
    - Styling approach (Tailwind, CSS modules, styled-components)
    - Accessibility baseline (initial WCAG read)
@@ -42,3 +42,4 @@ Coordinate a multi-agent codebase onboarding scan:
    - Key files and directories to know
    - Common gotchas and pitfalls
    - Suggested first tasks for new contributors
+

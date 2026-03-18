@@ -1,7 +1,7 @@
 ---
 title: "PR: Review Pull Request"
 description: "Review a pull request for architecture compliance, test coverage, security, and merge readiness."
-mode: "pr-evaluator"
+mode: "PRReviewer"
 input: "Provide the PR number or let the agent detect the active PR. Optionally specify focus areas."
 ---
 

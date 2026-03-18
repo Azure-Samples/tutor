@@ -8,6 +8,8 @@ Canonical shared-agent registry generated from enabled agent families in `repos/
 - Canonical source metadata: enabled shared agent families in `repos/asset-map.yaml`
 - Generated mirrors: `.github/instructions/team-mapping.instructions.md` and managed delegation blocks in `.github/copilot-instructions.md`
 
+## Shared Agents
+
 | Agent Name | File |
 | --- | --- |
 | `azure-aks` | `.github/agents/azure-aks.agent.md` |
@@ -29,7 +31,6 @@ Canonical shared-agent registry generated from enabled agent families in `repos/
 | `pr-evaluator` | `.github/agents/pr-evaluator.agent.md` |
 | `process-management-agent` | `.github/agents/process-management-agent.agent.md` |
 | `python-specialist` | `.github/agents/python-specialist.agent.md` |
-| `report-generator` | `.github/agents/report-generator.agent.md` |
 | `risk-analysis-agent` | `.github/agents/risk-analysis-agent.agent.md` |
 | `rust-specialist` | `.github/agents/rust-specialist.agent.md` |
 | `system-architect` | `.github/agents/system-architect.agent.md` |

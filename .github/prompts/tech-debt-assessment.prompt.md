@@ -8,25 +8,25 @@ input: "Specify scope: entire repo or specific areas. Optionally include known p
 Coordinate a systematic tech debt inventory:
 
 1. **Code-Level Debt** — Invoke language specialists via `#runSubagent` to scan for:
-   - `python-specialist` — Missing type hints, bare except blocks, deprecated APIs, TODO/FIXME/HACK comments, untested code paths
-   - `rust-specialist` — Clippy warnings suppressed, unwrap() in non-test code, outdated edition, unsafe without justification
-   - `typescript-specialist` — `any` type usage, disabled ESLint rules, legacy class components, untyped APIs, outdated dependencies
+   - `PythonDeveloper` — Missing type hints, bare except blocks, deprecated APIs, TODO/FIXME/HACK comments, untested code paths
+   - `RustDeveloper` — Clippy warnings suppressed, unwrap() in non-test code, outdated edition, unsafe without justification
+   - `TypeScriptDeveloper` — `any` type usage, disabled ESLint rules, legacy class components, untyped APIs, outdated dependencies
 
-2. **Architecture Debt** — Invoke `system-architect` via `#runSubagent` to identify:
+2. **Architecture Debt** — Invoke `SystemArchitect` via `#runSubagent` to identify:
    - Circular dependencies between modules/services
    - God classes/modules with too many responsibilities
    - Missing abstraction layers (business logic in controllers, SQL in handlers)
    - Stale ADRs that no longer reflect reality
    - Integration contracts that have drifted from specification
 
-3. **Infrastructure Debt** — Invoke `platform-quality` via `#runSubagent` to catalog:
+3. **Infrastructure Debt** — Invoke `PlatformEngineer` via `#runSubagent` to catalog:
    - Manual deployment steps that should be automated
    - Missing or flaky tests in CI/CD pipeline
    - Outdated base images, deprecated GitHub Actions, legacy IaC patterns
    - Monitoring gaps (services without health checks, missing alerts)
    - Documentation that's out of date with actual behavior
 
-4. **UI Debt** — If applicable, invoke `ui-agent` via `#runSubagent` to identify:
+4. **UI Debt** — If applicable, invoke `UIDesigner` via `#runSubagent` to identify:
    - Accessibility violations accumulated over time
    - Inconsistent component patterns (multiple button styles, duplicated layouts)
    - Performance regressions (large bundles, layout shifts, slow interactions)
@@ -44,3 +44,4 @@ Coordinate a systematic tech debt inventory:
    - Quick wins (< 1 day effort, high impact) highlighted separately
    - Estimated total remediation effort (in engineering days)
    - Recommended cadence for debt reduction (e.g., 20% of each sprint)
+

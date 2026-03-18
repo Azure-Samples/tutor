@@ -151,12 +151,12 @@ flowchart TD
 
 ## Data Ownership
 
-- **Canonical output path**: `myself/business/risk-analysis/`
+- **Canonical output path**: `myself/business/risk-analysis/` (when this path exists in the workspace)
 - **Scope boundary**: Business and operational risk — does not replace security scanning tools or Azure compliance audits
 
 ## References
 
-- [`myself/knowledge/`](../../myself/knowledge/) — Risk management expertise
+- `myself/knowledge/` — Risk management expertise (if available in workspace)
 - [ISO 31000](https://www.iso.org/iso-31000-risk-management.html) — Risk management standard
 - [NIST Risk Management Framework](https://csrc.nist.gov/projects/risk-management) — IT risk management
 
@@ -164,7 +164,7 @@ flowchart TD
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

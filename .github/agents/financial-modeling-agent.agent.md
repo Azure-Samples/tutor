@@ -148,12 +148,12 @@ flowchart TD
 
 ## Data Ownership
 
-- **Canonical output path**: `myself/business/financial-models/`
+- **Canonical output path**: `myself/business/financial-models/` (when this path exists in the workspace)
 - **Scope boundary**: Business financial modeling only — personal income/royalty tracking belongs to FinanceTracker
 
 ## References
 
-- [`myself/knowledge/`](../../myself/knowledge/) — Economics and finance expertise
+- `myself/knowledge/` — Economics and finance expertise (if available in workspace)
 - [Damodaran Online](https://pages.stern.nyu.edu/~adamodar/) — Valuation resources
 - [McKinsey Valuation](https://www.mckinsey.com/business-functions/strategy-and-corporate-finance/our-insights/valuation) — Corporate finance
 
@@ -161,7 +161,7 @@ flowchart TD
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

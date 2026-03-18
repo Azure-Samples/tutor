@@ -19,24 +19,24 @@ Delegate implementation and validation to the appropriate specialist agents via 
 
 | Change Type | Agent | Validation |
 |---|---|---|
-| Python code | `python-specialist` | Type check (mypy), tests (pytest), lint |
-| Rust code | `rust-specialist` | cargo check, cargo clippy, cargo test |
-| TypeScript/React | `typescript-specialist` | tsc --noEmit, ESLint, Vitest |
-| UI/accessibility | `ui-agent` | WCAG 2.2 AA audit, visual regression |
-| CI/CD / infra | `platform-quality` | actionlint, dry-run deploy, IaC validate |
-| Architecture impact | `system-architect` | ADR compliance, integration contract review |
+| Python code | `PythonDeveloper` | Type check (mypy), tests (pytest), lint |
+| Rust code | `RustDeveloper` | cargo check, cargo clippy, cargo test |
+| TypeScript/React | `TypeScriptDeveloper` | tsc --noEmit, ESLint, Vitest |
+| UI/accessibility | `UIDesigner` | WCAG 2.2 AA audit, visual regression |
+| CI/CD / infra | `PlatformEngineer` | actionlint, dry-run deploy, IaC validate |
+| Architecture impact | `SystemArchitect` | ADR compliance, integration contract review |
 | Azure resources | Relevant Azure specialist | Resource validation, config drift check |
 
 Run **all** applicable validations — most changes touch multiple domains.
 
 ## Phase 3: Pull Request
 
-1. **Create PR** — Invoke `pr-evaluator` via `#runSubagent` to:
+1. **Create PR** — Invoke `PRReviewer` via `#runSubagent` to:
    - Open the PR referencing the issue (`Closes #<number>`)
    - Verify all CI checks pass
    - Confirm test coverage is non-negative
    - Validate no security regressions (OWASP Top 10)
-   - Obtain architecture sign-off from `system-architect` if the change crosses service boundaries
+   - Obtain architecture sign-off from `SystemArchitect` if the change crosses service boundaries
 2. **Review Gate** — PR must have:
    - [ ] All checks green
    - [ ] No unresolved review comments
@@ -45,7 +45,7 @@ Run **all** applicable validations — most changes touch multiple domains.
 ## Phase 4: Merge & Deploy
 
 1. **Merge** — Squash-merge into the default branch. Ensure commit message references the issue.
-2. **Deploy** — Invoke `platform-quality` via `#runSubagent` to:
+2. **Deploy** — Invoke `PlatformEngineer` via `#runSubagent` to:
    - Trigger the deployment pipeline
    - Monitor deployment progress (build → staging → production)
    - Verify health checks pass post-deploy
@@ -54,7 +54,7 @@ Run **all** applicable validations — most changes touch multiple domains.
 
 After deployment, actively monitor for regressions:
 
-1. **Health Check** — Invoke `platform-quality` to verify:
+1. **Health Check** — Invoke `PlatformEngineer` to verify:
    - Application health endpoints return 200
    - No new errors in logs (compare error rate before/after)
    - Performance metrics within baseline (latency, throughput)
@@ -65,7 +65,7 @@ After deployment, actively monitor for regressions:
    - **P1/P2: Immediate hotfix** —
      - Create a `hotfix/<issue>-<slug>` branch from the default branch
      - Invoke the responsible specialist agent to implement the fix
-     - Fast-track PR: `pr-evaluator` reviews with expedited checklist (tests pass + no regression)
+     - Fast-track PR: `PRReviewer` reviews with expedited checklist (tests pass + no regression)
      - Merge and redeploy immediately
    - **P3/P4: Deferred fix** —
      - Create a new issue with `[Hotfix]` prefix
@@ -76,7 +76,7 @@ After deployment, actively monitor for regressions:
    - Root cause and causal chain
    - Why existing tests didn't catch it
    - Prevention measures (new tests, monitoring, validation steps)
-   - Delegate prevention implementation to `platform-quality`
+   - Delegate prevention implementation to `PlatformEngineer`
 
 ## Completion Criteria
 
@@ -86,3 +86,4 @@ After deployment, actively monitor for regressions:
 - [ ] Deployment successful with health checks passing
 - [ ] No P1/P2 regressions within monitoring window
 - [ ] Any hotfixes completed and documented
+

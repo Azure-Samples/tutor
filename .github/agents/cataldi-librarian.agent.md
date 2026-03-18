@@ -2,7 +2,7 @@
 name: ContentLibrarian
 description: "Repository librarian: categorizes, files, and cross-references content assets. Maintains README indexes, enforces governance-map placement rules, and ensures every artifact has a canonical home."
 argument-hint: "Categorize and file the newly completed Chapter 6 of the AI Operations book, update the content README index, and verify cross-references in the governance map"
-tools: ['execute', 'read', 'edit', 'search', 'web', 'agent', 'todo']
+tools: ['execute', 'read', 'edit', 'search', 'web', 'agent', 'todo', 'filesystem']
 user-invocable: true
 disable-model-invocation: false
 ---
@@ -77,10 +77,10 @@ When content in one category relates to content in another, add a "Related Conte
 ```markdown
 ## Related Content
 
-- **Book:** [Book Name](../../book/book-name/)
-- **Posts:** [Post Title](../../posts/post-slug/)
-- **Paper:** [Paper Title](../../papers/paper-slug/)
-- **Course:** [Course Name](../../courses/course-name/)
+- **Book:** [Book Name](book/book-name/)
+- **Posts:** [Post Title](posts/post-slug/)
+- **Paper:** [Paper Title](papers/paper-slug/)
+- **Course:** [Course Name](courses/course-name/)
 ```
 
 ### 5. Quality Checks
@@ -137,15 +137,15 @@ When working inside a repository that has content structure specifications in `.
 
 ## References
 
-- [`.github/governance-map.md`](../../.github/governance-map.md) — Repository governance and folder responsibilities
-- [`README.md`](../../README.md) — Repository model
-- [`docs/REPOSITORY-SURFACES.md`](../../docs/REPOSITORY-SURFACES.md) — Surface area map
+- [`.github/governance-map.md`](.github/governance-map.md) — Repository governance and folder responsibilities
+- [`README.md`](README.md) — Repository model
+- [`docs/REPOSITORY-SURFACES.md`](docs/REPOSITORY-SURFACES.md) — Surface area map
 
 ---
 
 ## Agent Ecosystem
 
-> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](../../.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
+> **Dynamic discovery**: Consult [`.github/agents/data/team-mapping.md`](.github/agents/data/team-mapping.md) when available; if it is absent, continue with available workspace agents/tools and do not hard-fail.
 >
 > Use `#runSubagent` with the agent name to invoke any specialist. The registry is the single source of truth for which agents exist and what they handle.
 

@@ -13,19 +13,19 @@ Coordinate enterprise connector design:
    - Document data models and field mappings (source → internal → target)
    - Classify the platform category (PIM, DAM, CRM, Commerce, Inventory/SCM, Data/Analytics, Integration, Workforce, Identity, Privacy)
 
-2. **Architecture Design** — Invoke `system-architect` via `#runSubagent` to:
+2. **Architecture Design** — Invoke `SystemArchitect` via `#runSubagent` to:
    - Define the connector's place in the overall integration architecture
    - Choose communication pattern (sync request-response, async events, batch ETL, webhook-driven)
    - Design error handling strategy (retry policies, dead-letter queues, circuit breakers)
    - Specify contract versioning approach for the connector API surface
 
 3. **Implementation Plan** — Invoke the appropriate language specialist via `#runSubagent`:
-   - `python-specialist` — For Python async connectors (httpx, aiohttp)
-   - `rust-specialist` — For high-throughput connectors (reqwest, tokio)
-   - `typescript-specialist` — For Node.js connectors (fetch, graphql-request)
+   - `PythonDeveloper` — For Python async connectors (httpx, aiohttp)
+   - `RustDeveloper` — For high-throughput connectors (reqwest, tokio)
+   - `TypeScriptDeveloper` — For Node.js connectors (fetch, graphql-request)
    - Define: auth flow, pagination handling, rate limit respect, data transformation pipeline
 
-4. **Security Review** — Invoke `platform-quality` via `#runSubagent` to verify:
+4. **Security Review** — Invoke `PlatformEngineer` via `#runSubagent` to verify:
    - Credential storage (Key Vault / env vars, never hardcoded)
    - OAuth token refresh handling
    - Input validation on all external data
@@ -37,3 +37,4 @@ Coordinate enterprise connector design:
    - Load tests to validate rate limit handling
 
 Deliver a connector design document with architecture diagram, data mapping table, implementation spec, and test plan.
+

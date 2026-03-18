@@ -1,7 +1,7 @@
 ---
 title: "Python: Implement Feature"
 description: "Implement a Python feature with type hints, async patterns, and pytest coverage following PEP standards."
-mode: "python-specialist"
+mode: "PythonDeveloper"
 input: "Describe the feature, module, or function to implement. Include any API contracts or data models."
 ---
 

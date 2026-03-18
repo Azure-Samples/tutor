@@ -15,13 +15,14 @@ Analyze the reported problems and create a structured remediation plan:
    - Acceptance criteria as a checklist
    - Labels for priority, component, and issue type
 4. **Agent Assignment** — Assign each issue to the appropriate specialist agent via `#runSubagent`:
-   - `python-specialist` — Python bugs, type errors, async issues, test failures
-   - `rust-specialist` — Rust panics, ownership bugs, linker issues, unsafe violations
-   - `typescript-specialist` — TypeScript errors, React rendering bugs, bundle failures
-   - `ui-agent` — Accessibility violations, layout regressions, responsive breakage
-   - `platform-quality` — CI/CD failures, dependency vulnerabilities, infra misconfigurations
-   - `system-architect` — Integration contract violations, architectural drift
+   - `PythonDeveloper` — Python bugs, type errors, async issues, test failures
+   - `RustDeveloper` — Rust panics, ownership bugs, linker issues, unsafe violations
+   - `TypeScriptDeveloper` — TypeScript errors, React rendering bugs, bundle failures
+   - `UIDesigner` — Accessibility violations, layout regressions, responsive breakage
+   - `PlatformEngineer` — CI/CD failures, dependency vulnerabilities, infra misconfigurations
+   - `SystemArchitect` — Integration contract violations, architectural drift
 5. **Dependency Sequencing** — Order issue resolution by dependency graph. Identify which fixes unblock others.
 6. **Execution** — Invoke each specialist via `#runSubagent` with the issue brief. Track completion against the issue checklist.
 
 Deliver a table mapping each issue number to its agent, priority, dependencies, and status.
+

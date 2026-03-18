@@ -1,7 +1,7 @@
 ---
 title: "Platform: CI/CD Audit"
 description: "Audit CI/CD pipelines for reliability, security, test masking, and deployment safety."
-mode: "platform-quality"
+mode: "PlatformEngineer"
 input: "Specify the pipeline file(s) or CI system (GitHub Actions, Azure Pipelines) to audit."
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: "Python: Refactor Module"
 description: "Refactor Python code to reduce complexity, eliminate code smells, and improve maintainability."
-mode: "python-specialist"
+mode: "PythonDeveloper"
 input: "Specify the module or file to refactor. Optionally describe the target improvement (performance, readability, testability)."
 ---
 

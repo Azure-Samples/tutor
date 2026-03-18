@@ -1,7 +1,7 @@
 ---
 title: "Python: Review Code"
 description: "Review Python code for type safety, async correctness, security, and adherence to PEP standards."
-mode: "python-specialist"
+mode: "PythonDeveloper"
 input: "Provide the file(s) or module to review. Optionally specify focus areas (security, performance, correctness)."
 ---
 

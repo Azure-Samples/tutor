@@ -1,7 +1,7 @@
 ---
 title: "Rust: Review Code"
 description: "Review Rust code for safety, ownership correctness, performance, and idiomatic patterns."
-mode: "rust-specialist"
+mode: "RustDeveloper"
 input: "Provide the crate or file(s) to review. Optionally specify focus (safety, performance, API design)."
 ---
 

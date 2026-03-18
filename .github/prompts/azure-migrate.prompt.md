@@ -7,7 +7,9 @@ input: "Describe the source (current service/provider) and target (desired Azure
 
 Coordinate multi-agent migration planning:
 
-1. **Current State Assessment** — Invoke `system-architect` via `#runSubagent` to document:
+**Delegation compatibility**: If the workspace has `.github/agents/data/team-mapping.md`, resolve exact agent names from it before calling `#runSubagent`. Otherwise, use the canonical agent names in this prompt and fall back to current-agent execution if a specialist is unavailable.
+
+1. **Current State Assessment** — Invoke `SystemArchitect` via `#runSubagent` to document:
    - Current architecture topology and dependencies
    - Data stores, volumes, and access patterns
    - Integration points that will be affected
@@ -25,14 +27,14 @@ Coordinate multi-agent migration planning:
    - `AzureStaticWebAppsSpecialist` — Frontend hosting migration (Vercel/Netlify → SWA, S3+CloudFront → SWA)
 
 3. **Application Changes** — Invoke language specialists via `#runSubagent` to assess code impact:
-   - `python-specialist` / `rust-specialist` / `typescript-specialist` — SDK changes, connection string updates, feature parity gaps
+   - `PythonDeveloper` / `RustDeveloper` / `TypeScriptDeveloper` — SDK changes, connection string updates, feature parity gaps
 
-4. **Infrastructure Changes** — Invoke `platform-quality` via `#runSubagent` to plan:
+4. **Infrastructure Changes** — Invoke `PlatformEngineer` via `#runSubagent` to plan:
    - IaC templates (Bicep/Terraform) for the target architecture
    - CI/CD pipeline changes for new deployment targets
    - DNS cutover, certificate provisioning, and network routing
 
-5. **Risk Analysis** — Invoke `risk-analysis-agent` via `#runSubagent` to evaluate:
+5. **Risk Analysis** — Invoke `RiskAnalyst` via `#runSubagent` to evaluate:
    - Data loss risk during migration
    - Downtime windows and rollback procedures
    - Feature parity gaps between source and target

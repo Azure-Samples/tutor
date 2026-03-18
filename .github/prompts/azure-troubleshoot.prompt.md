@@ -7,6 +7,8 @@ input: "Describe the issue: which Azure service, error messages, affected endpoi
 
 Coordinate Azure service troubleshooting:
 
+**Delegation compatibility**: If the workspace has `.github/agents/data/team-mapping.md`, resolve exact agent names from it before calling `#runSubagent`. Otherwise, use the canonical agent names in this prompt and fall back to current-agent execution if a specialist is unavailable.
+
 1. **Symptom Classification** — Identify the failing service type and route to the appropriate specialist via `#runSubagent`:
    - `AzureKubernetesSpecialist` — Pod crashes, image pull failures, node pressure, network policy blocks
    - `AzureAPIMSpecialist` — 502/504 errors, policy evaluation failures, backend timeouts, certificate issues
@@ -18,7 +20,7 @@ Coordinate Azure service troubleshooting:
    - `AzureRedisSpecialist` — Cache misses, eviction storms, connection timeouts, memory pressure
    - `AzureStaticWebAppsSpecialist` — Build failures, routing mismatches, auth callback errors, API cold starts
 
-2. **Log Analysis** — Invoke `platform-quality` via `#runSubagent` to:
+2. **Log Analysis** — Invoke `PlatformEngineer` via `#runSubagent` to:
    - Query Azure Monitor / Log Analytics with KQL for the relevant error patterns
    - Check resource health and recent Azure status incidents
    - Review activity log for recent configuration changes that may have caused the regression
@@ -30,11 +32,11 @@ Coordinate Azure service troubleshooting:
    - Code regression (bad deployment, missing env var)
 
 4. **Fix Implementation** — Delegate the fix to the appropriate agent:
-   - Infrastructure fix → `platform-quality`
-   - Application code fix → `python-specialist` / `rust-specialist` / `typescript-specialist`
+   - Infrastructure fix → `PlatformEngineer`
+   - Application code fix → `PythonDeveloper` / `RustDeveloper` / `TypeScriptDeveloper`
    - Configuration fix → relevant Azure specialist
 
-5. **Verification** — Invoke `platform-quality` to confirm:
+5. **Verification** — Invoke `PlatformEngineer` to confirm:
    - Error rate returns to baseline
    - Health checks pass
    - No new alerts triggered

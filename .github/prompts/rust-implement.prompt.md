@@ -1,7 +1,7 @@
 ---
 title: "Rust: Implement Feature"
 description: "Implement a Rust feature with safe ownership patterns, proper error handling, and cargo test coverage."
-mode: "rust-specialist"
+mode: "RustDeveloper"
 input: "Describe the feature, crate, or module to implement. Include any trait contracts or wire formats."
 ---
 
