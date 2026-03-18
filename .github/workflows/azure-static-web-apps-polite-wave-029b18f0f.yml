@@ -126,6 +126,34 @@ jobs:
 
           echo "Resolved: tier=$release_tier env=$azure_env_name swa=$swa_name rg=$resource_group"
 
+  resolve-azure-endpoints:
+    runs-on: ubuntu-latest
+    needs: resolve-release
+    outputs:
+      apim_base_url: ${{ steps.resolve_apim.outputs.apim_base_url }}
+    env:
+      AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
+      RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Resolve APIM gateway URL
+        id: resolve_apim
+        run: |
+          set -euo pipefail
+          apim_name="tutor-${AZURE_ENV_NAME}-apim"
+          gateway_url="$(az apim show --name "$apim_name" --resource-group "$RESOURCE_GROUP" --query "gatewayUrl" -o tsv)"
+          if [ -z "$gateway_url" ]; then
+            echo "Failed to resolve APIM gatewayUrl for APIM '$apim_name' in resource group '$RESOURCE_GROUP'."
+            exit 1
+          fi
+          echo "apim_base_url=$gateway_url" >> "$GITHUB_OUTPUT"
+          echo "Resolved APIM gateway URL for '$apim_name'."
+
   frontend_pr_checks:
     if: github.event_name == 'pull_request' && github.event.action != 'closed' && github.base_ref == 'main'
     runs-on: ubuntu-latest
@@ -159,7 +187,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'prod' && startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, 'stable')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'auto' && startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, 'stable'))
     runs-on: ubuntu-latest
-    needs: resolve-release
+    needs:
+      - resolve-release
+      - resolve-azure-endpoints
     name: Build and Deploy Prod
     env:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
@@ -186,17 +216,11 @@ jobs:
           fi
           echo "::add-mask::$token"
           echo "api_token=$token" >> "$GITHUB_OUTPUT"
-      - name: Validate APIM frontend env
-        run: |
-          if [ -z "${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}" ]; then
-            echo "NEXT_PUBLIC_APIM_BASE_URL secret is required for frontend deployment."
-            exit 1
-          fi
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         env:
-          NEXT_PUBLIC_APIM_BASE_URL: ${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}
+          NEXT_PUBLIC_APIM_BASE_URL: ${{ needs.resolve-azure-endpoints.outputs.apim_base_url }}
         with:
           azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.api_token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
@@ -211,7 +235,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'dev') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'auto' && (!startsWith(github.ref, 'refs/tags/') || !contains(github.ref_name, 'stable')))
     runs-on: ubuntu-latest
-    needs: resolve-release
+    needs:
+      - resolve-release
+      - resolve-azure-endpoints
     name: Build and Deploy Dev
     env:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
@@ -238,17 +264,11 @@ jobs:
           fi
           echo "::add-mask::$token"
           echo "api_token=$token" >> "$GITHUB_OUTPUT"
-      - name: Validate APIM frontend env
-        run: |
-          if [ -z "${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}" ]; then
-            echo "NEXT_PUBLIC_APIM_BASE_URL secret is required for frontend deployment."
-            exit 1
-          fi
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         env:
-          NEXT_PUBLIC_APIM_BASE_URL: ${{ secrets.NEXT_PUBLIC_APIM_BASE_URL }}
+          NEXT_PUBLIC_APIM_BASE_URL: ${{ needs.resolve-azure-endpoints.outputs.apim_base_url }}
         with:
           azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.api_token }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
