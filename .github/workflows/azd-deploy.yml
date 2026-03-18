@@ -1519,12 +1519,15 @@ jobs:
             latest_ready="$(az containerapp show --resource-group "$RG" --name "$APP_NAME" --query 'properties.latestReadyRevisionName' -o tsv 2>/dev/null || true)"
             running_state="$(az containerapp revision show --resource-group "$RG" --name "$APP_NAME" --revision "$latest_revision" --query 'properties.runningState' -o tsv 2>/dev/null || true)"
 
-            if [ "$aca_state" = "Succeeded" ] && [ "$latest_revision" = "$latest_ready" ] && [ "$running_state" = "Running" ]; then
+            if [ "$aca_state" = "Succeeded" ] && [ "$latest_revision" = "$latest_ready" ] && { [ "$running_state" = "Running" ] || [ "$running_state" = "ScaledToZero" ]; }; then
               echo "::notice::No source changes for '${SERVICE}' and ACA revision is healthy. Skipping build/push/deploy."
-              echo "DEPLOY_SKIPPED=true" >> "$GITHUB_ENV"
-              exit 0
+            else
+              echo "::warning::No source changes for '${SERVICE}', but ACA is not fully healthy (state=$aca_state, running=$running_state). Skipping deploy to keep provision/update stable."
+              echo "::warning::Use a service-specific deploy run when you need to force recovery for this app."
             fi
-            echo "No source changes but ACA is not fully healthy (state=$aca_state, running=$running_state). Proceeding with deploy."
+
+            echo "DEPLOY_SKIPPED=true" >> "$GITHUB_ENV"
+            exit 0
           fi
 
           echo "DEPLOY_SKIPPED=false" >> "$GITHUB_ENV"
