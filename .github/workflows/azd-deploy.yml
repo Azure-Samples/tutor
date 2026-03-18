@@ -1353,8 +1353,7 @@ jobs:
               fi
 
               if [ "$state" = "Failed" ]; then
-                echo "Container app '$APP_NAME' provisioning reached Failed state while waiting for image rollout."
-                return 1
+                echo "Container app '$APP_NAME' reached transient Failed state while waiting for image rollout; retrying."
               fi
 
               echo "Waiting for '$APP_NAME' rollout (state: ${state:-unknown}, image: ${current_image:-unknown}) attempt $attempt/$max_attempts..."
@@ -1411,8 +1410,7 @@ jobs:
 
               if [ -n "$latest_revision" ] \
                 && [ "$latest_revision" = "$latest_ready_revision" ] \
-                && [ "$running_state" = "Running" ] \
-                && [ "${replicas:-0}" != "0" ]; then
+                && { [ "$running_state" = "Running" ] || [ "$running_state" = "ScaledToZero" ]; }; then
                 echo "Latest revision '$latest_revision' is ready and running for '$APP_NAME'."
                 return 0
               fi
