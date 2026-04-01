@@ -1289,6 +1289,13 @@ jobs:
             fi
           fi
 
+          if [ "$init_succeeded" != "true" ] && [ "$RELEASE_TIER" != "prod" ] && [ "$STRICT_SECURITY" != "true" ]; then
+            echo "Remote Terraform backend remains unavailable for ${SERVICE}. Falling back to local backend for this reconciliation run."
+            if terraform -chdir="$STACK_DIR" init -backend=false -input=false; then
+              init_succeeded="true"
+            fi
+          fi
+
           if [ "$init_succeeded" != "true" ]; then
             echo "Terraform init failed after 5 attempts. Check TF state RBAC and storage access."
             exit 1
