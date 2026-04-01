@@ -273,6 +273,9 @@ jobs:
       - name: Set up Azure Developer CLI
         uses: Azure/setup-azd@v2
 
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
