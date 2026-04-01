@@ -1162,6 +1162,10 @@ jobs:
         run: |
           set -euo pipefail
 
+          RG="tutor-${AZURE_ENV_NAME}"
+          APIM_NAME="tutor-${AZURE_ENV_NAME}-apim"
+          API_ID="${SERVICE}-api"
+
           # Use commit range diff (push before -> current sha) so infra changes are
           # detected reliably even after this run updates the container image tag.
           base_sha="${BEFORE_SHA:-}"
@@ -1177,8 +1181,14 @@ jobs:
 
           changes="$(git diff --name-only "$base_sha" "$GITHUB_SHA" -- "infra/terraform/stacks/services/${SERVICE}/" "infra/terraform/modules/service-edge-apim/" 2>/dev/null || true)"
           if [ -z "$changes" ]; then
-            echo "No infra changes for service-edge '${SERVICE}' between ${base_sha:0:8} and ${GITHUB_SHA:0:8}."
-            echo "infra_changed=false" >> "$GITHUB_OUTPUT"
+            if az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" --query 'name' -o tsv >/dev/null 2>&1; then
+              echo "No infra changes for service-edge '${SERVICE}' between ${base_sha:0:8} and ${GITHUB_SHA:0:8}."
+              echo "infra_changed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            echo "APIM API '${API_ID}' is missing in ${APIM_NAME}; forcing terraform apply for service-edge reconciliation."
+            echo "infra_changed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
