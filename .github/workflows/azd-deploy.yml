@@ -1486,6 +1486,40 @@ jobs:
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
 
+      - name: Initialize Terraform backend for environment refresh
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: true
+          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
+          TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
+        run: |
+          set -euo pipefail
+          cd infra/terraform
+
+          : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
+          : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
+          : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
+          if [ "$AZURE_ENV_NAME" != "prod" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          elif [ -z "$TFSTATE_KEY" ]; then
+            TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
+          fi
+
+          {
+            echo "resource_group_name  = \"$TFSTATE_RESOURCE_GROUP\""
+            echo "storage_account_name = \"$TFSTATE_STORAGE_ACCOUNT\""
+            echo "container_name       = \"$TFSTATE_CONTAINER\""
+            echo "key                  = \"$TFSTATE_KEY\""
+            echo "use_azuread_auth     = true"
+            echo "use_oidc             = true"
+          } > backend.hcl
+
+          terraform init -reconfigure -backend-config=backend.hcl
+
       - name: Refresh deployment environment outputs
         run: azd env refresh -e "$AZURE_ENV_NAME" --no-prompt
 
