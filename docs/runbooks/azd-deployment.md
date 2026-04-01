@@ -162,7 +162,9 @@ The backend is stateless: no server-side session cache is used. Identity is vali
 
 ## Agent Entra permissions on provisioning
 
-Set `agent_principal_object_ids` in Terraform for each agent-managed identity or service principal. Provisioning automatically assigns required roles on Cosmos, Blob, and ACR.
+Provisioning automatically assigns `Cosmos DB Built-in Data Contributor` to each backend Container App identity at the shared Cosmos database scope.
+
+Set `agent_principal_object_ids` in Terraform for each additional agent-managed identity or service principal that also needs Cosmos, Blob, ACR, or Cognitive Services access.
 
 ## Operational Checks
 

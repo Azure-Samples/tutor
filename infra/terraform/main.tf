@@ -41,11 +41,13 @@ locals {
     var.apim_additional_allowed_origins,
   )))
 
+  cosmos_sql_data_contributor_role_definition_id = "${azurerm_cosmosdb_account.main.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
+  cosmos_sql_database_scope                      = "${azurerm_cosmosdb_account.main.id}/dbs/${azurerm_cosmosdb_sql_database.main.name}"
+
   agent_role_scopes = {
-    "Cosmos DB Built-in Data Contributor" = azurerm_cosmosdb_account.main.id
-    "Storage Blob Data Contributor"       = azurerm_storage_account.uploads.id
-    "AcrPull"                             = azurerm_container_registry.main.id
-    "Cognitive Services User"             = module.ai_foundry.ai_foundry_id
+    "Storage Blob Data Contributor" = azurerm_storage_account.uploads.id
+    "AcrPull"                       = azurerm_container_registry.main.id
+    "Cognitive Services User"       = module.ai_foundry.ai_foundry_id
   }
 
   agent_role_assignments = {
@@ -495,6 +497,28 @@ resource "azurerm_role_assignment" "container_app_cognitive_services" {
   scope                = module.ai_foundry.ai_foundry_id
   role_definition_name = "Cognitive Services User"
   principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "backend_services_cosmos_data" {
+  for_each = azurerm_container_app.backend_services
+
+  name                = uuidv5("dns", "${each.value.name}${each.value.identity[0].principal_id}cosmosdbsqlrole")
+  account_name        = azurerm_cosmosdb_account.main.name
+  resource_group_name = azurerm_resource_group.main.name
+  principal_id        = each.value.identity[0].principal_id
+  role_definition_id  = local.cosmos_sql_data_contributor_role_definition_id
+  scope               = local.cosmos_sql_database_scope
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "agent_cosmos_data" {
+  for_each = toset(var.agent_principal_object_ids)
+
+  name                = uuidv5("dns", "${each.value}agentcosmosdbsqlrole")
+  account_name        = azurerm_cosmosdb_account.main.name
+  resource_group_name = azurerm_resource_group.main.name
+  principal_id        = each.value
+  role_definition_id  = local.cosmos_sql_data_contributor_role_definition_id
+  scope               = local.cosmos_sql_database_scope
 }
 
 # ── RBAC: Agent permissions ──────────────────────────────────────────────────
