@@ -1518,7 +1518,28 @@ jobs:
             echo "use_oidc             = true"
           } > backend.hcl
 
-          terraform init -reconfigure -backend-config=backend.hcl
+          if ! terraform init -reconfigure -backend-config=backend.hcl; then
+            echo "OIDC backend auth unavailable during environment refresh initialization; retrying with storage account key fallback."
+            TFSTATE_ACCESS_KEY="$(az storage account keys list \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+              --query '[0].value' -o tsv)"
+
+            if [ -z "$TFSTATE_ACCESS_KEY" ]; then
+              echo "Failed to retrieve storage account access key for Terraform backend fallback."
+              exit 1
+            fi
+
+            {
+              echo "resource_group_name  = \"$TFSTATE_RESOURCE_GROUP\""
+              echo "storage_account_name = \"$TFSTATE_STORAGE_ACCOUNT\""
+              echo "container_name       = \"$TFSTATE_CONTAINER\""
+              echo "key                  = \"$TFSTATE_KEY\""
+              echo "access_key           = \"$TFSTATE_ACCESS_KEY\""
+            } > backend.hcl
+
+            terraform init -reconfigure -backend-config=backend.hcl
+          fi
 
       - name: Refresh deployment environment outputs
         run: azd env refresh -e "$AZURE_ENV_NAME" --no-prompt
