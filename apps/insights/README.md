@@ -38,6 +38,7 @@ When enabled, callers must be allowlisted supervisors and requests are constrain
 - Cosmos DB (Azure)
 - Falls back to in-memory storage when Cosmos configuration is absent in a dev environment
 - Production-style rollout still depends on the GitHub Actions backend deployment workflow
+- Push-triggered backend deploys are the fastest safe way to refresh only this service in 108dev
 
 ## Running Locally
 

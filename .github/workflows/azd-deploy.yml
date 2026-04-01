@@ -1487,6 +1487,7 @@ jobs:
           azd env set RS_KEY "$TFSTATE_KEY"
 
       - name: Initialize Terraform backend for environment refresh
+        continue-on-error: true
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -1542,6 +1543,7 @@ jobs:
           fi
 
       - name: Refresh deployment environment outputs
+        continue-on-error: true
         run: azd env refresh -e "$AZURE_ENV_NAME" --no-prompt
 
       - name: Build and deploy service image
@@ -1771,13 +1773,58 @@ jobs:
 
           echo "DEPLOY_SKIPPED=false" >> "$GITHUB_ENV"
 
-          eval "$(azd env get-values -e "$AZURE_ENV_NAME" --no-prompt | sed -E 's/^([^=]+)=(.*)$/export \1=\2/')"
+          eval "$(azd env get-values -e "$AZURE_ENV_NAME" --no-prompt | sed -E 's/^([^=]+)=(.*)$/export \1=\2/' || true)"
 
-          required_shared_env=(
-            COSMOS_ENDPOINT
-            COSMOS_DATABASE
-            PROJECT_ENDPOINT
-          )
+          RG_NAME="tutor-${AZURE_ENV_NAME}"
+          cosmos_account_name=""
+
+          if [ -z "${COSMOS_ENDPOINT:-}" ] || [ -z "${COSMOS_DATABASE:-}" ]; then
+            cosmos_account_name="$(az cosmosdb list --resource-group "$RG_NAME" --query '[0].name' -o tsv 2>/dev/null || true)"
+          fi
+
+          if [ -n "$cosmos_account_name" ]; then
+            if [ -z "${COSMOS_ENDPOINT:-}" ]; then
+              COSMOS_ENDPOINT="$(az cosmosdb show --resource-group "$RG_NAME" --name "$cosmos_account_name" --query documentEndpoint -o tsv 2>/dev/null || true)"
+            fi
+            if [ -z "${COSMOS_DATABASE:-}" ]; then
+              COSMOS_DATABASE="$(az cosmosdb sql database list --resource-group "$RG_NAME" --account-name "$cosmos_account_name" --query '[0].name' -o tsv 2>/dev/null || true)"
+            fi
+          fi
+
+          : "${COSMOS_AVATAR_CASE_TABLE:=avatar_case}"
+          : "${COSMOS_CONFIGURATION_TABLE:=configuration}"
+          : "${COSMOS_STUDENT_TABLE:=students}"
+          : "${COSMOS_PROFESSOR_TABLE:=professors}"
+          : "${COSMOS_COURSE_TABLE:=courses}"
+          : "${COSMOS_CLASS_TABLE:=classes}"
+          : "${COSMOS_GROUP_TABLE:=groups}"
+          : "${COSMOS_ESSAY_TABLE:=essays}"
+          : "${COSMOS_RESOURCE_TABLE:=resources}"
+          : "${COSMOS_ASSEMBLY_TABLE:=assemblies}"
+          : "${COSMOS_QUESTION_TABLE:=questions}"
+          : "${COSMOS_ANSWER_TABLE:=answers}"
+          : "${COSMOS_GRADER_TABLE:=graders}"
+          : "${COSMOS_UPSKILLING_TABLE:=upskilling_plans}"
+          : "${COSMOS_INSIGHTS_REPORT_TABLE:=insights_reports}"
+          : "${COSMOS_INSIGHTS_FEEDBACK_TABLE:=insights_feedback}"
+
+          case "$SERVICE" in
+            insights)
+              required_shared_env=(
+                COSMOS_ENDPOINT
+                COSMOS_DATABASE
+                COSMOS_INSIGHTS_REPORT_TABLE
+                COSMOS_INSIGHTS_FEEDBACK_TABLE
+              )
+              ;;
+            *)
+              required_shared_env=(
+                COSMOS_ENDPOINT
+                COSMOS_DATABASE
+                PROJECT_ENDPOINT
+              )
+              ;;
+          esac
 
           missing_required_env=()
           for env_name in "${required_shared_env[@]}"; do
