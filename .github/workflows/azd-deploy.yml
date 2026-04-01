@@ -1244,13 +1244,29 @@ jobs:
           echo "Resolved APIM required origins for ${SERVICE}: ${TF_VAR_allowed_origins}"
 
           STACK_STATE_KEY="stacks/services/${SERVICE}-${AZURE_ENV_NAME}.tfstate"
-          terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
-            -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
-            -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
-            -backend-config="container_name=${TFSTATE_CONTAINER}" \
-            -backend-config="key=${STACK_STATE_KEY}" \
-            -backend-config="use_azuread_auth=true" \
-            -backend-config="use_oidc=true"
+          init_succeeded="false"
+          for attempt in 1 2 3 4 5; do
+            if terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
+              -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+              -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+              -backend-config="container_name=${TFSTATE_CONTAINER}" \
+              -backend-config="key=${STACK_STATE_KEY}" \
+              -backend-config="use_azuread_auth=true" \
+              -backend-config="use_oidc=true"; then
+              init_succeeded="true"
+              break
+            fi
+
+            if [ "$attempt" -lt 5 ]; then
+              echo "Terraform init failed (attempt ${attempt}/5). Retrying after RBAC propagation delay..."
+              sleep 20
+            fi
+          done
+
+          if [ "$init_succeeded" != "true" ]; then
+            echo "Terraform init failed after 5 attempts. Check TF state RBAC and storage access."
+            exit 1
+          fi
 
           # Helper: only import if not already in state
           safe_import() {
