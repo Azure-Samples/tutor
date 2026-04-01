@@ -82,11 +82,11 @@ Set these Terraform variables to enable backend JWT validation:
 - `entra_api_client_id` (App Registration client ID for the backend API)
 - `entra_allowed_client_app_ids` (comma-separated frontend/API client IDs allowed as `azp`/`appid`)
 
-Backend Container Apps receive `Cosmos DB Built-in Data Contributor` on the shared `tutor` database via native Cosmos SQL role assignments.
+Backend Container Apps receive `Cosmos DB Built-in Data Contributor` via native Cosmos SQL role assignments at both the account scope for SDK metadata reads and the shared `tutor` database scope for data access.
 
 Set `agent_principal_object_ids` with managed identity object IDs for additional non-Container-App workloads so Terraform assigns:
 
-- `Cosmos DB Built-in Data Contributor` (native Cosmos SQL role assignment at database scope)
+- `Cosmos DB Built-in Data Contributor` (native Cosmos SQL role assignments at account and database scope)
 - `Storage Blob Data Contributor`
 - `AcrPull`
 - `Cognitive Services User`
