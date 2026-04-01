@@ -1,0 +1,32 @@
+[project]
+name = "tutor_insights"
+version = "0.1.0"
+description = "Supervisor insights service"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.2",
+    "pydantic-settings>=2.4.0",
+    "PyJWT[crypto]>=2.10.1"
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.10",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.23.7"
+]
+
+[build-system]
+requires = ["setuptools>=70.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+pythonpath = [
+    "lib/src",
+    "apps/insights/src",
+]

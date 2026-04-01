@@ -99,6 +99,7 @@ export const upskillingApi = createServiceClient(process.env.NEXT_PUBLIC_UPSKILL
 export const chatApi = createServiceClient(process.env.NEXT_PUBLIC_WEB_APP_BASE_URL, "http://localhost:8086", "api/chat");
 export const evaluationApi = createServiceClient(process.env.NEXT_PUBLIC_EVALUATION_APP_BASE_URL, "http://localhost:8086", "api/evaluation");
 export const lmsGatewayApi = createServiceClient(process.env.NEXT_PUBLIC_LMS_GATEWAY_APP_BASE_URL, "http://localhost:8087", "api/lms-gateway");
+export const insightsApi = createServiceClient(process.env.NEXT_PUBLIC_INSIGHTS_APP_BASE_URL, "http://localhost:8088", "api/insights");
 
 // Compatibility aliases for legacy modules still in the repo.
 export const webApp = chatApi;

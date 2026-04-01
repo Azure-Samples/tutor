@@ -138,6 +138,12 @@ variable "cosmos_containers" {
     upskilling_plans = {
       partition_key_path = "/professor_id"
     }
+    insights_reports = {
+      partition_key_path = "/school_id"
+    }
+    insights_feedback = {
+      partition_key_path = "/report_id"
+    }
   }
 }
 

@@ -164,6 +164,16 @@ output "COSMOS_AVATAR_CASE_TABLE" {
   value       = "avatar_case"
 }
 
+output "COSMOS_INSIGHTS_REPORT_TABLE" {
+  description = "Cosmos DB container name for insights reports."
+  value       = "insights_reports"
+}
+
+output "COSMOS_INSIGHTS_FEEDBACK_TABLE" {
+  description = "Cosmos DB container name for insights feedback entries."
+  value       = "insights_feedback"
+}
+
 output "BLOB_CONNECTION_STRING" {
   description = "Storage account connection string used by services."
   value       = azurerm_storage_account.uploads.primary_connection_string
@@ -275,6 +285,11 @@ output "SERVICE_CHAT_RESOURCE_ID" {
 output "SERVICE_EVALUATION_RESOURCE_ID" {
   description = "Resource ID for evaluation service target."
   value       = azurerm_container_app.backend_services["evaluation"].id
+}
+
+output "SERVICE_INSIGHTS_RESOURCE_ID" {
+  description = "Resource ID for insights service target."
+  value       = azurerm_container_app.backend_services["insights"].id
 }
 
 output "SERVICE_LMS_GATEWAY_RESOURCE_ID" {

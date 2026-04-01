@@ -9,6 +9,7 @@ locals {
     "upskilling",
     "chat",
     "evaluation",
+    "insights",
     "lms-gateway",
   ]
 

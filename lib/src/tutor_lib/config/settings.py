@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable
 
 from pydantic import Field
 from pydantic_settings import BaseSettings
@@ -26,6 +26,8 @@ class CosmosConfig(BaseSettings):
     group_container: str = Field(alias="COSMOS_GROUP_TABLE", default="groups")
     avatar_case_container: str = Field(alias="COSMOS_AVATAR_CASE_TABLE", default="avatar_case")
     upskilling_container: str = Field(alias="COSMOS_UPSKILLING_TABLE", default="upskilling_plans")
+    insights_report_container: str = Field(alias="COSMOS_INSIGHTS_REPORT_TABLE", default="insights_reports")
+    insights_feedback_container: str = Field(alias="COSMOS_INSIGHTS_FEEDBACK_TABLE", default="insights_feedback")
 
 
 class AzureAIConfig(BaseSettings):

@@ -48,6 +48,12 @@ const configOptions = [
     icon: "/images/logo/logo.webp",
   },
   {
+    title: "Supervisor",
+    description: "Prepare pre-visit school briefings, review report sections, and monitor generated insights by school.",
+    href: "/configuration/supervisor",
+    icon: "/images/logo/logo.webp",
+  },
+  {
     title: "LMS Gateway",
     description: "Trigger and inspect LMS synchronization jobs. Connect to Moodle or Canvas and schedule recurring syncs.",
     href: "/configuration/lms-gateway",

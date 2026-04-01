@@ -154,6 +154,23 @@ services:
       ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID}
       ENTRA_TOKEN_AUDIENCE: ${ENTRA_TOKEN_AUDIENCE}
       ENTRA_ALLOWED_CLIENT_APP_IDS: ${ENTRA_ALLOWED_CLIENT_APP_IDS}
+  insights:
+    project: apps/insights
+    language: python
+    host: containerapp
+    docker:
+      path: dockerfile
+      context: ../..
+    env:
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+      COSMOS_INSIGHTS_REPORT_TABLE: ${COSMOS_INSIGHTS_REPORT_TABLE}
+      COSMOS_INSIGHTS_FEEDBACK_TABLE: ${COSMOS_INSIGHTS_FEEDBACK_TABLE}
+      ENTRA_AUTH_ENABLED: ${ENTRA_AUTH_ENABLED}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID}
+      ENTRA_API_CLIENT_ID: ${ENTRA_API_CLIENT_ID}
+      ENTRA_TOKEN_AUDIENCE: ${ENTRA_TOKEN_AUDIENCE}
+      ENTRA_ALLOWED_CLIENT_APP_IDS: ${ENTRA_ALLOWED_CLIENT_APP_IDS}
   lms-gateway:
     project: apps/lms-gateway
     language: python

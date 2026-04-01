@@ -25,6 +25,7 @@ from pypdf.errors import PdfReadError
 class EssayStrategyType(str, Enum):
     """Enumeration describing available evaluation strategies."""
 
+    ENEM = "enem"
     ANALYTICAL = "analytical"
     NARRATIVE = "narrative"
     DEFAULT = "default"
@@ -126,6 +127,13 @@ class AnalyticalEssayStrategy(EssayEvaluationStrategy):
         return EssayStrategyType.ANALYTICAL
 
 
+class EnemEssayStrategy(EssayEvaluationStrategy):
+    """Strategy specialised for ENEM competency-based evaluations."""
+
+    def strategy_type(self) -> EssayStrategyType:  # noqa: D401
+        return EssayStrategyType.ENEM
+
+
 class NarrativeEssayStrategy(EssayEvaluationStrategy):
     """Strategy specialised for narrative or creative writing."""
 
@@ -143,8 +151,31 @@ class DefaultEssayStrategy(EssayEvaluationStrategy):
 class StrategyResolver:
     """Decide which evaluation strategy to apply for a given essay."""
 
+    ENEM_THEME_MARKERS: tuple[str, ...] = (
+        "enem",
+        "competencia",
+        "competência",
+        "redacao enem",
+        "redação enem",
+    )
+
+    ENEM_OBJECTIVE_MARKERS: tuple[str, ...] = (
+        "enem",
+        "competencia",
+        "competência",
+    )
+
     def resolve(self, essay: Essay, resources: Iterable[Resource]) -> EssayStrategyType:
+        theme = (essay.theme or "").lower()
         objectives = {obj.lower() for resource in resources for obj in resource.objective}
+        if any(marker in theme for marker in self.ENEM_THEME_MARKERS):
+            return EssayStrategyType.ENEM
+        if any(
+            marker in objective
+            for objective in objectives
+            for marker in self.ENEM_OBJECTIVE_MARKERS
+        ):
+            return EssayStrategyType.ENEM
         if essay.theme and "analytical" in essay.theme.lower():
             return EssayStrategyType.ANALYTICAL
         if any("creativ" in obj for obj in objectives):
@@ -163,6 +194,9 @@ class EssayOrchestrator:
         self._agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)  # pylint: disable=no-member
         self._assembly_repository = AssemblyRepository(settings.cosmos)
         self._strategies: dict[EssayStrategyType, EssayEvaluationStrategy] = {
+            EssayStrategyType.ENEM: EnemEssayStrategy(
+                self._agent_service, self._composer
+            ),
             EssayStrategyType.ANALYTICAL: AnalyticalEssayStrategy(
                 self._agent_service, self._composer
             ),
@@ -231,6 +265,7 @@ class EssayOrchestrator:
             raise ValueError(f"Assembly '{assembly.id}' does not contain agents")
 
         role_map = {
+            EssayStrategyType.ENEM: "enem",
             EssayStrategyType.ANALYTICAL: "analytical",
             EssayStrategyType.NARRATIVE: "narrative",
             EssayStrategyType.DEFAULT: "default",

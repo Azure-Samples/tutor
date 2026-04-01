@@ -4,7 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import SidebarItem from "@/components/Sidebar/SidebarItem";
 import useLocalStorage from "@/hooks/useLocalStorage";
-import { FaCog, FaFileAlt, FaQuestionCircle, FaUserGraduate, FaComments } from "react-icons/fa";
+import { FaCog, FaFileAlt, FaQuestionCircle, FaUserGraduate, FaComments, FaSchool } from "react-icons/fa";
 
 interface SidebarProps {
   sidebarOpen: boolean;
@@ -70,6 +70,17 @@ const menuGroups = [
         route: "/chat",
         gradient: "from-orange-400 to-pink-500",
         hoverText: "text-orange-500"
+      },
+      {
+        icon: (
+          <span className="sidebar-icon flex items-center justify-center w-10 h-10 rounded-full p-2 bg-gradient-to-br from-indigo-400 to-cyan-500 transition-all duration-300 group-hover:bg-white">
+            <FaSchool className="w-6 h-6 transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-indigo-400 group-hover:to-cyan-500 group-hover:text-transparent group-hover:bg-clip-text" />
+          </span>
+        ),
+        label: "Supervisor",
+        route: "/configuration/supervisor",
+        gradient: "from-indigo-400 to-cyan-500",
+        hoverText: "text-cyan-500"
       },
 
     ]

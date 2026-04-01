@@ -163,7 +163,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          all_services=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          all_services=(avatar chat configuration essays evaluation insights lms-gateway questions upskilling)
           selected_services=()
           selected_service_infra=()
           provision_required=false
@@ -814,7 +814,7 @@ jobs:
           set -euo pipefail
 
           RG_NAME="tutor-${AZURE_ENV_NAME}"
-          SERVICES=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          SERVICES=(avatar chat configuration essays evaluation insights lms-gateway questions upskilling)
 
           normalize_thresholds() {
             jq '
@@ -977,7 +977,7 @@ jobs:
           RG_NAME="tutor-${AZURE_ENV_NAME}"
           ACA_ENV_NAME="${ACA_ENVIRONMENT_NAME}"
           DIAG_DIR="diagnostics"
-          SERVICES=(avatar chat configuration essays evaluation lms-gateway questions upskilling)
+          SERVICES=(avatar chat configuration essays evaluation insights lms-gateway questions upskilling)
 
           mkdir -p "$DIAG_DIR"/{meta,env,apps,activity,logs,deployments}
 
@@ -1574,6 +1574,8 @@ jobs:
             "COSMOS_ANSWER_TABLE=${COSMOS_ANSWER_TABLE:-}"
             "COSMOS_GRADER_TABLE=${COSMOS_GRADER_TABLE:-}"
             "COSMOS_UPSKILLING_TABLE=${COSMOS_UPSKILLING_TABLE:-}"
+            "COSMOS_INSIGHTS_REPORT_TABLE=${COSMOS_INSIGHTS_REPORT_TABLE:-}"
+            "COSMOS_INSIGHTS_FEEDBACK_TABLE=${COSMOS_INSIGHTS_FEEDBACK_TABLE:-}"
             "PROJECT_ENDPOINT=${PROJECT_ENDPOINT:-}"
             "MODEL_DEPLOYMENT_NAME=${MODEL_DEPLOYMENT_NAME:-}"
             "MODEL_REASONING_DEPLOYMENT=${MODEL_REASONING_DEPLOYMENT:-}"

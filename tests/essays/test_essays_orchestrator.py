@@ -5,9 +5,61 @@
 import importlib
 import json
 import sys
+import types
 from pathlib import Path
 
 import pytest
+
+
+def _install_tutor_lib_agents_stub() -> None:
+    """Inject a lightweight tutor_lib.agents module for unit-test imports."""
+
+    agents_module = types.ModuleType("tutor_lib.agents")
+
+    class _ImportSafeFoundryAgentService:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.calls: list[tuple[str, str]] = []
+
+        async def run_agent(self, agent_id: str, prompt: str, **_kwargs) -> str:
+            self.calls.append((agent_id, prompt))
+            return "stub response"
+
+        async def create_agent(self, **_kwargs):
+            return types.SimpleNamespace(id="agent-stub")
+
+        async def get_agent(self, agent_id: str):
+            return types.SimpleNamespace(id=agent_id, model="gpt-5-nano")
+
+    class _ImportSafeAgentAttachment:
+        def __init__(self, file_name: str, content_type: str, payload: bytes) -> None:
+            self.file_name = file_name
+            self.content_type = content_type
+            self.payload = payload
+
+    agents_module.FoundryAgentService = _ImportSafeFoundryAgentService
+    agents_module.AgentAttachment = _ImportSafeAgentAttachment
+    sys.modules["tutor_lib.agents"] = agents_module
+
+
+def _install_document_intelligence_stub() -> None:
+    """Provide azure.ai.documentintelligence when the SDK is unavailable locally."""
+
+    module = types.ModuleType("azure.ai.documentintelligence")
+
+    class _Poller:
+        @staticmethod
+        def result():
+            return types.SimpleNamespace(content="", pages=[])
+
+    class _DocumentIntelligenceClient:
+        def __init__(self, *_args, **_kwargs) -> None:
+            pass
+
+        def begin_analyze_document(self, **_kwargs):
+            return _Poller()
+
+    module.DocumentIntelligenceClient = _DocumentIntelligenceClient
+    sys.modules["azure.ai.documentintelligence"] = module
 
 
 @pytest.fixture
@@ -30,8 +82,18 @@ def essays_app_module_fixture(monkeypatch):
 
     # Clear cached app.* modules to avoid cross-service contamination
     for mod_name in list(sys.modules):
-        if mod_name == "app" or mod_name.startswith("app."):
+        if (
+            mod_name == "app"
+            or mod_name.startswith("app.")
+            or mod_name == "tutor_lib.agents"
+            or mod_name.startswith("tutor_lib.agents.")
+            or mod_name == "azure.ai.documentintelligence"
+            or mod_name.startswith("azure.ai.documentintelligence.")
+        ):
             del sys.modules[mod_name]
+
+    _install_tutor_lib_agents_stub()
+    _install_document_intelligence_stub()
 
     from app.config import get_settings  # pylint: disable=import-error
 
@@ -61,8 +123,18 @@ def essays_main_module_fixture(monkeypatch):
         sys.path.insert(0, entry)
 
     for module_name in list(sys.modules):
-        if module_name == "app" or module_name.startswith("app."):
+        if (
+            module_name == "app"
+            or module_name.startswith("app.")
+            or module_name == "tutor_lib.agents"
+            or module_name.startswith("tutor_lib.agents.")
+            or module_name == "azure.ai.documentintelligence"
+            or module_name.startswith("azure.ai.documentintelligence.")
+        ):
             sys.modules.pop(module_name, None)
+
+    _install_tutor_lib_agents_stub()
+    _install_document_intelligence_stub()
 
     main_module = importlib.import_module("app.main")
     importlib.reload(main_module)
@@ -202,6 +274,102 @@ async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essa
 
     assert result.strategy is module.EssayStrategyType.ANALYTICAL
     assert result.strengths == ["Rigorous evidence"]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_uses_enem_strategy_and_routes_to_enem_role(
+    monkeypatch, essays_app_module_fixture
+):
+    module = essays_app_module_fixture
+
+    created: list[_StubFoundryAgentService] = []
+
+    class _RecordingService(_StubFoundryAgentService):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            created.append(self)
+
+    monkeypatch.setattr(module, "FoundryAgentService", _RecordingService)
+    _StubFoundryAgentService.response_text = (
+        "ENEM verdict\n\nStrengths: Competency coverage\n\n"
+        "Improvements: Strengthen intervention proposal"
+    )
+
+    enem_agent = module.AgentRef(
+        agent_id="agent-enem",
+        role="enem",
+        deployment="gpt-5",
+    )
+    default_agent = module.AgentRef(
+        agent_id="agent-default",
+        role="default",
+        deployment="gpt-5-nano",
+    )
+
+    async def _stub_load(_self, assembly_id, **kwargs):
+        return module.Assembly(
+            id=assembly_id,
+            topic_name="Topic",
+            essay_id="essay-enem-theme",
+            agents=[default_agent, enem_agent],
+        )
+
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
+
+    orchestrator = module.EssayOrchestrator()
+    essay = module.Essay(
+        id="essay-enem-theme",
+        topic="Citizenship",
+        content="Essay",
+        theme="ENEM competency matrix",
+    )
+
+    result = await orchestrator.invoke("assembly-enem", essay, [])
+
+    assert result.strategy is module.EssayStrategyType.ENEM
+    assert created[0].calls[0][0] == "agent-enem"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_uses_enem_strategy_for_competency_objectives(
+    monkeypatch, essays_app_module_fixture
+):
+    module = essays_app_module_fixture
+    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
+    _StubFoundryAgentService.response_text = (
+        "ENEM objective verdict\n\nStrengths: Clear argumentation\n\n"
+        "Improvements: Improve cohesion"
+    )
+
+    enem_agent = module.AgentRef(
+        agent_id="agent-enem",
+        role="enem",
+        deployment="gpt-5",
+    )
+
+    async def _stub_load(_self, assembly_id, **kwargs):
+        return module.Assembly(
+            id=assembly_id,
+            topic_name="Topic",
+            essay_id="essay-enem-objective",
+            agents=[enem_agent],
+        )
+
+    monkeypatch.setattr(module.EssayOrchestrator, "_load_assembly", _stub_load, raising=False)
+
+    orchestrator = module.EssayOrchestrator()
+
+    essay = module.Essay(id="essay-enem-objective", topic="Education", content="Essay")
+    resources = [
+        module.Resource(
+            id="res-enem",
+            essay_id="essay-enem-objective",
+            objective=["Competência 1", "Competência 2"],
+        )
+    ]
+    result = await orchestrator.invoke("assembly-enem-objective", essay, resources)
+
+    assert result.strategy is module.EssayStrategyType.ENEM
 
 
 class _StubContainer:
