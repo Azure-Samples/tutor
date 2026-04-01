@@ -1263,6 +1263,32 @@ jobs:
             fi
           done
 
+          if [ "$init_succeeded" != "true" ] && [ "$RELEASE_TIER" != "prod" ] && [ "$STRICT_SECURITY" != "true" ]; then
+            shared_key_access="$(az storage account show \
+              --resource-group "$TFSTATE_RESOURCE_GROUP" \
+              --name "$TFSTATE_STORAGE_ACCOUNT" \
+              --query allowSharedKeyAccess -o tsv 2>/dev/null || echo "true")"
+
+            if [ "$shared_key_access" != "false" ]; then
+              tfstate_access_key="$(az storage account keys list \
+                --resource-group "$TFSTATE_RESOURCE_GROUP" \
+                --account-name "$TFSTATE_STORAGE_ACCOUNT" \
+                --query '[0].value' -o tsv 2>/dev/null || true)"
+
+              if [ -n "$tfstate_access_key" ]; then
+                echo "OIDC backend auth unavailable for ${SERVICE}; retrying Terraform init with storage key fallback."
+                if terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
+                  -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+                  -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+                  -backend-config="container_name=${TFSTATE_CONTAINER}" \
+                  -backend-config="key=${STACK_STATE_KEY}" \
+                  -backend-config="access_key=${tfstate_access_key}"; then
+                  init_succeeded="true"
+                fi
+              fi
+            fi
+          fi
+
           if [ "$init_succeeded" != "true" ]; then
             echo "Terraform init failed after 5 attempts. Check TF state RBAC and storage access."
             exit 1
