@@ -1158,31 +1158,33 @@ jobs:
         id: infra_diff
         env:
           SERVICE: ${{ matrix.service }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
-          APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
-          current_aca_image="$(az containerapp show --resource-group "tutor-${AZURE_ENV_NAME}" --name "$APP_NAME" --query 'properties.template.containers[0].image' -o tsv 2>/dev/null || true)"
-          deployed_sha="${current_aca_image##*:}"
-          infra_changed="true"
-
-          if [ -n "$deployed_sha" ] && [ "$deployed_sha" != "$GITHUB_SHA" ] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
-            changes="$(git diff --name-only "$deployed_sha" "$GITHUB_SHA" -- "infra/terraform/stacks/services/${SERVICE}/" "infra/terraform/modules/service-edge-apim/" 2>/dev/null || true)"
-            if [ -z "$changes" ]; then
-              infra_changed="false"
-              echo "No infra changes for service-edge '${SERVICE}' between ${deployed_sha:0:8} and ${GITHUB_SHA:0:8}."
-            else
-              echo "Infra changes detected for '${SERVICE}':"
-              echo "$changes"
-            fi
-          elif [ "$deployed_sha" = "$GITHUB_SHA" ]; then
-            infra_changed="false"
-            echo "Deployed SHA matches current SHA. No infra changes."
-          else
-            echo "Cannot resolve deployed SHA (first deploy or pruned history). Will run terraform apply."
+          # Use commit range diff (push before -> current sha) so infra changes are
+          # detected reliably even after this run updates the container image tag.
+          base_sha="${BEFORE_SHA:-}"
+          if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+            base_sha="$(git rev-parse HEAD^ 2>/dev/null || true)"
           fi
 
-          echo "infra_changed=$infra_changed" >> "$GITHUB_OUTPUT"
+          if [ -z "$base_sha" ] || ! git cat-file -e "${base_sha}^{commit}" 2>/dev/null; then
+            echo "Unable to resolve base commit for infra diff. Running terraform apply for safety."
+            echo "infra_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changes="$(git diff --name-only "$base_sha" "$GITHUB_SHA" -- "infra/terraform/stacks/services/${SERVICE}/" "infra/terraform/modules/service-edge-apim/" 2>/dev/null || true)"
+          if [ -z "$changes" ]; then
+            echo "No infra changes for service-edge '${SERVICE}' between ${base_sha:0:8} and ${GITHUB_SHA:0:8}."
+            echo "infra_changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Infra changes detected for '${SERVICE}':"
+          echo "$changes"
+          echo "infra_changed=true" >> "$GITHUB_OUTPUT"
 
       - name: Apply changed service-edge stack
         if: steps.infra_diff.outputs.infra_changed != 'false'
