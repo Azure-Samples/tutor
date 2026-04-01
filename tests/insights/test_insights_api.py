@@ -25,7 +25,12 @@ def fixture_api_client(monkeypatch):
     sys.path.insert(0, str(INSIGHTS_SRC))
 
     for module_name in list(sys.modules):
-        if module_name == "app" or module_name.startswith("app."):
+        if (
+            module_name == "app"
+            or module_name.startswith("app.")
+            or module_name == "tutor_lib.config"
+            or module_name.startswith("tutor_lib.config.")
+        ):
             sys.modules.pop(module_name, None)
 
     main_module = importlib.import_module("app.main")
@@ -243,3 +248,34 @@ def test_non_supervisor_role_is_forbidden(api_client: TestClient):
 def test_missing_authentication_is_rejected(api_client: TestClient):
     response = api_client.get("/reports")
     assert response.status_code == 401
+
+
+def test_blank_cosmos_endpoint_falls_back_to_in_memory(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.delenv("INSIGHTS_REPOSITORY", raising=False)
+    monkeypatch.setenv("COSMOS_ENDPOINT", "")
+    monkeypatch.setenv("COSMOS_DATABASE", "unit-test-db")
+
+    if str(LIB_SRC) in sys.path:
+        sys.path.remove(str(LIB_SRC))
+    if str(INSIGHTS_SRC) in sys.path:
+        sys.path.remove(str(INSIGHTS_SRC))
+    sys.path.insert(0, str(LIB_SRC))
+    sys.path.insert(0, str(INSIGHTS_SRC))
+
+    for module_name in list(sys.modules):
+        if (
+            module_name == "app"
+            or module_name.startswith("app.")
+            or module_name == "tutor_lib.config"
+            or module_name.startswith("tutor_lib.config.")
+        ):
+            sys.modules.pop(module_name, None)
+
+    main_module = importlib.import_module("app.main")
+    importlib.reload(main_module)
+    main_module.get_settings.cache_clear()
+    main_module.reset_repository()
+
+    repository = main_module._repository()
+
+    assert isinstance(repository, main_module.InMemoryInsightsRepository)

@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from os import getenv
 from typing import Any
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from fastapi import Depends, HTTPException, Query, Request, status
@@ -58,9 +59,16 @@ def _repository() -> InsightsRepository:
         return InMemoryInsightsRepository()
     try:
         settings = get_settings()
+        if not _cosmos_endpoint_configured(settings.cosmos.endpoint):
+            return InMemoryInsightsRepository()
         return CosmosInsightsRepository(settings.cosmos)
     except ValidationError:
         return InMemoryInsightsRepository()
+
+
+def _cosmos_endpoint_configured(endpoint: str) -> bool:
+    parsed = urlparse(endpoint.strip())
+    return bool(parsed.scheme and parsed.netloc)
 
 
 @lru_cache(maxsize=1)

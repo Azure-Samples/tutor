@@ -6,7 +6,6 @@ on:
       release_tier:
         description: "Release tier to deploy"
         required: false
-        default: "auto"
         type: choice
         options:
           - auto
@@ -1424,6 +1423,7 @@ jobs:
       AZURE_ENV_NAME: ${{ needs.resolve-release.outputs.azure_env_name }}
       ACA_ENVIRONMENT_NAME: ${{ needs.resolve-release.outputs.aca_environment_name }}
       AZURE_LOCATION: ${{ needs.resolve-release.outputs.azure_location }}
+      PROVISION_REQUIRED: ${{ needs.detect-changes.outputs.provision_required }}
 
     steps:
       - name: Checkout
@@ -1468,6 +1468,9 @@ jobs:
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
           azd env set RS_KEY "$TFSTATE_KEY"
+
+      - name: Refresh deployment environment outputs
+        run: azd env refresh -e "$AZURE_ENV_NAME" --no-prompt
 
       - name: Build and deploy service image
         env:
@@ -1661,7 +1664,9 @@ jobs:
           deployed_sha="${current_aca_image##*:}"
           source_changed="true"
 
-          if [ -n "$deployed_sha" ] && [ "$deployed_sha" != "$GITHUB_SHA" ] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
+          if [ "$PROVISION_REQUIRED" = "true" ]; then
+            echo "Provisioning ran in this workflow; forcing config reconciliation for '$SERVICE'."
+          elif [ -n "$deployed_sha" ] && [ "$deployed_sha" != "$GITHUB_SHA" ] && git cat-file -e "${deployed_sha}^{commit}" 2>/dev/null; then
             changes="$(git diff --name-only "$deployed_sha" "$GITHUB_SHA" -- "apps/${SERVICE}/" "lib/" 2>/dev/null || true)"
             if [ -z "$changes" ]; then
               source_changed="false"
@@ -1694,7 +1699,25 @@ jobs:
 
           echo "DEPLOY_SKIPPED=false" >> "$GITHUB_ENV"
 
-          eval "$(azd env get-values | sed -E 's/^([^=]+)=(.*)$/export \1=\2/')"
+          eval "$(azd env get-values -e "$AZURE_ENV_NAME" --no-prompt | sed -E 's/^([^=]+)=(.*)$/export \1=\2/')"
+
+          required_shared_env=(
+            COSMOS_ENDPOINT
+            COSMOS_DATABASE
+            PROJECT_ENDPOINT
+          )
+
+          missing_required_env=()
+          for env_name in "${required_shared_env[@]}"; do
+            if [ -z "${!env_name:-}" ]; then
+              missing_required_env+=("$env_name")
+            fi
+          done
+
+          if [ "${#missing_required_env[@]}" -ne 0 ]; then
+            printf 'Missing required shared environment values after azd env refresh: %s\n' "${missing_required_env[*]}"
+            exit 1
+          fi
 
           ENV_VARS=(
             "COSMOS_ENDPOINT=${COSMOS_ENDPOINT:-}"
