@@ -36,6 +36,7 @@ When enabled, callers must be allowlisted supervisors and requests are constrain
 - Python 3.13+
 - FastAPI
 - Cosmos DB (Azure)
+- Falls back to in-memory storage when Cosmos configuration is absent in a dev environment
 
 ## Running Locally
 
