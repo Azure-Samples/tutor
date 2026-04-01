@@ -1291,7 +1291,8 @@ jobs:
 
           if [ "$init_succeeded" != "true" ] && [ "$RELEASE_TIER" != "prod" ] && [ "$STRICT_SECURITY" != "true" ]; then
             echo "Remote Terraform backend remains unavailable for ${SERVICE}. Falling back to local backend for this reconciliation run."
-            if terraform -chdir="$STACK_DIR" init -backend=false -input=false; then
+            rm -rf "$STACK_DIR/.terraform"
+            if terraform -chdir="$STACK_DIR" init -reconfigure -backend=false -input=false; then
               init_succeeded="true"
             fi
           fi
