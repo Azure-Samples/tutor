@@ -1245,6 +1245,7 @@ jobs:
 
           STACK_STATE_KEY="stacks/services/${SERVICE}-${AZURE_ENV_NAME}.tfstate"
           init_succeeded="false"
+          direct_reconcile="false"
           for attempt in 1 2 3 4 5; do
             if terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
               -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
@@ -1290,16 +1291,92 @@ jobs:
           fi
 
           if [ "$init_succeeded" != "true" ] && [ "$RELEASE_TIER" != "prod" ] && [ "$STRICT_SECURITY" != "true" ]; then
-            echo "Remote Terraform backend remains unavailable for ${SERVICE}. Falling back to local backend for this reconciliation run."
-            rm -rf "$STACK_DIR/.terraform"
-            if terraform -chdir="$STACK_DIR" init -reconfigure -backend=false -input=false; then
-              init_succeeded="true"
-            fi
+            echo "Remote Terraform backend remains unavailable for ${SERVICE}. Switching to direct APIM reconciliation fallback."
+            direct_reconcile="true"
           fi
 
-          if [ "$init_succeeded" != "true" ]; then
+          if [ "$init_succeeded" != "true" ] && [ "$direct_reconcile" != "true" ]; then
             echo "Terraform init failed after 5 attempts. Check TF state RBAC and storage access."
             exit 1
+          fi
+
+          if [ "$direct_reconcile" = "true" ]; then
+            RG="tutor-${AZURE_ENV_NAME}"
+            APIM_NAME="tutor-${AZURE_ENV_NAME}-apim"
+            API_ID="${SERVICE}-api"
+            APP_NAME="tutor-${SERVICE}-${AZURE_ENV_NAME}"
+            API_PATH="api/${SERVICE}"
+            APP_FQDN="$(az containerapp show -g "$RG" -n "$APP_NAME" --query 'properties.configuration.ingress.fqdn' -o tsv)"
+            SERVICE_URL="https://${APP_FQDN}"
+            DISPLAY_NAME="${SERVICE} API"
+
+            if az apim api show -g "$RG" --service-name "$APIM_NAME" --api-id "$API_ID" >/dev/null 2>&1; then
+              az apim api update \
+                -g "$RG" \
+                -n "$APIM_NAME" \
+                --api-id "$API_ID" \
+                --if-match '*' \
+                --display-name "$DISPLAY_NAME" \
+                --path "$API_PATH" \
+                --protocols https \
+                --service-url "$SERVICE_URL" \
+                --subscription-required false \
+                --only-show-errors >/dev/null
+            else
+              az apim api create \
+                -g "$RG" \
+                -n "$APIM_NAME" \
+                --api-id "$API_ID" \
+                --display-name "$DISPLAY_NAME" \
+                --path "$API_PATH" \
+                --protocols https \
+                --service-url "$SERVICE_URL" \
+                --subscription-required false \
+                --only-show-errors >/dev/null
+            fi
+
+            methods=(GET POST PUT PATCH DELETE OPTIONS HEAD)
+            for method in "${methods[@]}"; do
+              op_suffix="$(echo "$method" | tr '[:upper:]' '[:lower:]')"
+              operation_id="${SERVICE}${op_suffix}"
+              display_name="${method} catch-all"
+
+              if az apim api operation show -g "$RG" -n "$APIM_NAME" --api-id "$API_ID" --operation-id "$operation_id" >/dev/null 2>&1; then
+                az apim api operation update \
+                  -g "$RG" \
+                  -n "$APIM_NAME" \
+                  --api-id "$API_ID" \
+                  --operation-id "$operation_id" \
+                  --if-match '*' \
+                  --display-name "$display_name" \
+                  --method "$method" \
+                  --url-template '/{*path}' \
+                  --template-parameters name=path required=true type=string \
+                  --only-show-errors >/dev/null
+              else
+                az apim api operation create \
+                  -g "$RG" \
+                  -n "$APIM_NAME" \
+                  --api-id "$API_ID" \
+                  --operation-id "$operation_id" \
+                  --display-name "$display_name" \
+                  --method "$method" \
+                  --url-template '/{*path}' \
+                  --template-parameters name=path required=true type=string \
+                  --only-show-errors >/dev/null
+              fi
+            done
+
+            policy_payload="$(ORIGINS_JSON="$TF_VAR_allowed_origins" python -c 'import json, os; origins=json.loads(os.environ["ORIGINS_JSON"]); origin_xml="".join(f"        <origin>{origin}</origin>\\n" for origin in origins); xml=("<policies>\\n" "  <inbound>\\n" "    <base />\\n" "    <cors allow-credentials=\"false\">\\n" "      <allowed-origins>\\n" "        <origin>http://localhost:3000</origin>\\n" "        <origin>http://localhost:5173</origin>\\n" f"{origin_xml}" "      </allowed-origins>\\n" "      <allowed-methods preflight-result-max-age=\"86400\">\\n" "        <method>*</method>\\n" "      </allowed-methods>\\n" "      <allowed-headers>\\n" "        <header>*</header>\\n" "      </allowed-headers>\\n" "    </cors>\\n" "  </inbound>\\n" "  <backend>\\n" "    <base />\\n" "  </backend>\\n" "  <outbound>\\n" "    <base />\\n" "  </outbound>\\n" "  <on-error>\\n" "    <base />\\n" "  </on-error>\\n" "</policies>"); print(json.dumps({"properties": {"format": "rawxml", "value": xml}}))')"
+            az rest \
+              --method put \
+              --uri "https://management.azure.com/subscriptions/${ARM_SUBSCRIPTION_ID}/resourceGroups/${RG}/providers/Microsoft.ApiManagement/service/${APIM_NAME}/apis/${API_ID}/policies/policy?api-version=2022-08-01" \
+              --headers 'Content-Type=application/json' \
+              --body "$policy_payload" \
+              --only-show-errors >/dev/null
+
+            echo "Direct APIM reconciliation completed for ${API_ID}."
+            exit 0
           fi
 
           # Helper: only import if not already in state
