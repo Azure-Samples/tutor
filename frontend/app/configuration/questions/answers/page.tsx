@@ -12,7 +12,10 @@ export const metadata: Metadata = {
 const QuestionAnswersPage = () => {
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Question Answers" subtitle="Create and manage answer records for evaluation workflows." />
+      <Breadcrumb
+        pageName="Question Answers"
+        subtitle="Create and manage answer records for evaluation workflows."
+      />
       <AnswersList />
     </DefaultLayout>
   );

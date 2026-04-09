@@ -24,7 +24,7 @@ on:
       - "frontend/**"
       - ".github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     branches:
       - main
     paths:
@@ -127,6 +127,7 @@ jobs:
           echo "Resolved: tier=$release_tier env=$azure_env_name swa=$swa_name rg=$resource_group"
 
   resolve-azure-endpoints:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs: resolve-release
     outputs:

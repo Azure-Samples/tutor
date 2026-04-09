@@ -15,6 +15,12 @@ from fastapi.responses import JSONResponse
 
 from app.cosmos import CosmosCRUD
 from app.schemas import (
+    AccessActor,
+    AccessContextItem,
+    AccessContextPayload,
+    AccessGrantItem,
+    AccessRoleContext,
+    AccessScope,
     BulkRosterSyncRequest,
     RESPONSES,
     BodyMessage,
@@ -29,7 +35,8 @@ from app.schemas import (
     ThemeInput,
 )
 from tutor_lib.config import get_settings
-from tutor_lib.middleware import configure_entra_auth, require_roles
+from tutor_lib.middleware import configure_entra_auth, get_authenticated_user, require_roles
+from tutor_lib.middleware.auth import AccessContext, AccessGrant, AuthenticatedUser, RelationshipScope
 
 
 settings = get_settings()
@@ -39,6 +46,7 @@ app = FastAPI(
     version="2.0.0",
     description="Roster management and case assignment service",
     openapi_tags=[
+        {"name": "Access", "description": "Role and context resolution for workspace navigation"},
         {"name": "Students", "description": "Student roster management"},
         {"name": "Professors", "description": "Faculty roster management"},
         {"name": "Courses", "description": "Course catalog"},
@@ -105,6 +113,19 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
 
 require_professor = require_roles("professor", "admin")
 THEME_KIND = "theme"
+_BASE_FEATURE_FLAGS: tuple[str, ...] = (
+    "workspace-shell",
+    "learner-record-overlay",
+    "trust-provenance",
+)
+_ROLE_FEATURE_FLAGS: dict[str, tuple[str, ...]] = {
+    "student": ("student-workspace", "learner-record"),
+    "alumni": ("alumni-workspace", "reentry-pathways"),
+    "professor": ("professor-workspace", "faculty-review"),
+    "principal": ("principal-workspace", "school-briefings"),
+    "supervisor": ("supervisor-workspace", "network-briefings"),
+    "admin": ("admin-workspace", "ops-governance"),
+}
 
 
 async def _bulk_create(container: str, items: list[dict[str, Any]]) -> int:
@@ -123,6 +144,92 @@ def _theme_document(payload: ThemeInput, theme_id: str) -> dict[str, Any]:
         "description": payload.description,
         "criteria": payload.criteria,
     }
+
+
+def _ordered_flags(*flag_groups: tuple[str, ...] | list[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for group in flag_groups:
+        for raw_flag in group:
+            flag = str(raw_flag).strip()
+            if not flag or flag in seen:
+                continue
+            ordered.append(flag)
+            seen.add(flag)
+    return ordered
+
+
+def _scope_model(scope: RelationshipScope) -> AccessScope:
+    return AccessScope(**scope.as_dict())
+
+
+def _grant_item(grant: AccessGrant) -> AccessGrantItem:
+    return AccessGrantItem(role=grant.role, relationship=grant.relationship, scope=_scope_model(grant.scope))
+
+
+def _context_item(context: AccessContext) -> AccessContextItem:
+    return AccessContextItem(
+        context_id=context.context_id,
+        role=context.role,
+        context_type=context.context_type,
+        relationship=context.relationship,
+        label=context.label,
+        scope=_scope_model(context.scope),
+        workspace_path=f"/workspace/{context.role}",
+    )
+
+
+def _feature_flags_for_user(user: AuthenticatedUser) -> list[str]:
+    role_flags = tuple(flag for role in user.roles for flag in _ROLE_FEATURE_FLAGS.get(role, tuple()))
+    return _ordered_flags(_BASE_FEATURE_FLAGS, list(user.feature_flags), list(role_flags))
+
+
+def _access_context_payload(user: AuthenticatedUser) -> AccessContextPayload:
+    role_items: list[AccessRoleContext] = []
+    context_index: dict[str, AccessContextItem] = {}
+    for role in user.roles:
+        contexts = [_context_item(context) for context in user.contexts_for_role(role)]
+        for context in contexts:
+            context_index[context.context_id] = context
+        role_items.append(
+            AccessRoleContext(
+                role=role,
+                grants=[_grant_item(grant) for grant in user.grants_for_role(role)],
+                contexts=contexts,
+                default_context_id=contexts[0].context_id if contexts else None,
+            )
+        )
+
+    default_role = user.default_role
+    default_context = None
+    if default_role is not None:
+        default_context_id = next(
+            (role_item.default_context_id for role_item in role_items if role_item.role == default_role),
+            None,
+        )
+        if default_context_id is not None:
+            default_context = context_index.get(default_context_id)
+
+    return AccessContextPayload(
+        actor=AccessActor(
+            subject=user.subject,
+            tenant_id=user.tenant_id,
+            object_id=user.object_id,
+            display_name=user.display_name,
+            email=user.email,
+        ),
+        available_roles=list(user.roles),
+        default_role=default_role,
+        default_context=default_context,
+        roles=role_items,
+        feature_flags=_feature_flags_for_user(user),
+    )
+
+
+@app.get("/access-context", tags=["Access"])
+async def get_access_context(user: AuthenticatedUser = Depends(get_authenticated_user)) -> JSONResponse:
+    payload = _access_context_payload(user)
+    return _success("Access Context Retrieved", "Access context resolved", payload.model_dump())
 
 
 @app.post("/students", tags=["Students"])

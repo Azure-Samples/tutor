@@ -15,7 +15,9 @@ export interface ApiErrorEnvelope {
 }
 
 export function isApiEnvelope<T>(value: unknown): value is ApiEnvelope<T> {
-  return typeof value === "object" && value !== null && "content" in (value as Record<string, unknown>);
+  return (
+    typeof value === "object" && value !== null && "content" in (value as Record<string, unknown>)
+  );
 }
 
 export function unwrapContent<T>(value: ApiEnvelope<T> | T): T {

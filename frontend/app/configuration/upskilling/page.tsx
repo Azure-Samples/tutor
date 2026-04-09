@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
@@ -14,6 +14,10 @@ import { upskillingApi } from "@/utils/api";
 interface Paragraph {
   title: string;
   content: string;
+}
+
+interface ParagraphDraft extends Paragraph {
+  id: string;
 }
 
 interface EvaluationFeedback {
@@ -68,7 +72,32 @@ const VERDICT_COLORS: Record<string, string> = {
 
 const TIMEFRAMES = ["week", "month", "semester", "year"] as const;
 
-const EMPTY_PARAGRAPH: Paragraph = { title: "", content: "" };
+let paragraphDraftSequence = 0;
+
+const PLAN_TITLE_INPUT_ID = "upskilling-plan-title";
+const PLAN_TIMEFRAME_INPUT_ID = "upskilling-plan-timeframe";
+const PLAN_TOPIC_INPUT_ID = "upskilling-plan-topic";
+const PLAN_CLASS_ID_INPUT_ID = "upskilling-plan-class-id";
+
+const createParagraphDraft = (paragraph: Partial<Paragraph> = {}): ParagraphDraft => ({
+  id: `paragraph-${paragraphDraftSequence++}`,
+  title: paragraph.title ?? "",
+  content: paragraph.content ?? "",
+});
+
+const toParagraphPayload = ({ title, content }: ParagraphDraft): Paragraph => ({
+  title,
+  content,
+});
+
+const feedbackKey = (evaluation: Evaluation, feedback: EvaluationFeedback) =>
+  [
+    evaluation.paragraph_index,
+    feedback.agent,
+    feedback.verdict,
+    feedback.strengths.join("|"),
+    feedback.improvements.join("|"),
+  ].join(":");
 
 // ---------------------------------------------------------------------------
 // Component
@@ -89,7 +118,7 @@ const UpskillingConfigPage = () => {
   const [formTimeframe, setFormTimeframe] = useState<string>("week");
   const [formTopic, setFormTopic] = useState("");
   const [formClassId, setFormClassId] = useState("");
-  const [formParagraphs, setFormParagraphs] = useState<Paragraph[]>([{ ...EMPTY_PARAGRAPH }]);
+  const [formParagraphs, setFormParagraphs] = useState<ParagraphDraft[]>([createParagraphDraft()]);
   const [formEvaluations, setFormEvaluations] = useState<Evaluation[]>([]);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
@@ -100,7 +129,7 @@ const UpskillingConfigPage = () => {
 
   // ------- Data fetching -------
 
-  const fetchPlans = async () => {
+  const fetchPlans = useCallback(async () => {
     setListLoading(true);
     setListError("");
     try {
@@ -111,11 +140,11 @@ const UpskillingConfigPage = () => {
     } finally {
       setListLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchPlans();
-  }, []);
+    void fetchPlans();
+  }, [fetchPlans]);
 
   // ------- Navigation helpers -------
 
@@ -125,7 +154,7 @@ const UpskillingConfigPage = () => {
     setFormTimeframe("week");
     setFormTopic("");
     setFormClassId("");
-    setFormParagraphs([{ ...EMPTY_PARAGRAPH }]);
+    setFormParagraphs([createParagraphDraft()]);
     setFormEvaluations([]);
     setFormError("");
     setFormSuccess("");
@@ -146,7 +175,11 @@ const UpskillingConfigPage = () => {
       setFormTimeframe(plan.timeframe);
       setFormTopic(plan.topic);
       setFormClassId(plan.class_id);
-      setFormParagraphs(plan.paragraphs.length > 0 ? plan.paragraphs : [{ ...EMPTY_PARAGRAPH }]);
+      setFormParagraphs(
+        plan.paragraphs.length > 0
+          ? plan.paragraphs.map((paragraph) => createParagraphDraft(paragraph))
+          : [createParagraphDraft()],
+      );
       setFormEvaluations(plan.evaluations ?? []);
       setView("detail");
     } catch (err: unknown) {
@@ -158,7 +191,7 @@ const UpskillingConfigPage = () => {
 
   const backToList = () => {
     setView("list");
-    fetchPlans();
+    void fetchPlans();
   };
 
   // ------- CRUD actions -------
@@ -173,7 +206,7 @@ const UpskillingConfigPage = () => {
         timeframe: formTimeframe,
         topic: formTopic,
         class_id: formClassId,
-        paragraphs: formParagraphs,
+        paragraphs: formParagraphs.map(toParagraphPayload),
         performance_history: [],
       };
 
@@ -221,16 +254,22 @@ const UpskillingConfigPage = () => {
 
   // ------- Paragraph helpers -------
 
-  const updateParagraph = (idx: number, field: keyof Paragraph, value: string) => {
-    setFormParagraphs((prev) => prev.map((p, i) => (i === idx ? { ...p, [field]: value } : p)));
+  const updateParagraph = (paragraphId: string, field: keyof Paragraph, value: string) => {
+    setFormParagraphs((prev) =>
+      prev.map((paragraph) =>
+        paragraph.id === paragraphId ? { ...paragraph, [field]: value } : paragraph,
+      ),
+    );
   };
 
   const addParagraph = () => {
-    setFormParagraphs((prev) => [...prev, { ...EMPTY_PARAGRAPH }]);
+    setFormParagraphs((prev) => [...prev, createParagraphDraft()]);
   };
 
-  const removeParagraph = (idx: number) => {
-    setFormParagraphs((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  const removeParagraph = (paragraphId: string) => {
+    setFormParagraphs((prev) =>
+      prev.length <= 1 ? prev : prev.filter((paragraph) => paragraph.id !== paragraphId),
+    );
   };
 
   const toggleEval = (idx: number) => {
@@ -245,7 +284,9 @@ const UpskillingConfigPage = () => {
   // ------- Renderers -------
 
   const renderStatusBadge = (status: string) => (
-    <span className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${STATUS_COLORS[status] ?? STATUS_COLORS.draft}`}>
+    <span
+      className={`inline-block rounded-full px-3 py-0.5 text-xs font-semibold ${STATUS_COLORS[status] ?? STATUS_COLORS.draft}`}
+    >
       {status}
     </span>
   );
@@ -255,6 +296,7 @@ const UpskillingConfigPage = () => {
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-black dark:text-white">Teaching Plans</h3>
         <button
+          type="button"
           onClick={openCreate}
           className="rounded bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
         >
@@ -262,12 +304,18 @@ const UpskillingConfigPage = () => {
         </button>
       </div>
 
-      {listError && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">{listError}</p>}
+      {listError && (
+        <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">
+          {listError}
+        </p>
+      )}
 
       {listLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading plans…</p>}
 
       {!listLoading && plans.length === 0 && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">No plans found. Create one to get started.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No plans found. Create one to get started.
+        </p>
       )}
 
       {!listLoading && plans.length > 0 && (
@@ -285,7 +333,10 @@ const UpskillingConfigPage = () => {
             </thead>
             <tbody>
               {plans.map((plan) => (
-                <tr key={plan.id} className="border-b border-stroke last:border-b-0 dark:border-strokedark">
+                <tr
+                  key={plan.id}
+                  className="border-b border-stroke last:border-b-0 dark:border-strokedark"
+                >
                   <td className="px-4 py-3 text-black dark:text-white">{plan.title}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{plan.topic}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{plan.timeframe}</td>
@@ -295,18 +346,21 @@ const UpskillingConfigPage = () => {
                   </td>
                   <td className="flex gap-2 px-4 py-3">
                     <button
+                      type="button"
                       onClick={() => openEdit(plan.id)}
                       className="rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
                     >
                       View / Edit
                     </button>
                     <button
+                      type="button"
                       onClick={() => evaluatePlan(plan.id)}
                       className="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
                     >
                       Evaluate
                     </button>
                     <button
+                      type="button"
                       onClick={() => deletePlan(plan.id)}
                       className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
                     >
@@ -329,6 +383,7 @@ const UpskillingConfigPage = () => {
           {editingPlanId ? "Edit Plan" : "Create New Plan"}
         </h3>
         <button
+          type="button"
           onClick={backToList}
           className="rounded border border-stroke px-4 py-2 text-sm font-semibold text-black hover:bg-gray-100 dark:border-strokedark dark:text-white dark:hover:bg-white/10"
         >
@@ -336,14 +391,28 @@ const UpskillingConfigPage = () => {
         </button>
       </div>
 
-      {formError && <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">{formError}</p>}
-      {formSuccess && <p className="mb-4 rounded bg-emerald-50 p-3 text-sm text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">{formSuccess}</p>}
+      {formError && (
+        <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">
+          {formError}
+        </p>
+      )}
+      {formSuccess && (
+        <p className="mb-4 rounded bg-emerald-50 p-3 text-sm text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+          {formSuccess}
+        </p>
+      )}
 
       {/* Form fields */}
       <div className="space-y-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-black dark:text-white">Title</label>
+          <label
+            className="mb-1 block text-sm font-medium text-black dark:text-white"
+            htmlFor={PLAN_TITLE_INPUT_ID}
+          >
+            Title
+          </label>
           <input
+            id={PLAN_TITLE_INPUT_ID}
             type="text"
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
@@ -354,8 +423,14 @@ const UpskillingConfigPage = () => {
 
         <div className="grid gap-4 md:grid-cols-3">
           <div>
-            <label className="mb-1 block text-sm font-medium text-black dark:text-white">Timeframe</label>
+            <label
+              className="mb-1 block text-sm font-medium text-black dark:text-white"
+              htmlFor={PLAN_TIMEFRAME_INPUT_ID}
+            >
+              Timeframe
+            </label>
             <select
+              id={PLAN_TIMEFRAME_INPUT_ID}
               value={formTimeframe}
               onChange={(e) => setFormTimeframe(e.target.value)}
               className="w-full rounded border border-stroke bg-transparent px-4 py-2 text-black outline-none focus:border-cyan-600 dark:border-form-strokedark dark:bg-form-input dark:text-white"
@@ -369,8 +444,14 @@ const UpskillingConfigPage = () => {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-black dark:text-white">Topic</label>
+            <label
+              className="mb-1 block text-sm font-medium text-black dark:text-white"
+              htmlFor={PLAN_TOPIC_INPUT_ID}
+            >
+              Topic
+            </label>
             <input
+              id={PLAN_TOPIC_INPUT_ID}
               type="text"
               value={formTopic}
               onChange={(e) => setFormTopic(e.target.value)}
@@ -380,8 +461,14 @@ const UpskillingConfigPage = () => {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-black dark:text-white">Class ID</label>
+            <label
+              className="mb-1 block text-sm font-medium text-black dark:text-white"
+              htmlFor={PLAN_CLASS_ID_INPUT_ID}
+            >
+              Class ID
+            </label>
             <input
+              id={PLAN_CLASS_ID_INPUT_ID}
               type="text"
               value={formClassId}
               onChange={(e) => setFormClassId(e.target.value)}
@@ -394,7 +481,7 @@ const UpskillingConfigPage = () => {
         {/* Paragraphs */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-medium text-black dark:text-white">Paragraphs</label>
+            <p className="text-sm font-medium text-black dark:text-white">Paragraphs</p>
             <button
               type="button"
               onClick={addParagraph}
@@ -406,7 +493,10 @@ const UpskillingConfigPage = () => {
 
           <div className="space-y-3">
             {formParagraphs.map((para, idx) => (
-              <div key={idx} className="rounded border border-stroke p-3 dark:border-form-strokedark">
+              <div
+                key={para.id}
+                className="rounded border border-stroke p-3 dark:border-form-strokedark"
+              >
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
                     Paragraph {idx + 1}
@@ -414,7 +504,7 @@ const UpskillingConfigPage = () => {
                   {formParagraphs.length > 1 && (
                     <button
                       type="button"
-                      onClick={() => removeParagraph(idx)}
+                      onClick={() => removeParagraph(para.id)}
                       className="text-xs font-semibold text-red-500 hover:text-red-700"
                     >
                       Remove
@@ -424,13 +514,15 @@ const UpskillingConfigPage = () => {
                 <input
                   type="text"
                   value={para.title}
-                  onChange={(e) => updateParagraph(idx, "title", e.target.value)}
+                  onChange={(e) => updateParagraph(para.id, "title", e.target.value)}
+                  aria-label={`Paragraph ${idx + 1} title`}
                   className="mb-2 w-full rounded border border-stroke bg-transparent px-3 py-1.5 text-sm text-black outline-none focus:border-cyan-600 dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   placeholder="Paragraph title"
                 />
                 <textarea
                   value={para.content}
-                  onChange={(e) => updateParagraph(idx, "content", e.target.value)}
+                  onChange={(e) => updateParagraph(para.id, "content", e.target.value)}
+                  aria-label={`Paragraph ${idx + 1} content`}
                   rows={3}
                   className="w-full rounded border border-stroke bg-transparent px-3 py-1.5 text-sm text-black outline-none focus:border-cyan-600 dark:border-form-strokedark dark:bg-form-input dark:text-white"
                   placeholder="Paragraph content"
@@ -442,6 +534,7 @@ const UpskillingConfigPage = () => {
 
         {/* Save */}
         <button
+          type="button"
           onClick={savePlan}
           disabled={formLoading}
           className="rounded bg-cyan-600 px-6 py-2 font-semibold text-white hover:bg-cyan-700 disabled:opacity-50"
@@ -456,7 +549,10 @@ const UpskillingConfigPage = () => {
           <h4 className="mb-3 text-base font-semibold text-black dark:text-white">Evaluations</h4>
           <div className="space-y-2">
             {formEvaluations.map((ev) => (
-              <div key={ev.paragraph_index} className="rounded border border-stroke dark:border-form-strokedark">
+              <div
+                key={ev.paragraph_index}
+                className="rounded border border-stroke dark:border-form-strokedark"
+              >
                 <button
                   type="button"
                   onClick={() => toggleEval(ev.paragraph_index)}
@@ -465,15 +561,19 @@ const UpskillingConfigPage = () => {
                   <span>
                     §{ev.paragraph_index + 1} — {ev.title}
                   </span>
-                  <span className="text-xs text-gray-400">{expandedEvals.has(ev.paragraph_index) ? "▲" : "▼"}</span>
+                  <span className="text-xs text-gray-400">
+                    {expandedEvals.has(ev.paragraph_index) ? "▲" : "▼"}
+                  </span>
                 </button>
 
                 {expandedEvals.has(ev.paragraph_index) && (
                   <div className="border-t border-stroke px-4 py-3 dark:border-form-strokedark">
-                    {ev.feedback.map((fb, fbIdx) => (
-                      <div key={fbIdx} className="mb-3 last:mb-0">
+                    {ev.feedback.map((fb) => (
+                      <div key={feedbackKey(ev, fb)} className="mb-3 last:mb-0">
                         <div className="mb-1 flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">{fb.agent}</span>
+                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            {fb.agent}
+                          </span>
                           <span
                             className={`text-xs font-bold ${VERDICT_COLORS[fb.verdict.toLowerCase()] ?? VERDICT_COLORS.neutral}`}
                           >
@@ -483,16 +583,16 @@ const UpskillingConfigPage = () => {
 
                         {fb.strengths.length > 0 && (
                           <ul className="mb-1 ml-4 list-disc text-sm text-emerald-700 dark:text-emerald-400">
-                            {fb.strengths.map((s, i) => (
-                              <li key={i}>{s}</li>
+                            {fb.strengths.map((strength) => (
+                              <li key={`${fb.agent}:strength:${strength}`}>{strength}</li>
                             ))}
                           </ul>
                         )}
 
                         {fb.improvements.length > 0 && (
                           <ul className="ml-4 list-disc text-sm text-orange-600 dark:text-orange-400">
-                            {fb.improvements.map((imp, i) => (
-                              <li key={i}>{imp}</li>
+                            {fb.improvements.map((improvement) => (
+                              <li key={`${fb.agent}:improvement:${improvement}`}>{improvement}</li>
                             ))}
                           </ul>
                         )}

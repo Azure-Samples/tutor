@@ -1,9 +1,9 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import AvatarChat from "@/components/Avatar/Avatar";
+import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { useParams } from "next/navigation";
 
 const AvatarCasePage = () => {
   const params = useParams<{ id: string }>();

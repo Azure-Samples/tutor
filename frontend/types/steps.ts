@@ -1,4 +1,3 @@
-
 export type CaseStep = {
   order: number;
   name: string;

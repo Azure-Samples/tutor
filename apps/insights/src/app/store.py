@@ -23,6 +23,9 @@ class ReportRecord:
     focus_points: list[str] = field(default_factory=list)
     improvements: list[str] = field(default_factory=list)
     feedback_count: int = 0
+    trust: dict[str, object] = field(default_factory=dict)
+    freshness: dict[str, object] = field(default_factory=dict)
+    deep_links: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
@@ -247,6 +250,9 @@ def _feedback_to_payload(feedback: FeedbackRecord) -> dict[str, object]:
 
 
 def _payload_to_report(payload: dict[str, object]) -> ReportRecord:
+    raw_trust = payload.get("trust")
+    raw_freshness = payload.get("freshness")
+    raw_deep_links = payload.get("deep_links")
     return ReportRecord(
         report_id=str(payload["report_id"]),
         school_id=str(payload["school_id"]),
@@ -260,6 +266,9 @@ def _payload_to_report(payload: dict[str, object]) -> ReportRecord:
         focus_points=list(payload.get("focus_points", [])),
         improvements=list(payload.get("improvements", [])),
         feedback_count=int(payload.get("feedback_count", 0)),
+        trust=dict(raw_trust) if isinstance(raw_trust, dict) else {},
+        freshness=dict(raw_freshness) if isinstance(raw_freshness, dict) else {},
+        deep_links=list(raw_deep_links) if isinstance(raw_deep_links, list) else [],
     )
 
 

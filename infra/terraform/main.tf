@@ -1,6 +1,7 @@
 locals {
   normalized_prefix              = lower(replace("${var.name_prefix}${var.environment}", "-", ""))
   container_app_environment_name = "${var.name_prefix}-${var.environment}-acae"
+  service_bus_namespace_name     = "${local.normalized_prefix}${random_string.suffix.result}sb"
   backend_service_names = [
     "avatar",
     "configuration",
@@ -44,6 +45,7 @@ locals {
   cosmos_sql_data_contributor_role_definition_id = "${azurerm_cosmosdb_account.main.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
   cosmos_sql_account_scope                       = azurerm_cosmosdb_account.main.id
   cosmos_sql_database_scope                      = "${azurerm_cosmosdb_account.main.id}/dbs/${azurerm_cosmosdb_sql_database.main.name}"
+  learner_record_publisher_service_names         = ["insights"]
 
   agent_role_scopes = {
     "Storage Blob Data Contributor" = azurerm_storage_account.uploads.id
@@ -350,6 +352,33 @@ resource "azurerm_cosmosdb_sql_container" "containers" {
   partition_key_version = 2
 }
 
+# ── Service Bus: learner-record distribution seam ───────────────────────────
+
+resource "azurerm_servicebus_namespace" "main" {
+  name                         = local.service_bus_namespace_name
+  location                     = azurerm_resource_group.main.location
+  resource_group_name          = azurerm_resource_group.main.name
+  sku                          = "Standard"
+  local_auth_enabled           = false
+  minimum_tls_version          = "1.2"
+  public_network_access_enabled = true
+}
+
+resource "azurerm_servicebus_topic" "learner_record" {
+  name                                 = var.service_bus_learner_record_topic_name
+  namespace_id                         = azurerm_servicebus_namespace.main.id
+  requires_duplicate_detection         = true
+  duplicate_detection_history_time_window = "PT10M"
+  support_ordering                     = true
+}
+
+resource "azurerm_servicebus_subscription" "learner_record_integration_backlog" {
+  name                                 = var.service_bus_learner_record_subscription_name
+  topic_id                             = azurerm_servicebus_topic.learner_record.id
+  max_delivery_count                   = 10
+  dead_lettering_on_message_expiration = true
+}
+
 # ── Azure AI Foundry (ADR-011 → ADR-012: AVM module, public endpoint) ──────
 
 module "ai_foundry" {
@@ -497,6 +526,13 @@ resource "azurerm_role_assignment" "container_app_cognitive_services" {
   for_each             = toset(local.backend_service_names)
   scope                = module.ai_foundry.ai_foundry_id
   role_definition_name = "Cognitive Services User"
+  principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "learner_record_service_bus_sender" {
+  for_each             = toset(local.learner_record_publisher_service_names)
+  scope                = azurerm_servicebus_namespace.main.id
+  role_definition_name = "Azure Service Bus Data Sender"
   principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
 }
 

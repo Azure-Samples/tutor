@@ -1,44 +1,92 @@
-import { useState } from "react";
+import type { Theme } from "@/types/theme";
 import { configurationApi } from "@/utils/api";
-import { Theme } from "@/types/theme";
-import { FaPalette, FaBullseye, FaFileAlt, FaListOl, FaPen, FaPlus, FaTimes } from "react-icons/fa";
+import { useState } from "react";
+import { FaBullseye, FaFileAlt, FaListOl, FaPalette, FaPen, FaPlus, FaTimes } from "react-icons/fa";
 
-const ThemeForm: React.FC<{ themeData?: Theme; onSuccess?: () => void }> = ({ themeData, onSuccess }) => {
-  const [form, setForm] = useState<Theme>(
-    themeData || { id: "", name: "", objective: "", description: "", criteria: [] }
-  );
+type CriterionDraft = {
+  id: string;
+  value: string;
+};
+
+type ThemeDraft = Omit<Theme, "criteria"> & {
+  criteria: CriterionDraft[];
+};
+
+const createDraftId = (prefix: string) => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const createThemeDraft = (themeData?: Theme): ThemeDraft =>
+  themeData
+    ? {
+        ...themeData,
+        criteria: themeData.criteria.map((criterion) => ({
+          id: createDraftId("criterion"),
+          value: criterion,
+        })),
+      }
+    : { id: "", name: "", objective: "", description: "", criteria: [] };
+
+const toThemePayload = (form: ThemeDraft): Theme => ({
+  id: form.id,
+  name: form.name,
+  objective: form.objective,
+  description: form.description,
+  criteria: form.criteria.map((criterion) => criterion.value),
+});
+
+const ThemeForm: React.FC<{ themeData?: Theme; onSuccess?: () => void }> = ({
+  themeData,
+  onSuccess,
+}) => {
+  const [form, setForm] = useState<ThemeDraft>(() => createThemeDraft(themeData));
   const [status, setStatus] = useState("");
   const isEdit = !!themeData;
 
-  const handleCriteriaChange = (index: number, value: string) => {
-    const updated = form.criteria.map((c, i) => (i === index ? value : c));
-    setForm({ ...form, criteria: updated });
+  const handleCriteriaChange = (criterionId: string, value: string) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      criteria: currentForm.criteria.map((criterion) =>
+        criterion.id === criterionId ? { ...criterion, value } : criterion,
+      ),
+    }));
   };
 
   const addCriterion = () => {
-    setForm({ ...form, criteria: [...form.criteria, ""] });
+    setForm((currentForm) => ({
+      ...currentForm,
+      criteria: [...currentForm.criteria, { id: createDraftId("criterion"), value: "" }],
+    }));
   };
 
-  const removeCriterion = (index: number) => {
-    setForm({ ...form, criteria: form.criteria.filter((_, i) => i !== index) });
+  const removeCriterion = (criterionId: string) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      criteria: currentForm.criteria.filter((criterion) => criterion.id !== criterionId),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus("Saving...");
     try {
-      const themeId = form.id?.trim() || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `theme-${Date.now()}`);
-      const payload = { ...form, id: themeId };
-      let res;
-      if (isEdit) {
-        res = await configurationApi.put(`/themes/${themeId}`, payload);
-      } else {
-        res = await configurationApi.post("/themes", payload);
-      }
+      const themeId =
+        form.id?.trim() ||
+        (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `theme-${Date.now()}`);
+      const payload = { ...toThemePayload(form), id: themeId };
+      const res = isEdit
+        ? await configurationApi.put(`/themes/${themeId}`, payload)
+        : await configurationApi.post("/themes", payload);
       if (res.status === 200 || res.status === 201) {
         setStatus(isEdit ? "Theme updated!" : "Theme created!");
         if (onSuccess) onSuccess();
-        if (!isEdit) setForm({ id: "", name: "", objective: "", description: "", criteria: [] });
+        if (!isEdit) setForm(createThemeDraft());
       } else {
         setStatus("Error saving theme.");
       }
@@ -53,51 +101,61 @@ const ThemeForm: React.FC<{ themeData?: Theme; onSuccess?: () => void }> = ({ th
       id="modal-form"
       onSubmit={handleSubmit}
     >
-      <label className="flex items-center gap-2 text-cyan-700 font-bold">
+      <label htmlFor="theme-form-name" className="flex items-center gap-2 text-cyan-700 font-bold">
         <FaPalette /> Name
       </label>
       <input
+        id="theme-form-name"
         type="text"
         value={form.name}
-        onChange={e => setForm({ ...form, name: e.target.value })}
+        onChange={(e) => setForm({ ...form, name: e.target.value })}
         className="w-full rounded-2xl border-2 border-cyan-200 focus:border-green-400 focus:ring-2 focus:ring-green-200 px-4 py-3 text-lg transition-all duration-200 bg-cyan-50 dark:bg-cyan-900 placeholder:text-cyan-400 focus:bg-white dark:focus:bg-boxdark"
         placeholder="Theme name"
       />
-      <label className="flex items-center gap-2 text-green-700 font-bold">
+      <label
+        htmlFor="theme-form-objective"
+        className="flex items-center gap-2 text-green-700 font-bold"
+      >
         <FaBullseye /> Objective
       </label>
       <input
+        id="theme-form-objective"
         type="text"
         value={form.objective}
-        onChange={e => setForm({ ...form, objective: e.target.value })}
+        onChange={(e) => setForm({ ...form, objective: e.target.value })}
         className="w-full rounded-2xl border-2 border-green-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-green-50 dark:bg-green-900 placeholder:text-green-400 focus:bg-white dark:focus:bg-boxdark"
         placeholder="Theme objective"
       />
-      <label className="flex items-center gap-2 text-blue-700 font-bold">
+      <label
+        htmlFor="theme-form-description"
+        className="flex items-center gap-2 text-blue-700 font-bold"
+      >
         <FaFileAlt /> Description
       </label>
       <textarea
+        id="theme-form-description"
         value={form.description}
-        onChange={e => setForm({ ...form, description: e.target.value })}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
         className="w-full rounded-2xl border-2 border-blue-200 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200 px-4 py-3 text-lg transition-all duration-200 bg-blue-50 dark:bg-blue-900 placeholder:text-blue-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[240px]"
         placeholder="Theme description"
         rows={3}
       />
-      <label className="flex items-center gap-2 text-purple-700 font-bold">
+      <p className="flex items-center gap-2 text-purple-700 font-bold">
         <FaListOl /> Criteria
-      </label>
+      </p>
       {form.criteria.map((criterion, index) => (
-        <div key={index} className="flex items-center gap-2">
+        <div key={criterion.id} className="flex items-center gap-2">
           <input
             type="text"
-            value={criterion}
-            onChange={e => handleCriteriaChange(index, e.target.value)}
+            aria-label={`Criterion ${index + 1}`}
+            value={criterion.value}
+            onChange={(e) => handleCriteriaChange(criterion.id, e.target.value)}
             className="flex-1 rounded-2xl border-2 border-purple-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 px-4 py-3 text-lg transition-all duration-200 bg-purple-50 dark:bg-purple-900 placeholder:text-purple-400 focus:bg-white dark:focus:bg-boxdark"
             placeholder={`Criterion ${index + 1}`}
           />
           <button
             type="button"
-            onClick={() => removeCriterion(index)}
+            onClick={() => removeCriterion(criterion.id)}
             className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
             title="Remove criterion"
           >
@@ -118,7 +176,9 @@ const ThemeForm: React.FC<{ themeData?: Theme; onSuccess?: () => void }> = ({ th
       >
         {isEdit ? <FaPen /> : <FaPlus />} {isEdit ? "Update Theme" : "Add Theme"}
       </button>
-      {status && <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>}
+      {status && (
+        <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>
+      )}
     </form>
   );
 };

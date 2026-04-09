@@ -1,140 +1,155 @@
 # Architecture
 
-> Target architecture for **The Tutor** — a multi-agent LMS-enhancer platform that integrates with existing educational ecosystems. This document describes every major flow using Mermaid diagrams and explains the system topology after modernization.
+> Target architecture for **The Tutor** as a learner-record-centered lifelong-learning and outcomes platform. The platform preserves the repo's deterministic-core plus agentic-services split and evolves through Strangler Fig around the services and Azure topology already present in this repository.
 
 ---
 
 ## 1. High-Level System Context
 
-The Tutor operates within an existing educational ecosystem as an **AI enhancement layer** for the host LMS. It serves three primary personas: **students** (AI-assisted learning), **teachers** (AI-corrected assessments + pedagogical content), and **supervisors** (data-driven school supervision with narrative insight reports).
+Tutor is moving from an LMS enhancement layer to the institution-owned control plane for lifelong learning. Following DDD bounded contexts and TOGAF architecture building blocks, Tutor owns learner records, evidence, role-aware workflows, and credentials, while LMS, SIS, CRM, analytics, and wallet ecosystems remain external systems behind anti-corruption layers.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 C4Context
-    title System Context — The Tutor LMS Enhancer
+    title System Context — The Tutor Standalone Lifelong-Learning Platform
 
-    Person(student, "Student", "Learner: essays, questions, avatar tutoring")
-    Person(teacher, "Teacher / Coordinator", "Configures rubrics, reviews evaluations")
-    Person(supervisor, "Supervisor", "Pre-visit briefings, school insight reports")
+    Person(learner, "Learner / Alumni", "Owns progress, evidence, record, credentials, and re-entry journeys")
+    Person(faculty, "Professor / Advisor", "Designs learning, reviews evidence, guides interventions")
+    Person(leader, "Principal / Supervisor / Program Leader", "Reviews cohort, school, and program briefings")
+    Person(admin, "Administrator", "Manages programs, policies, integrations, and governance")
 
-    System(tutor, "The Tutor Platform", "Multi-agent LMS enhancer")
-    System_Ext(escola_total, "External LMS Platform", "Source of truth: enrollment, grades, assignments")
-    System_Ext(fabric, "Microsoft Fabric", "Semantic model: standardized assessments, attendance, task completion")
-    System_Ext(azure_ai, "Azure AI Services", "OpenAI, Speech, Document Intelligence, AI Search, AI Foundry")
-    System_Ext(identity, "Microsoft Entra ID", "Identity & access management with role-based scoping")
+    System(tutor, "The Tutor Platform", "Institution-owned lifelong-learning and outcomes platform")
+    System_Ext(academic, "Academic Systems", "LMS, SIS, registrar, CRM, and roster sources")
+    System_Ext(credential_ecosystem, "Credential Ecosystem", "Wallets, verifiers, partner and employer systems")
+    System_Ext(analytics, "Institutional Data Sources", "Microsoft Fabric and other approved analytics feeds")
+    System_Ext(azure_ai, "Azure AI Services", "OpenAI, Speech, Document Intelligence, AI Search, Foundry")
+    System_Ext(identity, "Microsoft Entra ID", "Identity, roles, and relationship-aware access inputs")
 
-    Rel(student, tutor, "Submits essays (handwritten + digital), answers questions, chats with tutor")
-    Rel(teacher, tutor, "Uploads pedagogical materials, configures rubrics and rules")
-    Rel(supervisor, tutor, "Requests pre-visit briefings, reviews school insight reports")
-    Rel(tutor, escola_total, "Syncs courses, students, assignments via LMS Gateway")
-    Rel(tutor, fabric, "Reads educational indicators (standardized assessments, attendance, task completion)")
-    Rel(tutor, azure_ai, "LLM inference, OCR, vector search, speech, agent evaluation")
-    Rel(tutor, identity, "Authenticates via OAuth 2.0 / OIDC, enforces supervisor school scoping")
+    Rel(learner, tutor, "Uses role-aware workspaces for learning, progress, record, and credentials")
+    Rel(faculty, tutor, "Reviews assessments, evidence, cohort progress, and interventions")
+    Rel(leader, tutor, "Consumes narrative briefings and deterministic program read models")
+    Rel(admin, tutor, "Manages governance, integrations, policies, and platform operations")
+    Rel(tutor, academic, "Normalizes external data through anti-corruption layers")
+    Rel(tutor, credential_ecosystem, "Publishes and verifies portable credentials when required")
+    Rel(tutor, analytics, "Consumes approved institutional indicators for read models and briefings")
+    Rel(tutor, azure_ai, "Uses agentic capabilities for assessment, tutoring, advising, and synthesis")
+    Rel(tutor, identity, "Authenticates users and enforces role + relationship scope")
 ```
 
 ---
 
-## 2. Container Diagram (Target State)
+## 2. Target-State Control Plane and Bounded Contexts
 
-After modernization, the system is decomposed into **five business domains** with a **shared library** and centralized infrastructure. Two new domains (Supervision, Content) address the core business agendas directly.
+The target state has four cooperating layers: a role-aware workspace shell, a deterministic control plane, bounded agentic services, and CQRS-style read models. The logical design changes now; the deployment substrate can remain APIM + ACA + Cosmos DB + Blob Storage + Azure AI while the migration proceeds.
 
 ```mermaid
-C4Container
-    title Container Diagram — The Tutor Platform
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
+flowchart TB
+    EXT["External LMS / SIS / CRM / Wallets / Analytics"]
 
-    Person(student, "Student")
-    Person(teacher, "Teacher")
-    Person(supervisor, "Supervisor")
+    subgraph WORKSPACES["Role-Aware Workspaces"]
+        SHELL["Workspace Shell"]
+        STUDENT_WS["Student"]
+        FACULTY_WS["Professor"]
+        LEADER_WS["Leader"]
+        ADMIN_WS["Admin"]
+        ALUMNI_WS["Alumni"]
+    end
 
-    Container_Boundary(frontend_boundary, "Frontend") {
-        Container(ui, "Tutor UI", "Next.js 15 / React 19", "SPA hosted on Azure Static Web Apps")
-    }
+    subgraph CORE["Deterministic Core / Control Plane"]
+        ID["Identity & Tenancy"]
+        INTEGRATION["Integration Hub\nAnti-Corruption Layers"]
+        CATALOG["Catalog & Pathways"]
+        LIFECYCLE["Enrollment & Lifecycle"]
+        RECORD["Learner Record\nAppend-Only History"]
+        CONTENT["Content & Knowledge"]
+        CREDENTIALS["Credentialing & Portfolio"]
+        COMMUNITY["Community & Network"]
+        GOVERNANCE["Governance & Provenance"]
+    end
 
-    Container_Boundary(gateway, "API Gateway") {
-        Container(apim, "API Management", "Azure APIM", "Rate limiting, auth, routing")
-    }
+    subgraph AGENTIC["Agentic Services"]
+        ASSESS["Assessment & Evidence"]
+        COACH["Coaching & Interaction"]
+        ADVISE["Advising & Success"]
+        INSIGHTS["Institutional Insights"]
+        EVAL["Agent Evaluation"]
+    end
 
-    Container_Boundary(platform_domain, "Platform Domain (Non-Agentic)") {
-        Container(config_svc, "Configuration Service", "FastAPI / ACA", "CRUD: students, courses, pedagogical rules")
-        Container(lms_gateway, "LMS Gateway", "FastAPI / ACA", "Adapter for external LMS sync")
-        Container(content_svc, "Content Service", "FastAPI / ACA", "Pedagogical material ingestion & RAG index")
-    }
+    subgraph READ["CQRS Read Models"]
+        TODAY["Today / Work Queues"]
+        TIMELINE["Learner Timeline"]
+        COHORT["Cohort / Program Progress"]
+        BRIEFINGS["Briefings / Alerts"]
+        REENTRY["Alumni Re-Entry"]
+    end
 
-    Container_Boundary(assessment_domain, "Assessment Domain (Agentic)") {
-        Container(essays_svc, "Essays Service", "FastAPI / ACA", "Strategy-based essay evaluation + OCR + ENEM")
-        Container(questions_svc, "Questions Service", "FastAPI / ACA", "State-machine question grading + discursive")
-    }
-
-    Container_Boundary(interaction_domain, "Interaction Domain (Agentic)") {
-        Container(avatar_svc, "Avatar Service", "FastAPI / ACA", "Speech-driven avatar tutoring")
-        Container(chat_svc, "Chat Service", "FastAPI / ACA", "Guided text tutoring during writing")
-    }
-
-    Container_Boundary(analytics_domain, "Analytics Domain (Agentic)") {
-        Container(upskilling_svc, "Upskilling Service", "FastAPI / ACA", "Performance & guidance analysis")
-        Container(evaluation_svc, "Evaluation Service", "FastAPI / ACA", "Agent quality evaluation via Foundry")
-    }
-
-    Container_Boundary(supervision_domain, "Supervision Domain (Agentic)") {
-        Container(insights_svc, "Insights Service", "FastAPI / ACA", "Supervisor briefings from Fabric indicators")
-    }
-
-    Container_Boundary(data, "Data Layer") {
-        ContainerDb(cosmos, "Azure Cosmos DB", "NoSQL", "5 databases with HPK")
-        ContainerDb(blob, "Azure Blob Storage", "Object Store", "Essays, pedagogical materials")
-    }
-
-    Container_Boundary(ai, "AI Services (Cloud Only)") {
-        Container(openai, "Azure OpenAI", "GPT-4o", "LLM inference")
-        Container(speech, "Azure Speech", "TTS/STT", "Avatar voice")
-        Container(foundry, "Azure AI Foundry", "Agents", "Agent orchestration & evaluation")
-        Container(doc_intel, "AI Document Intelligence", "OCR", "Handwritten essay scanning")
-        Container(ai_search, "Azure AI Search", "Vector Index", "RAG over pedagogical materials")
-    }
-
-    Container_Boundary(external, "External Systems") {
-        Container(fabric, "Microsoft Fabric", "Semantic Model", "Standardized assessments, attendance, task completion")
-    }
-
-    Rel(student, ui, "HTTPS")
-    Rel(teacher, ui, "HTTPS")
-    Rel(supervisor, ui, "HTTPS")
-    Rel(ui, apim, "REST / WebSocket")
-    Rel(apim, essays_svc, "")
-    Rel(apim, questions_svc, "")
-    Rel(apim, avatar_svc, "")
-    Rel(apim, chat_svc, "")
-    Rel(apim, upskilling_svc, "")
-    Rel(apim, evaluation_svc, "")
-    Rel(apim, config_svc, "")
-    Rel(apim, lms_gateway, "")
-    Rel(apim, content_svc, "")
-    Rel(apim, insights_svc, "")
-
-    Rel(essays_svc, cosmos, "")
-    Rel(essays_svc, blob, "")
-    Rel(essays_svc, foundry, "")
-    Rel(essays_svc, doc_intel, "OCR handwritten essays")
-    Rel(essays_svc, ai_search, "RAG: rubrics & exemplars")
-    Rel(questions_svc, cosmos, "")
-    Rel(questions_svc, foundry, "")
-    Rel(questions_svc, ai_search, "RAG: pedagogical context")
-    Rel(avatar_svc, cosmos, "")
-    Rel(avatar_svc, openai, "")
-    Rel(avatar_svc, speech, "")
-    Rel(chat_svc, cosmos, "")
-    Rel(chat_svc, openai, "")
-    Rel(chat_svc, ai_search, "RAG: guided tutoring context")
-    Rel(upskilling_svc, cosmos, "")
-    Rel(evaluation_svc, foundry, "")
-    Rel(insights_svc, fabric, "Read educational indicators")
-    Rel(insights_svc, openai, "Narrative synthesis")
-    Rel(insights_svc, cosmos, "")
-    Rel(content_svc, blob, "Store materials")
-    Rel(content_svc, doc_intel, "Extract text from uploads")
-    Rel(content_svc, ai_search, "Index for RAG")
-    Rel(config_svc, cosmos, "")
-    Rel(lms_gateway, cosmos, "")
+    EXT --> INTEGRATION
+    INTEGRATION --> LIFECYCLE
+    INTEGRATION --> CATALOG
+    INTEGRATION --> RECORD
+    ID --> LIFECYCLE
+    CATALOG --> RECORD
+    LIFECYCLE --> RECORD
+    CONTENT --> ASSESS
+    CONTENT --> COACH
+    GOVERNANCE --> ASSESS
+    GOVERNANCE --> COACH
+    GOVERNANCE --> ADVISE
+    GOVERNANCE --> INSIGHTS
+    EVAL --> GOVERNANCE
+    ASSESS --> RECORD
+    COACH --> RECORD
+    ADVISE --> RECORD
+    INSIGHTS --> RECORD
+    CREDENTIALS --> RECORD
+    COMMUNITY --> RECORD
+    RECORD --> TODAY
+    RECORD --> TIMELINE
+    RECORD --> COHORT
+    RECORD --> BRIEFINGS
+    RECORD --> REENTRY
+    TODAY --> SHELL
+    TIMELINE --> SHELL
+    COHORT --> SHELL
+    BRIEFINGS --> SHELL
+    REENTRY --> SHELL
+    SHELL --> STUDENT_WS
+    SHELL --> FACULTY_WS
+    SHELL --> LEADER_WS
+    SHELL --> ADMIN_WS
+    SHELL --> ALUMNI_WS
 ```
+
+| Layer | Primary bounded contexts | Design intent | Current repo anchors |
+| ----- | ------------------------ | ------------- | -------------------- |
+| **Deterministic core** | Identity and Tenancy, Integration Hub, Catalog and Pathways, Enrollment and Lifecycle, Learner Record, Content and Knowledge, Credentialing and Portfolio, Community and Network, Governance and Provenance | Own institutional records, policies, lifecycle state, and provenance | `config-svc`, `lms-gateway`, `content-svc`, shared auth middleware, and future learner-record / credential contexts |
+| **Agentic services** | Assessment and Evidence, Coaching and Interaction, Advising and Success, Institutional Insights, Agent Evaluation | Constrain probabilistic reasoning to high-value educational workflows | `essays-svc`, `questions-svc`, `avatar-svc`, `chat-svc`, `upskilling-svc`, `insights-svc`, `evaluation-svc` |
+| **Read models** | Learner timeline, work queues, cohort and school projections, alumni re-entry views | Project append-only records into role-specific experiences | Existing dashboards plus future role-aware workspace shell |
+
+### 2.1 Migration Horizons
+
+| Horizon | Wave | Objective | Approved backlog alignment | Current repo implication |
+| ------- | ---- | --------- | -------------------------- | ------------------------ |
+| **H1: Record-First Overlay** | Wave 1 | Establish relationship-based access control, event backbone, provenance capture, learner-record MVP, and role-aware shell without breaking current enhancer flows. | LL-01, LL-02, LL-03, LL-04, LL-06, LL-18 | Existing services stay in place and begin writing governed learner-record events and projections. |
+| **H2: Standalone Learning Core** | Wave 2 | Introduce deterministic advising, interventions, role workspaces, and institutional read models. | LL-05, LL-08, LL-09, LL-10, LL-11, LL-13, LL-17 | Current assessment, interaction, and insights services become the execution fabric behind role-specific workspaces and intervention flows. |
+| **H3: Lifelong Network Platform** | Wave 3 | Add skills graph, credentialing, alumni re-entry, community, and continuing-education expansion. | LL-07, LL-12, LL-14, LL-15, LL-16 | New bounded contexts can start inside existing services or shared libraries and split only when ownership or scale justifies it. |
+
+> Sections 3-8 describe the current Wave 1 runtime realization. They remain the implementation reference for the services already in the repo while the target bounded contexts above are introduced incrementally.
 
 ---
 
@@ -143,6 +158,7 @@ C4Container
 ### 3.1 Essay Evaluation Flow (with OCR + ENEM)
 
 > **Implementation status:**
+>
 > - Steps 1–4 (upload → Blob): ✅ Live
 > - Steps 5–6 (OCR via Document Intelligence): 🔧 Phase A — branch `feat/ocr-essay-ingestion` (issue #18)
 > - Steps 7–8 (RAG via AI Search): ⏳ Phase B (issue #19)
@@ -488,7 +504,7 @@ sequenceDiagram
 
 ---
 
-## 4. Deployment Topology
+## 4. Deployment Topology (Current Runtime Substrate)
 
 ```mermaid
 graph TB
@@ -576,7 +592,7 @@ graph TB
 
 ---
 
-## 5. Shared Library Architecture
+## 5. Shared Library Architecture (Current Runtime)
 
 Following the [holiday-peak-hub](https://github.com/Azure-Samples/holiday-peak-hub) reference, all services consume a shared `lib/` package.
 
@@ -621,7 +637,7 @@ graph TB
 
 ---
 
-## 6. Data Model (Cosmos DB Partitioning)
+## 6. Wave 1 Data Model (Cosmos DB Partitioning)
 
 ```mermaid
 erDiagram
@@ -725,7 +741,7 @@ erDiagram
 
 ---
 
-## 7. Frontend Component Architecture
+## 7. Wave 1 Frontend Component Architecture
 
 ```mermaid
 graph TB
@@ -1255,7 +1271,7 @@ graph TB
 ### 8.10 Design Pattern Summary
 
 | Service | Pattern | Agent Framework (rc3) | Orchestration | Persistence | External AI |
-|---------|---------|----------------------|---------------|-------------|-------------|
+| ------- | ------- | --------------------- | ------------- | ----------- | ----------- |
 | **essays-svc** | Strategy + Orchestrator | `ChatAgent` via `AzureAIAgentClient` | `SequentialBuilder` (OCR → strategy → grading → synthesis) | Cosmos DB (assemblies) + Blob | AI Foundry, Doc Intel, AI Search |
 | **questions-svc** | State Machine | `ChatAgent` via `AzureAIAgentClient` | `ConcurrentBuilder` (parallel dimension grading) | Cosmos DB (assemblies) | AI Foundry |
 | **avatar-svc** | Agent + Speech | `ChatAgent` via `AzureAIAgentClient` | Single agent with conversation memory | Cosmos DB (cases) | AI Foundry, Speech |

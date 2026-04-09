@@ -1,8 +1,8 @@
 export type SubCriteria = {
-    topic: string;
-    description: string;
-  };
-  
+  topic: string;
+  description: string;
+};
+
 export type Criteria = {
   topic: string;
   description: string;

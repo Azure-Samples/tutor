@@ -1,6 +1,5 @@
-import { CaseStep } from "@/types/steps";
-import { Profile } from "@/types/profile";
-
+import type { Profile } from "@/types/profile";
+import type { CaseStep } from "@/types/steps";
 
 export type Case = {
   id?: string;
@@ -8,5 +7,5 @@ export type Case = {
   role: string;
   steps: CaseStep[];
   profile?: Profile;
-  history?: Object;
+  history?: Record<string, unknown>;
 };

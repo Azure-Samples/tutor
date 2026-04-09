@@ -1,5 +1,8 @@
-import React, { createContext, useState, useContext, ReactNode } from "react";
-import { Transcription } from "@/types/transcription";
+"use client";
+
+import type { Transcription } from "@/types/transcription";
+import type React from "react";
+import { type ReactNode, createContext, useContext, useState } from "react";
 
 interface TranscriptionContextProps {
   transcriptions: { [specialistId: string]: Transcription[] }; // Armazenar as transcrições por especialista
@@ -21,7 +24,9 @@ export const useTranscriptionContext = () => useContext(TranscriptionContext);
 
 // Componente que fornece o contexto
 export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [transcriptions, setAllTranscriptions] = useState<{ [specialistId: string]: Transcription[] }>({});
+  const [transcriptions, setAllTranscriptions] = useState<{
+    [specialistId: string]: Transcription[];
+  }>({});
   const [selectedTranscription, setSelectedTranscription] = useState<Transcription | null>(null);
 
   // Função para definir transcrições para um especialista específico
@@ -33,7 +38,9 @@ export const TranscriptionProvider: React.FC<{ children: ReactNode }> = ({ child
   };
 
   return (
-    <TranscriptionContext.Provider value={{ transcriptions, setTranscriptions, selectedTranscription, setSelectedTranscription }}>
+    <TranscriptionContext.Provider
+      value={{ transcriptions, setTranscriptions, selectedTranscription, setSelectedTranscription }}
+    >
       {children}
     </TranscriptionContext.Provider>
   );

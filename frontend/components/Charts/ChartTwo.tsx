@@ -1,8 +1,8 @@
 "use client";
 
-import { ApexOptions } from "apexcharts";
-import React from "react";
+import type { ApexOptions } from "apexcharts";
 import dynamic from "next/dynamic";
+import type React from "react";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
   ssr: false,
@@ -64,13 +64,6 @@ const options: ApexOptions = {
   },
 };
 
-interface ChartTwoState {
-  series: {
-    name: string;
-    data: number[];
-  }[];
-}
-
 const ChartTwo: React.FC = () => {
   const series = [
     {
@@ -87,15 +80,14 @@ const ChartTwo: React.FC = () => {
     <div className="col-span-12 rounded-sm border border-stroke bg-white p-7.5 shadow-default dark:border-strokedark dark:bg-boxdark xl:col-span-4">
       <div className="mb-4 justify-between gap-4 sm:flex">
         <div>
-          <h4 className="text-xl font-semibold text-black dark:text-white">
-            Profit this week
-          </h4>
+          <h4 className="text-xl font-semibold text-black dark:text-white">Profit this week</h4>
         </div>
         <div>
           <div className="relative z-20 inline-block">
             <select
-              name="#"
-              id="#"
+              aria-label="Profit time range"
+              name="chart-two-range"
+              id="chart-two-range"
               className="relative z-20 inline-flex appearance-none bg-transparent py-1 pl-3 pr-8 text-sm font-medium outline-none"
             >
               <option value="" className="dark:bg-boxdark">
@@ -107,6 +99,7 @@ const ChartTwo: React.FC = () => {
             </select>
             <span className="absolute right-3 top-1/2 z-10 -translate-y-1/2">
               <svg
+                aria-hidden="true"
                 width="10"
                 height="6"
                 viewBox="0 0 10 6"

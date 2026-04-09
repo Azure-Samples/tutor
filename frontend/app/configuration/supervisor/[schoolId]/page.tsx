@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { humanizeIdentifier } from "@/utils/workspace-api";
 
 import {
   type InsightIndicator,
@@ -13,6 +14,13 @@ import {
   getInsightReport,
   listInsightReports,
 } from "../api";
+
+const freshnessStyles = {
+  fresh: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  derived: "border-sky-200 bg-sky-50 text-sky-900",
+  stale: "border-amber-200 bg-amber-50 text-amber-900",
+  degraded: "border-rose-200 bg-rose-50 text-rose-900",
+} as const;
 
 const formatDate = (value: string) => {
   const parsed = new Date(value);
@@ -163,6 +171,13 @@ const SupervisorSchoolDetailPage = () => {
                       <p className="text-xs opacity-80">
                         {report.source} • feedback {report.feedback_count}
                       </p>
+                      {report.freshness && (
+                        <span
+                          className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${freshnessStyles[report.freshness.status]}`}
+                        >
+                          {humanizeIdentifier(report.freshness.status)}
+                        </span>
+                      )}
                     </button>
                   </li>
                 );
@@ -220,7 +235,83 @@ const SupervisorSchoolDetailPage = () => {
                   <span className="font-semibold">Feedback Count:</span>{" "}
                   {selectedReport.feedback_count}
                 </p>
+                <p className="text-black dark:text-white">
+                  <span className="font-semibold">Freshness:</span>{" "}
+                  {selectedReport.freshness
+                    ? humanizeIdentifier(selectedReport.freshness.status)
+                    : "-"}
+                </p>
+                <p className="text-black dark:text-white">
+                  <span className="font-semibold">Review:</span>{" "}
+                  {selectedReport.trust
+                    ? humanizeIdentifier(selectedReport.trust.human_review.status)
+                    : "-"}
+                </p>
               </div>
+
+              {(selectedReport.freshness || selectedReport.trust) && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {selectedReport.freshness && (
+                    <div className="rounded border border-stroke p-4 text-sm dark:border-strokedark">
+                      <p className="font-semibold text-black dark:text-white">Freshness metadata</p>
+                      <span
+                        className={`mt-3 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${freshnessStyles[selectedReport.freshness.status]}`}
+                      >
+                        {humanizeIdentifier(selectedReport.freshness.status)}
+                      </span>
+                      <p className="mt-3 text-gray-700 dark:text-gray-200">
+                        {selectedReport.freshness.note}
+                      </p>
+                      <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                        Generated {formatDate(selectedReport.freshness.generated_at)}
+                      </p>
+                      {selectedReport.freshness.source_updated_at && (
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Source updated {formatDate(selectedReport.freshness.source_updated_at)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {selectedReport.trust && (
+                    <div className="rounded border border-stroke p-4 text-sm dark:border-strokedark">
+                      <p className="font-semibold text-black dark:text-white">Trust metadata</p>
+                      <p className="mt-3 text-gray-700 dark:text-gray-200">
+                        {selectedReport.trust.note}
+                      </p>
+                      <p className="mt-3 text-gray-700 dark:text-gray-200">
+                        Evaluation: {humanizeIdentifier(selectedReport.trust.evaluation_state)}
+                      </p>
+                      <p className="mt-1 text-gray-700 dark:text-gray-200">
+                        Human review: {selectedReport.trust.human_review.summary}
+                      </p>
+                      <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                        {selectedReport.trust.provenance.generator} ·{" "}
+                        {selectedReport.trust.provenance.workflow_version}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedReport.deep_links?.length ? (
+                <div>
+                  <h4 className="mb-2 text-sm font-semibold text-black dark:text-white">
+                    Deep Links
+                  </h4>
+                  <div className="flex flex-wrap gap-3">
+                    {selectedReport.deep_links.map((link) => (
+                      <Link
+                        key={`${selectedReport.report_id}-${link.href}`}
+                        href={link.href}
+                        className="rounded border border-stroke px-3 py-2 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 dark:border-strokedark dark:text-cyan-300 dark:hover:bg-cyan-900/20"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
 
               <div>
                 <h4 className="mb-2 text-sm font-semibold text-black dark:text-white">

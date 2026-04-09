@@ -1,12 +1,26 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { essaysEngine } from "@/utils/api";
-import FormsModal from "@/components/common/Modals";
-import { FaTrash, FaPlus, FaRobot, FaSync } from "react-icons/fa";
-import EssayForm from "@/components/Forms/Essays";
 import AgentForm from "@/components/Forms/Agent";
-import type { Essay, EssayEvaluationResult, AgentRef } from "@/types/essays";
+import EssayForm from "@/components/Forms/Essays";
+import FormsModal from "@/components/common/Modals";
 import { unwrapContent } from "@/types/api";
+import type { AgentRef, Essay, EssayEvaluationResult } from "@/types/essays";
+import { essaysEngine } from "@/utils/api";
+import { useCallback, useEffect, useState } from "react";
+import { FaPlus, FaRobot, FaSync, FaTrash } from "react-icons/fa";
+
+const toStableTextItems = (items: string[], prefix: string) => {
+  const occurrenceCounts = new Map<string, number>();
+
+  return items.map((value) => {
+    const occurrence = (occurrenceCounts.get(value) ?? 0) + 1;
+    occurrenceCounts.set(value, occurrence);
+
+    return {
+      key: `${prefix}-${value}-${occurrence}`,
+      value,
+    };
+  });
+};
 
 const EssaysList: React.FC = () => {
   const [essays, setEssays] = useState<Essay[]>([]);
@@ -107,7 +121,12 @@ const EssaysList: React.FC = () => {
     } catch (error) {
       console.error("Failed to re-evaluate essay", error);
       let message = "Could not re-run the evaluation. Please try again.";
-      if (error && typeof error === "object" && "message" in error && typeof (error as { message?: string }).message === "string") {
+      if (
+        error &&
+        typeof error === "object" &&
+        "message" in error &&
+        typeof (error as { message?: string }).message === "string"
+      ) {
         message = (error as { message: string }).message || message;
       }
       setReprocessError(message);
@@ -137,6 +156,7 @@ const EssaysList: React.FC = () => {
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <button
+              type="button"
               className="flex items-center gap-2 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
               onClick={() => {
                 closeAllModals();
@@ -147,6 +167,7 @@ const EssaysList: React.FC = () => {
               <FaPlus className="text-xl" /> New Essay
             </button>
             <button
+              type="button"
               className="flex items-center gap-2 bg-gradient-to-br from-purple-500 to-blue-500 hover:from-blue-500 hover:to-purple-400 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
               onClick={() => {
                 closeAllModals();
@@ -159,7 +180,9 @@ const EssaysList: React.FC = () => {
           {latestAgent && (
             <div className="mt-4 text-sm text-cyan-800 dark:text-cyan-200 bg-cyan-100/80 dark:bg-cyan-900/40 rounded-2xl px-4 py-3">
               <p className="font-semibold">Last provisioned agent:</p>
-              <p>{latestAgent.role} ({latestAgent.agent_id})</p>
+              <p>
+                {latestAgent.role} ({latestAgent.agent_id})
+              </p>
             </div>
           )}
         </div>
@@ -168,11 +191,13 @@ const EssaysList: React.FC = () => {
           <div className="flex flex-col gap-4 mb-6">
             {latestAgent && (
               <div className="rounded-2xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-900/40 px-4 py-3 text-sm text-cyan-800 dark:text-cyan-200">
-                <span className="font-semibold">Last provisioned agent:</span> {latestAgent.role} ({latestAgent.agent_id})
+                <span className="font-semibold">Last provisioned agent:</span> {latestAgent.role} (
+                {latestAgent.agent_id})
               </div>
             )}
             <div className="flex flex-col sm:flex-row items-center justify-end gap-3">
               <button
+                type="button"
                 className="flex items-center gap-2 bg-gradient-to-br from-purple-500 to-blue-500 hover:from-blue-500 hover:to-purple-400 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
                 onClick={() => {
                   closeAllModals();
@@ -182,6 +207,7 @@ const EssaysList: React.FC = () => {
                 <FaRobot className="text-xl" /> Provision Agent
               </button>
               <button
+                type="button"
                 className="flex items-center gap-2 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
                 onClick={() => {
                   closeAllModals();
@@ -216,21 +242,37 @@ const EssaysList: React.FC = () => {
                 </div>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   <div>
-                    <h5 className="text-sm font-semibold text-green-700 dark:text-green-300">Strengths</h5>
+                    <h5 className="text-sm font-semibold text-green-700 dark:text-green-300">
+                      Strengths
+                    </h5>
                     <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                      {latestEvaluation.result.strengths.map((item, index) => (
-                        <li key={`latest-strength-${index}`} className="rounded-lg bg-cyan-50/60 dark:bg-cyan-900/40 px-3 py-2">
-                          {item}
+                      {toStableTextItems(
+                        latestEvaluation.result.strengths,
+                        `${latestEvaluation.essayId}-strength`,
+                      ).map((item) => (
+                        <li
+                          key={item.key}
+                          className="rounded-lg bg-cyan-50/60 dark:bg-cyan-900/40 px-3 py-2"
+                        >
+                          {item.value}
                         </li>
                       ))}
                     </ul>
                   </div>
                   <div>
-                    <h5 className="text-sm font-semibold text-orange-700 dark:text-orange-300">Improvements</h5>
+                    <h5 className="text-sm font-semibold text-orange-700 dark:text-orange-300">
+                      Improvements
+                    </h5>
                     <ul className="mt-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
-                      {latestEvaluation.result.improvements.map((item, index) => (
-                        <li key={`latest-improvement-${index}`} className="rounded-lg bg-orange-50/80 dark:bg-orange-900/30 px-3 py-2">
-                          {item}
+                      {toStableTextItems(
+                        latestEvaluation.result.improvements,
+                        `${latestEvaluation.essayId}-improvement`,
+                      ).map((item) => (
+                        <li
+                          key={item.key}
+                          className="rounded-lg bg-orange-50/80 dark:bg-orange-900/30 px-3 py-2"
+                        >
+                          {item.value}
                         </li>
                       ))}
                     </ul>
@@ -241,28 +283,31 @@ const EssaysList: React.FC = () => {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {essays.map((e) => (
-              <div
+              <article
                 key={e.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleCardClick(e)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    handleCardClick(e);
-                  }
-                }}
                 className="group flex flex-col justify-between rounded-2xl border border-cyan-200 dark:border-cyan-800 bg-white dark:bg-boxdark shadow hover:shadow-lg transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-cyan-400/40"
               >
-                <div className="flex items-start justify-between gap-3 p-4">
+                <button
+                  type="button"
+                  onClick={() => handleCardClick(e)}
+                  className="flex items-start justify-between gap-3 rounded-t-2xl p-4 text-left transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-cyan-400/40"
+                >
                   <div className="text-left">
-                    <p className="text-sm uppercase tracking-wide text-cyan-600 dark:text-cyan-300">Essay Topic</p>
-                    <h3 className="text-xl font-bold text-blue-700 dark:text-cyan-100 truncate">{e.topic}</h3>
+                    <p className="text-sm uppercase tracking-wide text-cyan-600 dark:text-cyan-300">
+                      Essay Topic
+                    </p>
+                    <h3 className="text-xl font-bold text-blue-700 dark:text-cyan-100 truncate">
+                      {e.topic}
+                    </h3>
                   </div>
-                  <span className="rounded-full bg-cyan-50 dark:bg-cyan-900/60 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-200">View</span>
-                </div>
+                  <span className="rounded-full bg-cyan-50 dark:bg-cyan-900/60 px-3 py-1 text-xs font-semibold text-cyan-700 dark:text-cyan-200">
+                    View
+                  </span>
+                </button>
                 <div className="flex items-center justify-between gap-3 border-t border-cyan-100 dark:border-cyan-900 px-4 py-3">
-                  <span className="text-sm font-medium text-cyan-600 dark:text-cyan-300">Click to view & edit</span>
+                  <span className="text-sm font-medium text-cyan-600 dark:text-cyan-300">
+                    Click to view & edit
+                  </span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -291,7 +336,7 @@ const EssaysList: React.FC = () => {
                     </button>
                   </div>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         </>
@@ -304,7 +349,11 @@ const EssaysList: React.FC = () => {
           }}
         />
       </FormsModal>
-      <FormsModal open={showAgentModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Provision Foundry Agent">
+      <FormsModal
+        open={showAgentModal && !showCreateModal && !showDeleteModal}
+        onClose={closeAllModals}
+        title="Provision Foundry Agent"
+      >
         <AgentForm
           onSuccess={(agent) => {
             setLatestAgent(agent);
@@ -322,7 +371,11 @@ const EssaysList: React.FC = () => {
           />
         )}
       </FormsModal>
-      <FormsModal open={showDeleteModal && !showCreateModal} onClose={closeAllModals} title="Confirm Delete">
+      <FormsModal
+        open={showDeleteModal && !showCreateModal}
+        onClose={closeAllModals}
+        title="Confirm Delete"
+      >
         <div className="p-6">
           <h2 className="text-2xl font-bold text-red-700 mb-2 flex items-center gap-2">
             <span className="inline-block">⚠️</span>
@@ -332,8 +385,20 @@ const EssaysList: React.FC = () => {
             Are you sure you want to delete this essay? This action cannot be undone.
           </p>
           <div className="flex gap-2 mt-4">
-            <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200" onClick={confirmDelete}>Delete</button>
-            <button className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200" onClick={closeAllModals}>Cancel</button>
+            <button
+              type="button"
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200"
+              onClick={confirmDelete}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200"
+              onClick={closeAllModals}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </FormsModal>

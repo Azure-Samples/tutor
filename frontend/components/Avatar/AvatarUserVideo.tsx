@@ -1,5 +1,16 @@
-import React, { useEffect, useRef, useState } from "react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaVideo, FaVideoSlash } from "react-icons/fa";
+
+const stopStreamTracks = (mediaStream: MediaStream | null) => {
+  if (!mediaStream) {
+    return;
+  }
+
+  for (const track of mediaStream.getTracks()) {
+    track.stop();
+  }
+};
 
 const AvatarUserVideo: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -7,44 +18,70 @@ const AvatarUserVideo: React.FC = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
+    let activeStream: MediaStream | null = null;
+    let isCancelled = false;
+    const videoElement = videoRef.current;
+
     if (isVideoOn) {
-      navigator.mediaDevices.getUserMedia({ video: true, audio: false })
-        .then(mediaStream => {
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: false })
+        .then((mediaStream) => {
+          if (isCancelled) {
+            stopStreamTracks(mediaStream);
+            return;
+          }
+
+          activeStream = mediaStream;
           setStream(mediaStream);
-          if (videoRef.current) {
-            videoRef.current.srcObject = mediaStream;
+          if (videoElement) {
+            videoElement.srcObject = mediaStream;
           }
         })
         .catch((err) => {
           console.error("Error accessing camera:", err);
         });
-    } else if (stream) {
-      stream.getTracks().forEach(track => track.stop());
+    } else {
+      setStream((currentStream) => {
+        stopStreamTracks(currentStream);
+        return null;
+      });
+      if (videoElement) {
+        videoElement.srcObject = null;
+      }
     }
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+      isCancelled = true;
+      stopStreamTracks(activeStream);
+      if (!isVideoOn && videoElement) {
+        videoElement.srcObject = null;
       }
     };
   }, [isVideoOn]);
 
   const toggleVideo = () => {
-    setIsVideoOn(prev => !prev);
+    setIsVideoOn((prev) => !prev);
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-boxdark rounded-xl shadow-lg p-2 flex items-center gap-3">
-      <button 
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl bg-white p-2 shadow-lg dark:bg-boxdark">
+      <button
+        type="button"
         onClick={toggleVideo}
-        className={`rounded-full p-2 ${isVideoOn ? 'bg-cyan-600 text-white' : 'bg-gray-300 text-gray-600'}`}
+        className={`rounded-full p-2 ${isVideoOn ? "bg-cyan-600 text-white" : "bg-gray-300 text-gray-600"}`}
       >
         {isVideoOn ? <FaVideo /> : <FaVideoSlash />}
       </button>
       {isVideoOn ? (
-        <video ref={videoRef} autoPlay muted playsInline className="w-32 h-24 rounded-lg object-cover" />
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="h-24 w-32 rounded-lg object-cover"
+        />
       ) : (
-        <div className="w-32 h-24 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+        <div className="flex h-24 w-32 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700">
           <span className="text-xs text-gray-500 dark:text-gray-400">Camera off</span>
         </div>
       )}

@@ -12,7 +12,10 @@ export const metadata: Metadata = {
 const QuestionGradersPage = () => {
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Question Graders" subtitle="Create and maintain grader agents for assembly composition." />
+      <Breadcrumb
+        pageName="Question Graders"
+        subtitle="Create and maintain grader agents for assembly composition."
+      />
       <GradersList />
     </DefaultLayout>
   );

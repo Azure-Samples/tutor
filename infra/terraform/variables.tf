@@ -138,6 +138,9 @@ variable "cosmos_containers" {
     upskilling_plans = {
       partition_key_path = "/professor_id"
     }
+    learner_record_events = {
+      partition_key_path = "/learner_key"
+    }
     insights_reports = {
       partition_key_path = "/school_id"
     }
@@ -163,6 +166,18 @@ variable "apim_rate_limit_renewal_period_seconds" {
   description = "Renewal period in seconds for APIM rate limiting."
   type        = number
   default     = 60
+}
+
+variable "service_bus_learner_record_topic_name" {
+  description = "Topic name used to distribute learner-record integration events."
+  type        = string
+  default     = "learner-record-events"
+}
+
+variable "service_bus_learner_record_subscription_name" {
+  description = "Default subscription name used for learner-record integration backlog inspection."
+  type        = string
+  default     = "integration-backlog"
 }
 
 variable "manage_apim_service_edge_in_foundation" {

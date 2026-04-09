@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+"use client";
+
+import { type ReactNode, createContext, useContext, useState } from "react";
 
 interface HumanEvaluationContextType {
   humanEvaluation: Record<string, number>;
@@ -10,7 +12,7 @@ const HumanEvaluationContext = createContext<HumanEvaluationContextType | undefi
 export const useHumanEvaluation = () => {
   const context = useContext(HumanEvaluationContext);
   if (!context) {
-    throw new Error('useHumanEvaluation must be used within a HumanEvaluationProvider');
+    throw new Error("useHumanEvaluation must be used within a HumanEvaluationProvider");
   }
   return context;
 };

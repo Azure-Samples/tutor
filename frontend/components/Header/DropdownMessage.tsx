@@ -1,12 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import Image from "next/image";
 import ClickOutside from "@/components/ClickOutside";
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 
 const DropdownMessage = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifying, setNotifying] = useState(true);
-
 
   return (
     <ClickOutside onClick={() => setDropdownOpen(false)} className="relative">
@@ -24,10 +23,11 @@ const DropdownMessage = () => {
               notifying === false ? "hidden" : "inline"
             }`}
           >
-            <span className="absolute -z-1 inline-flex h-full w-full animate-ping rounded-full bg-meta-1 opacity-75"></span>
+            <span className="absolute -z-1 inline-flex h-full w-full animate-ping rounded-full bg-meta-1 opacity-75" />
           </span>
 
           <svg
+            aria-hidden="true"
             className="fill-current duration-300 ease-in-out"
             width="18"
             height="18"
@@ -56,9 +56,7 @@ const DropdownMessage = () => {
 
         {/* <!-- Dropdown Start --> */}
         {dropdownOpen && (
-          <div
-            className={`absolute -right-16 mt-2.5 flex h-90 w-75 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark sm:right-0 sm:w-80`}
-          >
+          <div className="absolute -right-16 mt-2.5 flex h-90 w-75 flex-col rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark sm:right-0 sm:w-80">
             <div className="px-4.5 py-3">
               <h5 className="text-sm font-medium text-bodydark2">Messages</h5>
             </div>
@@ -110,9 +108,7 @@ const DropdownMessage = () => {
                   </div>
 
                   <div>
-                    <h6 className="text-sm font-medium text-black dark:text-white">
-                      Robert Jhon
-                    </h6>
+                    <h6 className="text-sm font-medium text-black dark:text-white">Robert Jhon</h6>
                     <p className="text-sm">Can you share your offer?</p>
                     <p className="text-xs">10min ago</p>
                   </div>
@@ -137,9 +133,7 @@ const DropdownMessage = () => {
                   </div>
 
                   <div>
-                    <h6 className="text-sm font-medium text-black dark:text-white">
-                      Henry Dholi
-                    </h6>
+                    <h6 className="text-sm font-medium text-black dark:text-white">Henry Dholi</h6>
                     <p className="text-sm">I cam across your profile and...</p>
                     <p className="text-xs">1day ago</p>
                   </div>
@@ -164,9 +158,7 @@ const DropdownMessage = () => {
                   </div>
 
                   <div>
-                    <h6 className="text-sm font-medium text-black dark:text-white">
-                      Cody Fisher
-                    </h6>
+                    <h6 className="text-sm font-medium text-black dark:text-white">Cody Fisher</h6>
                     <p className="text-sm">I’m waiting for you response!</p>
                     <p className="text-xs">5days ago</p>
                   </div>

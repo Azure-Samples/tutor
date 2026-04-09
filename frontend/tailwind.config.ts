@@ -8,7 +8,7 @@ const config: Config = {
     "./hooks/**/*.{js,ts,jsx,tsx,mdx}",
     "./js/**/*.{js,ts,jsx,tsx,mdx}",
     "./types/**/*.{js,ts,jsx,tsx,mdx}",
-    './css/**/*.css'
+    "./css/**/*.css",
   ],
   darkMode: "class",
   theme: {
@@ -37,10 +37,10 @@ const config: Config = {
         primary: "#3C50E0",
         secondary: "#80CAEE",
         "kelly-green": "#58B214ff",
-        "puce": "#CE8896ff",
+        puce: "#CE8896ff",
         "light-cyan": "#CAECEFff",
         "non-photo-blue": "#7AD5E6ff",
-        "fulvous": "#E4810Eff",
+        fulvous: "#E4810Eff",
         stroke: "#E2E8F0",
         gray: "#EFF4FB",
         graydark: "#333A48",
@@ -77,7 +77,7 @@ const config: Config = {
         "title-md2": ["26px", "30px"],
         "title-sm": ["20px", "26px"],
         "title-sm2": ["22px", "28px"],
-        "title-xsm": ["18px", "24px"]
+        "title-xsm": ["18px", "24px"],
       },
       spacing: {
         4.5: "1.125rem",
@@ -322,10 +322,8 @@ const config: Config = {
       animation: {
         linspin: "linspin 1568.2353ms linear infinite",
         easespin: "easespin 5332ms cubic-bezier(0.4, 0, 0.2, 1) infinite both",
-        "left-spin":
-          "left-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both",
-        "right-spin":
-          "right-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both",
+        "left-spin": "left-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both",
+        "right-spin": "right-spin 1333ms cubic-bezier(0.4, 0, 0.2, 1) infinite both",
         "ping-once": "ping 5s cubic-bezier(0, 0, 0.2, 1)",
         rotating: "rotating 30s linear infinite",
         topbottom: "topbottom 60s infinite alternate linear",

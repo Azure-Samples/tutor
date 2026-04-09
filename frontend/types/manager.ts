@@ -1,4 +1,4 @@
-import { Specialist } from "@/types/specialist";
+import type { Specialist } from "@/types/specialist";
 
 export type Manager = {
   id?: string;

@@ -1,6 +1,6 @@
-import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import EssaySubmission from "@/components/Essays/EssaySubmission";
+import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -12,9 +12,9 @@ export const metadata: Metadata = {
 const EssaysPage = () => {
   return (
     <DefaultLayout metadata={metadata}>
-      <Breadcrumb 
-        pageName="Essay Evaluation" 
-        subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights." 
+      <Breadcrumb
+        pageName="Essay Evaluation"
+        subtitle="Submit, review, and receive feedback on your essays. Grow your writing and critical thinking skills with supportive, actionable insights."
       />
       <EssaySubmission />
     </DefaultLayout>

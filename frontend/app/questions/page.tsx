@@ -1,7 +1,7 @@
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import StudentQuestionAnswer from "@/components/Questions/StudentQuestionAnswer";
-import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import StudentQuestionAnswer from "@/components/Questions/StudentQuestionAnswer";
+import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Questions | Tutor App",

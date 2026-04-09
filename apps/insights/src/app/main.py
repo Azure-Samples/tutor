@@ -6,7 +6,7 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from functools import lru_cache
 from os import getenv
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -16,8 +16,18 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from tutor_lib.config import create_app, get_settings
-from tutor_lib.middleware import require_roles
-from tutor_lib.middleware.auth import AuthenticatedUser
+from tutor_lib.learner_record import (
+    AzureServiceBusLearnerRecordEventPublisher,
+    CosmosLearnerRecordEventRepository,
+    InMemoryLearnerRecordEventPublisher,
+    InMemoryLearnerRecordEventRepository,
+    LearnerRecordEventPublisher,
+    LearnerRecordEventRepository,
+    NoOpLearnerRecordEventPublisher,
+    PublishingLearnerRecordEventRepository,
+)
+from tutor_lib.middleware import get_authenticated_user, require_roles, resolve_access_context
+from tutor_lib.middleware.auth import AccessContext, AuthenticatedUser
 
 from app.indicators import (
     AttendanceStrategy,
@@ -28,12 +38,18 @@ from app.indicators import (
     TaskCompletionStrategy,
 )
 from app.orchestrator import build_briefing
+from app.projections import WorkspaceProjectionBuilder
 from app.schemas import (
     BodyMessage,
     BriefingRequest,
+    DeepLink,
     ErrorMessage,
     FeedbackRequest,
+    FreshnessMetadata,
+    ProvenanceMetadata,
+    ReviewMetadata,
     SuccessMessage,
+    TrustMetadata,
 )
 from app.store import (
     CosmosInsightsRepository,
@@ -46,6 +62,8 @@ from app.store import (
     report_to_dict,
 )
 
+AuthenticatedUserDependency = Annotated[AuthenticatedUser, Depends(get_authenticated_user)]
+
 app = create_app(
     title="Insights",
     version="0.1.0",
@@ -55,15 +73,56 @@ app = create_app(
 
 @lru_cache(maxsize=1)
 def _repository() -> InsightsRepository:
-    if getenv("INSIGHTS_REPOSITORY", "cosmos").lower() == "memory":
+    if _use_in_memory_store():
         return InMemoryInsightsRepository()
+    settings = get_settings()
+    return CosmosInsightsRepository(settings.cosmos)
+
+
+@lru_cache(maxsize=1)
+def _learner_record_repository() -> LearnerRecordEventRepository:
+    base_repository: LearnerRecordEventRepository
+    if _use_in_memory_store():
+        base_repository = InMemoryLearnerRecordEventRepository()
+    else:
+        settings = get_settings()
+        base_repository = CosmosLearnerRecordEventRepository(settings.cosmos)
+
+    return PublishingLearnerRecordEventRepository(
+        repository=base_repository,
+        publisher=_learner_record_event_publisher(),
+    )
+
+
+@lru_cache(maxsize=1)
+def _learner_record_event_publisher() -> LearnerRecordEventPublisher:
+    publisher_mode = getenv("LEARNER_RECORD_PUBLISHER", "").strip().lower()
+    if publisher_mode == "memory":
+        return InMemoryLearnerRecordEventPublisher()
+    if publisher_mode == "noop":
+        return NoOpLearnerRecordEventPublisher()
+
+    settings = get_settings()
+    if (
+        settings.service_bus.fully_qualified_namespace
+        and settings.service_bus.learner_record_topic
+    ):
+        return AzureServiceBusLearnerRecordEventPublisher(
+            fully_qualified_namespace=settings.service_bus.fully_qualified_namespace,
+            topic_name=settings.service_bus.learner_record_topic,
+        )
+
+    return NoOpLearnerRecordEventPublisher()
+
+
+def _use_in_memory_store() -> bool:
+    if getenv("INSIGHTS_REPOSITORY", "cosmos").lower() == "memory":
+        return True
     try:
         settings = get_settings()
-        if not _cosmos_endpoint_configured(settings.cosmos.endpoint):
-            return InMemoryInsightsRepository()
-        return CosmosInsightsRepository(settings.cosmos)
+        return not _cosmos_endpoint_configured(settings.cosmos.endpoint)
     except ValidationError:
-        return InMemoryInsightsRepository()
+        return True
 
 
 def _cosmos_endpoint_configured(endpoint: str) -> bool:
@@ -78,8 +137,11 @@ def _fabric_adapter() -> FabricReadAdapter:
 
 def reset_repository() -> None:
     _repository.cache_clear()
+    _learner_record_repository.cache_clear()
+    _learner_record_event_publisher.cache_clear()
     _fabric_adapter.cache_clear()
     _indicator_strategies.cache_clear()
+    _projection_builder.cache_clear()
 
 
 @lru_cache(maxsize=1)
@@ -91,8 +153,18 @@ def _indicator_strategies() -> tuple[IndicatorStrategy, ...]:
     )
 
 
+@lru_cache(maxsize=1)
+def _projection_builder() -> WorkspaceProjectionBuilder:
+    return WorkspaceProjectionBuilder(
+        repository=_repository(),
+        indicator_strategies=_indicator_strategies(),
+        learner_record_repository=_learner_record_repository(),
+    )
+
+
 require_supervisor = require_roles("supervisor", "admin")
 require_supervisor_dep = Depends(require_supervisor)
+_WORKSPACE_ROLES: set[str] = {"student", "professor", "principal", "supervisor", "admin", "alumni"}
 
 
 @app.get("/health")
@@ -157,6 +229,79 @@ def _pilot_school_ids() -> set[str]:
 
 def _pilot_supervisor_ids() -> set[str]:
     return _parse_school_ids(getenv("INSIGHTS_PILOT_SUPERVISOR_IDS", ""))
+
+
+def _briefing_trust_payload(*, report_id: str, school_id: str) -> dict[str, Any]:
+    return TrustMetadata(
+        provenance=ProvenanceMetadata(
+            source_type="insight_report",
+            source_ids=[report_id, f"school:{school_id}"],
+            generator="insights.briefing",
+            workflow_version="workspace-projection-v1",
+            model="gpt-4o",
+        ),
+        evaluation_state="pending",
+        human_review=ReviewMetadata(
+            status="recommended",
+            summary="Narrative briefings remain advisory and should be reviewed alongside the deterministic school indicators.",
+        ),
+        degraded=False,
+        advisory_only=True,
+        note="Stored insight reports preserve provenance, review posture, and source lineage for leader-facing experiences.",
+    ).model_dump()
+
+
+def _briefing_freshness_payload(*, generated_at: str) -> dict[str, Any]:
+    return FreshnessMetadata(
+        generated_at=generated_at,
+        source_updated_at=generated_at,
+        status="fresh",
+        note="This briefing reflects the report generation time currently stored by insights-svc.",
+    ).model_dump()
+
+
+def _briefing_deep_links() -> list[dict[str, str]]:
+    return [
+        DeepLink(label="Open school briefings", href="/configuration/supervisor").model_dump(),
+        DeepLink(label="Review evidence and trust", href="/evidence-trust").model_dump(),
+    ]
+
+
+def _resolve_workspace_context(user: AuthenticatedUser, *, role: str, context_id: str) -> AccessContext:
+    if role not in _WORKSPACE_ROLES:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace role not found")
+    if role not in user.roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requested role is outside the caller grants")
+
+    context = resolve_access_context(user, role=role, context_id=context_id)
+    if context is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requested context is outside the caller scope")
+    return context
+
+
+def _role_from_context_id(context_id: str) -> str:
+    role, separator, _ = context_id.partition(":")
+    if not separator or not role:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="context_id must use the access-context identifier shape")
+    return role
+
+
+def _enforce_learner_record_scope(
+    *,
+    learner_id: str,
+    role: str,
+    context: AccessContext,
+    user: AuthenticatedUser,
+) -> None:
+    scoped_learner_ids = set(context.scope.learner_ids)
+    if role in {"student", "alumni"}:
+        allowed_learner_ids = scoped_learner_ids or ({user.subject} if user.subject else set())
+        if allowed_learner_ids and learner_id not in allowed_learner_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requested learner is outside the caller scope")
+        return
+
+    if scoped_learner_ids and learner_id not in scoped_learner_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requested learner is outside the caller scope")
 
 
 def _resolve_school_scope(
@@ -279,6 +424,53 @@ def _enforce_pilot_school_scope(school_id: str) -> None:
         )
 
 
+def _enforce_workspace_pilot_scope(*, role: str, context: AccessContext, user: AuthenticatedUser) -> None:
+    if role == "supervisor":
+        _enforce_pilot_supervisor_scope(user)
+    if role in {"principal", "supervisor"}:
+        for school_id in context.scope.school_ids:
+            _enforce_pilot_school_scope(school_id)
+
+
+@app.get("/workspace-snapshots/{role}")
+async def get_workspace_snapshot(
+    role: str,
+    user: AuthenticatedUserDependency,
+    context_id: str = Query(..., min_length=1),
+) -> JSONResponse:
+    context = _resolve_workspace_context(user, role=role, context_id=context_id)
+    _enforce_workspace_pilot_scope(role=role, context=context, user=user)
+
+    payload = await _projection_builder().build_workspace_snapshot(role=role, context=context, user=user)
+    return _success("Workspace Snapshot Retrieved", "Workspace snapshot fetched.", payload.model_dump())
+
+
+@app.get("/learner-records/{learner_id}")
+async def get_learner_record_timeline(
+    learner_id: str,
+    user: AuthenticatedUserDependency,
+    context_id: str = Query(..., min_length=1),
+    limit: int = Query(default=10, ge=1, le=25),
+    cursor: str | None = Query(default=None),
+) -> JSONResponse:
+    role = _role_from_context_id(context_id)
+    context = _resolve_workspace_context(user, role=role, context_id=context_id)
+    _enforce_workspace_pilot_scope(role=role, context=context, user=user)
+    _enforce_learner_record_scope(learner_id=learner_id, role=role, context=context, user=user)
+
+    try:
+        payload = await _projection_builder().build_learner_record_timeline(
+            learner_id=learner_id,
+            context=context,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return _success("Learner Record Retrieved", "Learner record timeline fetched.", payload.model_dump())
+
+
 @app.post("/briefing")
 async def create_briefing(
     payload: BriefingRequest,
@@ -307,7 +499,12 @@ async def create_briefing(
         alerts=briefing.alerts,
         focus_points=briefing.focus_points,
         improvements=briefing.improvements,
+        trust=_briefing_trust_payload(report_id="pending", school_id=payload.school_id),
+        freshness={},
+        deep_links=_briefing_deep_links(),
     )
+    report.trust = _briefing_trust_payload(report_id=report.report_id, school_id=payload.school_id)
+    report.freshness = _briefing_freshness_payload(generated_at=report.generated_at)
 
     saved = await _repository().create_report(report)
     return _created(

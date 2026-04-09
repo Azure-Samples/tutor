@@ -1,5 +1,5 @@
 import React from "react";
-import { FaHamburger } from "react-icons/fa";
+import { FiMenu } from "react-icons/fi";
 
 interface SidebarSwitcherProps {
   sidebarOpen: boolean;
@@ -11,20 +11,20 @@ const SidebarSwitcher = React.forwardRef<HTMLButtonElement, SidebarSwitcherProps
     <button
       ref={ref}
       aria-controls="sidebar"
-      onClick={e => {
+      aria-expanded={sidebarOpen}
+      onClick={(e) => {
         e.stopPropagation();
         setSidebarOpen(!sidebarOpen);
       }}
-      className={`z-99999 block rounded-full border border-stroke p-2 shadow-sm transition-colors duration-300
-        ${sidebarOpen ? "bg-gradient-to-br from-orange-400 to-red-500 border-transparent" : "bg-white border-stroke"}`}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-stone-200 bg-white text-slate-700 shadow-sm transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
       title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
       type="button"
     >
-      <span className="flex items-center justify-center w-6 h-6 transition-all duration-300">
-        <FaHamburger className="w-6 h-6 transition-all duration-300" color={sidebarOpen ? "white": "orange"} />
+      <span className="flex h-5 w-5 items-center justify-center">
+        <FiMenu className="h-5 w-5" />
       </span>
     </button>
-  )
+  ),
 );
 
 SidebarSwitcher.displayName = "SidebarSwitcher";

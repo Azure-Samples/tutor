@@ -1,4 +1,4 @@
-import { Profile } from "@/types/profile";
+import type { Profile } from "@/types/profile";
 import { useState } from "react";
 
 interface ProfileFormProps {
@@ -10,7 +10,7 @@ interface ProfileFormProps {
 const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onChange, readOnly }) => {
   const [localProfile, setLocalProfile] = useState<Profile>(profile);
 
-  const handleChange = (field: keyof Profile, value: any) => {
+  const handleChange = (field: keyof Profile, value: Profile[keyof Profile]) => {
     const updated = { ...localProfile, [field]: value };
     setLocalProfile(updated);
     onChange(updated);
@@ -23,7 +23,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onChange, readOnly }
           <input
             type="text"
             value={localProfile.name}
-            onChange={e => handleChange("name", e.target.value)}
+            onChange={(e) => handleChange("name", e.target.value)}
             className="input"
             placeholder="Name"
             disabled={readOnly}
@@ -31,7 +31,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onChange, readOnly }
           <input
             type="text"
             value={localProfile.gender || ""}
-            onChange={e => handleChange("gender", e.target.value)}
+            onChange={(e) => handleChange("gender", e.target.value)}
             className="input"
             placeholder="Gender"
             disabled={readOnly}
@@ -39,7 +39,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onChange, readOnly }
           <input
             type="number"
             value={localProfile.age || ""}
-            onChange={e => handleChange("age", parseInt(e.target.value))}
+            onChange={(e) => handleChange("age", Number.parseInt(e.target.value))}
             className="input"
             placeholder="Age"
             disabled={readOnly}
@@ -47,7 +47,7 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onChange, readOnly }
           <input
             type="text"
             value={localProfile.role}
-            onChange={e => handleChange("role", e.target.value)}
+            onChange={(e) => handleChange("role", e.target.value)}
             className="input"
             placeholder="Role"
             disabled={readOnly}
@@ -55,14 +55,14 @@ const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onChange, readOnly }
           <input
             type="text"
             value={localProfile.level || ""}
-            onChange={e => handleChange("level", e.target.value)}
+            onChange={(e) => handleChange("level", e.target.value)}
             className="input"
             placeholder="Level"
             disabled={readOnly}
           />
           <textarea
             value={localProfile.details}
-            onChange={e => handleChange("details", e.target.value)}
+            onChange={(e) => handleChange("details", e.target.value)}
             className="input"
             placeholder="Details"
             disabled={readOnly}
