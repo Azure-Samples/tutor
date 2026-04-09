@@ -19,10 +19,6 @@
     }
   },
   "files": {
-    "ignore": [
-      "node_modules",
-      ".next",
-      "out"
-    ]
+    "ignore": ["node_modules", ".next", "out"]
   }
 }

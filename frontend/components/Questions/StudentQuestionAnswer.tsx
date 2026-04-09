@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import axios, { CanceledError } from "axios";
+import { useEffect, useMemo, useState } from "react";
 
-import { questionsEngine } from "@/utils/api";
 import type { Answer } from "@/types/answer";
 import type { Assembly } from "@/types/assembly";
 import type { ChatResponse } from "@/types/chatResponse";
 import type { Question } from "@/types/question";
 import type { QuestionEvaluationResult } from "@/types/questionEvaluation";
+import { questionsEngine } from "@/utils/api";
 
 const resolveQuestionKey = (question: Question) => question.id ?? question.topic ?? "";
 const RESPONDENT = "student";
@@ -16,7 +16,10 @@ const RESPONDENT = "student";
 const createAnswerPayload = (question: Question, draft: string): Answer => {
   const questionId = resolveQuestionKey(question) || `question-${Date.now()}`;
   return {
-    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `draft-${Date.now()}`,
+    id:
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `draft-${Date.now()}`,
     text: draft,
     question_id: questionId,
     respondent: RESPONDENT,
@@ -38,12 +41,12 @@ const StudentQuestionAnswer = () => {
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   const selectedQuestion = useMemo(
-    () => questions.find(question => resolveQuestionKey(question) === selectedQuestionId) || null,
+    () => questions.find((question) => resolveQuestionKey(question) === selectedQuestionId) || null,
     [questions, selectedQuestionId],
   );
 
   const selectedAssembly = useMemo(
-    () => assemblies.find(assembly => assembly.id === selectedAssemblyId) || null,
+    () => assemblies.find((assembly) => assembly.id === selectedAssemblyId) || null,
     [assemblies, selectedAssemblyId],
   );
 
@@ -115,17 +118,6 @@ const StudentQuestionAnswer = () => {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    setAnswerDraft("");
-    setEvaluation(null);
-    setEvaluationError(null);
-  }, [selectedQuestionId]);
-
-  useEffect(() => {
-    setEvaluation(null);
-    setEvaluationError(null);
-  }, [selectedAssemblyId]);
 
   // Debounce evaluation so graders run only after the student pauses typing.
   useEffect(() => {
@@ -217,10 +209,15 @@ const StudentQuestionAnswer = () => {
               id="question-select"
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               value={selectedQuestionId ?? ""}
-              onChange={event => setSelectedQuestionId(event.target.value)}
+              onChange={(event) => {
+                setSelectedQuestionId(event.target.value);
+                setAnswerDraft("");
+                setEvaluation(null);
+                setEvaluationError(null);
+              }}
               disabled={questionsLoading || questions.length === 0}
             >
-              {questions.map(question => {
+              {questions.map((question) => {
                 const value = resolveQuestionKey(question);
                 if (!value) {
                   return null;
@@ -244,10 +241,14 @@ const StudentQuestionAnswer = () => {
               id="assembly-select"
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               value={selectedAssemblyId ?? ""}
-              onChange={event => setSelectedAssemblyId(event.target.value)}
+              onChange={(event) => {
+                setSelectedAssemblyId(event.target.value);
+                setEvaluation(null);
+                setEvaluationError(null);
+              }}
               disabled={assembliesLoading || assemblies.length === 0}
             >
-              {assemblies.map(assembly => (
+              {assemblies.map((assembly) => (
                 <option key={assembly.id} value={assembly.id}>
                   {assembly.topic_name || assembly.id}
                 </option>
@@ -281,7 +282,7 @@ const StudentQuestionAnswer = () => {
             className="min-h-[140px] w-full rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             placeholder="Start typing your answer…"
             value={answerDraft}
-            onChange={event => setAnswerDraft(event.target.value)}
+            onChange={(event) => setAnswerDraft(event.target.value)}
             disabled={!selectedQuestion || !selectedAssembly}
           />
           <p className="text-xs text-slate-500">
@@ -298,15 +299,24 @@ const StudentQuestionAnswer = () => {
           {evaluation ? (
             <div className="space-y-4">
               <div className="rounded-lg border border-slate-200 bg-white p-4">
-                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Overall</p>
-                <p className="mt-2 whitespace-pre-line text-base text-slate-900">{evaluation.overall}</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                  Overall
+                </p>
+                <p className="mt-2 whitespace-pre-line text-base text-slate-900">
+                  {evaluation.overall}
+                </p>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                {evaluation.dimensions.map(dimension => (
-                  <article key={dimension.dimension} className="rounded-lg border border-slate-200 bg-white p-4">
+                {evaluation.dimensions.map((dimension) => (
+                  <article
+                    key={dimension.dimension}
+                    className="rounded-lg border border-slate-200 bg-white p-4"
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-800">{dimension.dimension}</p>
+                        <p className="text-sm font-semibold text-slate-800">
+                          {dimension.dimension}
+                        </p>
                         <p className="mt-1 text-sm text-slate-600">{dimension.verdict}</p>
                       </div>
                       <span className="text-xs font-medium text-slate-500">

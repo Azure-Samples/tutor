@@ -5,8 +5,8 @@ This directory contains the Architecture Decision Records (ADRs) for **The Tutor
 ## ADR Index
 
 | ADR | Title | Status | Date |
-|-----|-------|--------|------|
-| [001](./001-lms-enhancer-platform.md) | LMS-Enhancer Multi-Agent Platform | Accepted | 2026-02-24 |
+| --- | ----- | ------ | ---- |
+| [001](./001-lms-enhancer-platform.md) | LMS-Enhancer Multi-Agent Platform | Superseded | 2026-02-24 |
 | [002](./002-shared-library.md) | Shared Library Extraction (`tutor-lib`) | Accepted | 2026-02-24 |
 | [003](./003-aca-microservices.md) | Azure Container Apps for Microservices | Accepted | 2026-02-24 |
 | [004](./004-terraform-avm.md) | Terraform with Azure Verified Modules | Accepted | 2026-02-24 |
@@ -18,6 +18,8 @@ This directory contains the Architecture Decision Records (ADRs) for **The Tutor
 | [010](./010-pedagogical-content-ocr.md) | Pedagogical Content Ingestion, OCR & RAG | Accepted | 2026-03-02 |
 | [011](./011-foundry-first-agent-architecture.md) | Foundry-First Agent Architecture | Accepted | 2026-03-09 |
 | [012](./012-cosmos-foundry-agent-migration.md) | Cosmos-to-Foundry Agent Migration Implementation | Accepted | 2026-03-16 |
+| [013](./013-learner-record-standalone-platform.md) | Learner-Record-Centered Standalone Lifelong-Learning Platform | Accepted | 2026-04-08 |
+| [014](./014-hybrid-learner-record-service-bus-distribution.md) | Hybrid Learner-Record Service Bus Distribution | Accepted | 2026-04-08 |
 
 ## ADR Format
 

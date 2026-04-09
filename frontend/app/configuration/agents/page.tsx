@@ -1,5 +1,5 @@
-import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
+import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import AssembliesList from "@/components/Lists/Assemblies";
 import type { Metadata } from "next";
 
@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 const AgentsPage = () => {
   return (
     <DefaultLayout>
-      <Breadcrumb 
-        pageName="Agent Configuration" 
-        subtitle="Create and manage AI agent assemblies used in essay and question evaluation." 
+      <Breadcrumb
+        pageName="Agent Configuration"
+        subtitle="Create and manage AI agent assemblies used in essay and question evaluation."
       />
       <AssembliesList />
     </DefaultLayout>

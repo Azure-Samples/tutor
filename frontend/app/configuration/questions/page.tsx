@@ -1,7 +1,7 @@
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
-import QuestionsList from "@/components/Lists/Questions";
-import { Metadata } from "next";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import QuestionsList from "@/components/Lists/Questions";
+import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -12,7 +12,10 @@ export const metadata: Metadata = {
 const QuestionsPage = () => {
   return (
     <DefaultLayout metadata={metadata}>
-      <Breadcrumb pageName="Questions" subtitle="Manage the question bank and jump to grader/answer admin views." />
+      <Breadcrumb
+        pageName="Questions"
+        subtitle="Manage the question bank and jump to grader/answer admin views."
+      />
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <Link
           href="/configuration/questions"

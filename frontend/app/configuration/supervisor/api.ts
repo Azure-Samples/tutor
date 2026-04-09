@@ -1,4 +1,5 @@
 import { insightsApi } from "@/utils/api";
+import type { DeepLink, FreshnessMetadata, TrustMetadata } from "@/utils/workspace-api";
 
 export interface InsightIndicator {
   indicator: string;
@@ -20,6 +21,9 @@ export interface InsightReport {
   focus_points: string[];
   improvements: string[];
   feedback_count: number;
+  trust?: TrustMetadata;
+  freshness?: FreshnessMetadata;
+  deep_links?: DeepLink[];
 }
 
 export interface CreateBriefingInput {

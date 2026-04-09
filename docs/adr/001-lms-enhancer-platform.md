@@ -1,7 +1,8 @@
 # ADR-001: LMS-Enhancer Multi-Agent Platform
 
-**Status:** Accepted  
+**Status:** Superseded  
 **Date:** 2026-02-24  
+**Superseded By:** [ADR-013](./013-learner-record-standalone-platform.md)  
 **Deciders:** Platform Team
 
 ---
@@ -31,7 +32,7 @@ The Tutor started as a standalone intelligent tutoring application with five ind
 ### New System Boundaries
 
 | Boundary | The Tutor Owns | Host LMS / Department Owns |
-|----------|---------------|--------------------------|
+| -------- | -------------- | ------------------------- |
 | **Enrollment** | ✗ | ✓ |
 | **Calendars / Scheduling** | ✗ | ✓ |
 | **Grade books** | ✗ (contributes scores) | ✓ |
@@ -50,7 +51,7 @@ The Tutor started as a standalone intelligent tutoring application with five ind
 
 A new **LMS Gateway** service implements the Adapter pattern for each supported LMS:
 
-```
+```text
 LMSGateway
 ├── adapters/
 │   ├── moodle.py      # Moodle REST API adapter

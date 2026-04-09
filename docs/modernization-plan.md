@@ -1,6 +1,6 @@
 # Modernization Plan
 
-> Phased plan for upgrading **The Tutor** from a standalone tutoring app to a multi-agent educational intelligence platform with modern dependencies, infrastructure, and architecture.
+> Phased plan for upgrading **The Tutor** into a learner-record-centered lifelong-learning and outcomes platform while preserving the current deterministic-core plus agentic-services split and the repo's existing deployment assumptions.
 
 ---
 
@@ -19,6 +19,25 @@
 | **8** | Observability & Hardening | 1 week | Phase 5, 6, 7 |
 | **9** | Content Ingestion & OCR | 2 weeks | Phase 1, 3 |
 | **10** | Supervision Domain | 2 weeks | Phase 3, 5, 9 |
+
+---
+
+## Lifelong-Learning Execution Track
+
+The phase plan below remains the implementation scaffold for infrastructure, services, and frontend modernization. The approved standalone-platform backlog now overlays that scaffold with a three-wave execution track that clarifies product direction and architectural sequencing.
+
+| Wave | Horizon | Primary goal | Approved backlog alignment | Architectural outcome | Phase alignment |
+| ---- | ------- | ------------ | -------------------------- | --------------------- | --------------- |
+| **1** | Record-First Overlay | Establish the standalone control plane without breaking current enhancer flows. | LL-01, LL-02, LL-03, LL-04, LL-06, LL-18 | Relationship-based access control, event backbone, provenance capture, learner-record MVP, role-aware shell, governance gates | Primarily Phases 4, 5, 6, 7, 8, with existing services reused as the runtime substrate |
+| **2** | Standalone Learning Core | Own role workspaces, interventions, advising, and deterministic read models. | LL-05, LL-08, LL-09, LL-10, LL-11, LL-13, LL-17 | Student, professor, leader, and admin workspaces; design system; advising core; institutional projections and intervention flows | Extends Phases 4, 6, 9, 10 and adds new bounded contexts without assuming new Azure topology |
+| **3** | Lifelong Network Platform | Expand Tutor into a durable record, credential, alumni, and community network. | LL-07, LL-12, LL-14, LL-15, LL-16 | Skills graph, credentialing, portfolio, alumni re-entry, community, and continuing-education catalog pilot | Extends later platform work on top of the same APIM, ACA, Cosmos DB, Blob Storage, and Azure AI deployment model |
+
+### Execution Rules
+
+- Use **Strangler Fig** migration. Existing services remain the implementation substrate while bounded contexts are formalized around the learner record.
+- Keep **anti-corruption layers** for LMS, SIS, CRM, analytics, and credential ecosystems. Wave delivery must not depend on direct coupling to external schemas.
+- Treat **provenance, evaluation, and human review** as wave-exit criteria for high-impact capabilities rather than post-launch hardening.
+- Allow new bounded contexts to start inside existing services or shared libraries when necessary, then split only when operational or ownership pressure justifies it.
 
 ---
 

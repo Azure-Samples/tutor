@@ -3,46 +3,95 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 255, 255, 255;
-  --background-end-rgb: 255, 255, 255;
+  --shell-background: #f4efe7;
+  --shell-surface: rgba(255, 255, 255, 0.9);
+  --shell-panel: #ffffff;
+  --shell-muted: #f8f4ed;
+  --shell-border: #d8cfc1;
+  --shell-ink: #16212b;
+  --shell-subtle: #5d6873;
+  --shell-accent: #0f5e5b;
+  --shell-accent-soft: #dce9e8;
+  --shell-warm: #8a6249;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 0, 0, 0;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+html.dark,
+.dark {
+  --shell-background: #0f1720;
+  --shell-surface: rgba(15, 23, 32, 0.92);
+  --shell-panel: #17212b;
+  --shell-muted: #111b24;
+  --shell-border: #2b3948;
+  --shell-ink: #edf2f7;
+  --shell-subtle: #aab8c3;
+  --shell-accent: #70c0bc;
+  --shell-accent-soft: rgba(112, 192, 188, 0.18);
+  --shell-warm: #e6c8a6;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--shell-background);
+  color: var(--shell-ink);
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+  color: var(--shell-ink);
+  background: radial-gradient(circle at top left, rgba(15, 94, 91, 0.08), transparent 32%),
+    radial-gradient(circle at top right, rgba(138, 98, 73, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent 22%), var(--shell-background);
 }
 
-body, input, textarea, button, select {
-  font-family: 'Satoshi', 'Quicksand', 'Nunito', 'Inter', 'Segoe UI Rounded', 'Segoe UI', Arial, sans-serif;
+body,
+input,
+textarea,
+button,
+select {
+  font-family: "Satoshi", "Avenir Next", "Segoe UI", sans-serif;
   font-feature-settings: "ss01" on, "ss02" on;
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.03em;
+}
+
+::selection {
+  background: rgba(15, 94, 91, 0.18);
+  color: var(--shell-ink);
+}
+
 @keyframes wiggle {
-  0%, 100% { transform: rotate(-8deg) scale(1); }
-  20% { transform: rotate(8deg) scale(1.08); }
-  40% { transform: rotate(-8deg) scale(1.12); }
-  60% { transform: rotate(8deg) scale(1.16); }
-  80% { transform: rotate(-8deg) scale(1.12); }
+  0%,
+  100% {
+    transform: rotate(-8deg) scale(1);
+  }
+  20% {
+    transform: rotate(8deg) scale(1.08);
+  }
+  40% {
+    transform: rotate(-8deg) scale(1.12);
+  }
+  60% {
+    transform: rotate(8deg) scale(1.16);
+  }
+  80% {
+    transform: rotate(-8deg) scale(1.12);
+  }
 }
 .animate-wiggle {
   animation: wiggle 1.5s infinite;
 }
 @keyframes spin-slow {
-  100% { transform: rotate(360deg); }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 .animate-spin-slow {
   animation: spin-slow 4s linear infinite;

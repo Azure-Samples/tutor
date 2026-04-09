@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-
 ROOT = Path(__file__).resolve().parents[2]
 LIB_SRC = ROOT / "lib" / "src"
 CONFIG_SRC = ROOT / "apps" / "configuration" / "src"
@@ -73,6 +72,59 @@ def fixture_api_client(monkeypatch):
 
 def _auth_headers() -> dict[str, str]:
     return {"X-User-Id": "prof-1"}
+
+
+def test_access_context_returns_normalized_roles_and_contexts(api_client: TestClient):
+    response = api_client.get(
+        "/access-context",
+        headers={
+            "X-User-Id": "leader-1",
+            "X-User-Name": "Principal Lin",
+            "X-User-Email": "principal.lin@example.com",
+            "X-User-Roles": "professor,principal",
+            "X-School-Ids": "school-a,school-b",
+            "X-Program-Ids": "program-1",
+            "X-Class-Ids": "class-1,class-2",
+            "X-Feature-Flags": "pilot-shell,priority-briefings",
+        },
+    )
+
+    assert response.status_code == 200
+    content = response.json()["content"]
+    assert content["actor"] == {
+        "subject": "leader-1",
+        "tenant_id": "local-dev",
+        "object_id": "leader-1",
+        "display_name": "Principal Lin",
+        "email": "principal.lin@example.com",
+    }
+    assert content["available_roles"] == ["professor", "principal"]
+    assert content["default_role"] == "professor"
+    assert content["default_context"]["context_id"] == "professor:class:class-1"
+    assert content["default_context"]["workspace_path"] == "/workspace/professor"
+
+    role_map = {item["role"]: item for item in content["roles"]}
+    professor_contexts = role_map["professor"]["contexts"]
+    principal_contexts = role_map["principal"]["contexts"]
+
+    assert [context["context_id"] for context in professor_contexts] == [
+        "professor:class:class-1",
+        "professor:class:class-2",
+    ]
+    assert [context["context_id"] for context in principal_contexts] == [
+        "principal:school:school-a",
+        "principal:school:school-b",
+    ]
+    assert role_map["professor"]["grants"][0]["scope"]["class_ids"] == ["class-1", "class-2"]
+    assert role_map["principal"]["grants"][0]["scope"]["school_ids"] == ["school-a", "school-b"]
+    assert set(content["feature_flags"]) >= {
+        "workspace-shell",
+        "trust-provenance",
+        "professor-workspace",
+        "principal-workspace",
+        "pilot-shell",
+        "priority-briefings",
+    }
 
 
 def test_create_and_list_students(api_client: TestClient):

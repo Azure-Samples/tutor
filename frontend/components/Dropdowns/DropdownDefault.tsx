@@ -3,24 +3,20 @@ import { useEffect, useRef, useState } from "react";
 const DropdownDefault = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const trigger = useRef<any>(null);
-  const dropdown = useRef<any>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const dropdown = useRef<HTMLDivElement | null>(null);
 
   // close on click outside
   useEffect(() => {
     const clickHandler = ({ target }: MouseEvent) => {
-      if (!dropdown.current) return;
-      if (
-        !dropdownOpen ||
-        dropdown.current.contains(target) ||
-        trigger.current.contains(target)
-      )
+      if (!dropdown.current || !trigger.current || !(target instanceof Node)) return;
+      if (!dropdownOpen || dropdown.current.contains(target) || trigger.current.contains(target))
         return;
       setDropdownOpen(false);
     };
     document.addEventListener("click", clickHandler);
     return () => document.removeEventListener("click", clickHandler);
-  });
+  }, [dropdownOpen]);
 
   // close if the esc key is pressed
   useEffect(() => {
@@ -30,16 +26,18 @@ const DropdownDefault = () => {
     };
     document.addEventListener("keydown", keyHandler);
     return () => document.removeEventListener("keydown", keyHandler);
-  });
+  }, [dropdownOpen]);
 
   return (
     <div className="relative flex">
       <button
+        type="button"
         className="text-[#98A6AD] hover:text-body"
         ref={trigger}
         onClick={() => setDropdownOpen(!dropdownOpen)}
       >
         <svg
+          aria-hidden="true"
           className="fill-current"
           width="18"
           height="18"
@@ -69,8 +67,12 @@ const DropdownDefault = () => {
           dropdownOpen === true ? "block" : "hidden"
         }`}
       >
-        <button className="flex w-full items-center gap-2 rounded-sm px-4 py-1.5 text-left text-sm hover:bg-gray dark:hover:bg-meta-4">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-sm px-4 py-1.5 text-left text-sm hover:bg-gray dark:hover:bg-meta-4"
+        >
           <svg
+            aria-hidden="true"
             className="fill-current"
             width="16"
             height="16"
@@ -92,8 +94,12 @@ const DropdownDefault = () => {
           </svg>
           Edit
         </button>
-        <button className="flex w-full items-center gap-2 rounded-sm px-4 py-1.5 text-left text-sm hover:bg-gray dark:hover:bg-meta-4">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2 rounded-sm px-4 py-1.5 text-left text-sm hover:bg-gray dark:hover:bg-meta-4"
+        >
           <svg
+            aria-hidden="true"
             className="fill-current"
             width="16"
             height="16"

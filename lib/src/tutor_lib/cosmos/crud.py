@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Iterable, Mapping
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from typing import Any, cast
 
 from azure.core import exceptions as azure_exceptions
@@ -13,6 +14,12 @@ from azure.cosmos.aio import CosmosClient
 from azure.identity.aio import DefaultAzureCredential
 
 from tutor_lib.config import CosmosConfig
+
+
+@dataclass(frozen=True, slots=True)
+class StrictCreateResult:
+    item: Any
+    created: bool
 
 
 class CosmosCRUD:
@@ -82,12 +89,18 @@ class CosmosCRUD:
         self,
         query: str = "SELECT * FROM c",
         parameters: Iterable[dict[str, Any]] | None = None,
+        partition_key: str | None = None,
     ) -> list[Any]:
         params = list(parameters or [])
 
         async def _execute() -> list[Any]:
             async with self._container_client() as container:
-                return [self._normalize(item) async for item in container.query_items(query=query, parameters=params)]
+                query_iterable = (
+                    container.query_items(query=query, parameters=params, partition_key=partition_key)
+                    if partition_key is not None
+                    else container.query_items(query=query, parameters=params)
+                )
+                return [self._normalize(item) async for item in query_iterable]
 
         return await self._with_retries("list_items", _execute)
 
@@ -98,6 +111,33 @@ class CosmosCRUD:
                 return self._normalize(created)
 
         return await self._with_retries("create_item", _execute)
+
+    async def create_item_strict(
+        self,
+        item: dict[str, Any],
+        *,
+        partition_key: str | None = None,
+    ) -> StrictCreateResult:
+        item_id = str(item.get("id", "")).strip()
+        if not item_id:
+            raise ValueError("create_item_strict requires an item with a non-empty 'id'")
+
+        async def _execute() -> StrictCreateResult:
+            async with self._container_client() as container:
+                try:
+                    created = await container.create_item(body=item)
+                    return StrictCreateResult(item=self._normalize(created), created=True)
+                except cosmos_exceptions.CosmosResourceExistsError:
+                    if partition_key is None:
+                        raise
+                except cosmos_exceptions.CosmosHttpResponseError as exc:
+                    if getattr(exc, "status_code", None) != 409 or partition_key is None:
+                        raise
+
+                existing = await container.read_item(item=item_id, partition_key=partition_key)
+                return StrictCreateResult(item=self._normalize(existing), created=False)
+
+        return await self._with_retries("create_item_strict", _execute)
 
     async def read_item(self, item_id: str, partition_key: str | None = None) -> Any:
         key = partition_key or item_id

@@ -1,10 +1,10 @@
 "use client";
-import { useState, useEffect } from "react";
+import type { Manager } from "@/types/manager";
+import type { Specialist } from "@/types/specialist";
+import { transcriptionApi, webApp } from "@/utils/api";
 import Image from "next/image";
-import { useRouter } from 'next/navigation';
-import { webApp, transcriptionApi } from "@/utils/api";
-import { Manager } from "@/types/manager";
-import { Specialist } from "@/types/specialist";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -29,12 +29,12 @@ const CardLayout = () => {
       try {
         const response = await webApp.get("/managers-names");
         if (response.status === 200) {
-          const detail = isRecord(response.data) && isRecord((response.data as { detail?: unknown }).detail)
-            ? (response.data as { detail: Record<string, unknown> }).detail
-            : null;
-          const managers = detail && Array.isArray(detail.managers)
-            ? (detail.managers as Manager[])
-            : [];
+          const detail =
+            isRecord(response.data) && isRecord((response.data as { detail?: unknown }).detail)
+              ? (response.data as { detail: Record<string, unknown> }).detail
+              : null;
+          const managers =
+            detail && Array.isArray(detail.managers) ? (detail.managers as Manager[]) : [];
           setManagers(managers);
         } else {
           console.error("Failed to fetch managers:", response.statusText);
@@ -49,9 +49,11 @@ const CardLayout = () => {
   const handleManagerClick = async (managerName: string) => {
     setLoading(true);
     try {
-      const response = await transcriptionApi.get(`/transcription-data?manager=${encodeURIComponent(managerName)}`);
+      const response = await transcriptionApi.get(
+        `/transcription-data?manager=${encodeURIComponent(managerName)}`,
+      );
       const resolvedManagerData = extractManagerFromPayload(response.data);
-      
+
       if (resolvedManagerData) {
         const assistantCandidates = Array.isArray(resolvedManagerData.assistants)
           ? resolvedManagerData.assistants
@@ -94,6 +96,7 @@ const CardLayout = () => {
         </h4>
         {selectedManager && (
           <button
+            type="button"
             onClick={handleBackClick}
             className="text-sm bg-meta-4 text-white py-2 px-4 rounded hover:bg-red"
           >
@@ -104,48 +107,46 @@ const CardLayout = () => {
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 p-4">
         {selectedManager
-          ? selectedManager.specialists.map((specialist, key) => (
-            <div
-              key={key}
-              className="flex flex-col items-center border border-stroke p-4 rounded-lg dark:border-strokedark dark:bg-boxdark hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => handleSpecialistClick(specialist.name)}
-            >
-              <Image
-                src={specialist.image || "/images/users/user-02.png"}
-                width={250}
-                height={250}
-                alt={specialist.name}
-                className="rounded-full mb-4"
-              />
-              <h5 className="text-lg font-bold text-black dark:text-white">
-                {specialist.name}
-              </h5>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {specialist.role}
-              </p>
-            </div>
-          ))
-          : managers.map((manager, key) => (
-            <div
-              className="flex flex-col items-center border border-stroke p-4 rounded-lg dark:border-strokedark dark:bg-boxdark hover:shadow-lg transition-shadow cursor-pointer"
-              key={key}
-              onClick={() => handleManagerClick(manager.name)}
-            >
-              <Image
-                src="/images/user/best-manager.png"
-                width={250}
-                height={250}
-                alt={manager.name}
-                className="rounded-full mb-4"
-              />
-              <h5 className="text-xl font-bold text-black dark:text-white mb-1 text-center">
-                {manager.name}
-              </h5>
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                {manager.role}
-              </p>
-            </div>
-          ))}
+          ? selectedManager.specialists.map((specialist) => (
+              <button
+                type="button"
+                key={specialist.name}
+                className="flex cursor-pointer flex-col items-center rounded-lg border border-stroke p-4 transition-shadow hover:shadow-lg dark:border-strokedark dark:bg-boxdark"
+                onClick={() => handleSpecialistClick(specialist.name)}
+              >
+                <Image
+                  src={specialist.image || "/images/users/user-02.png"}
+                  width={250}
+                  height={250}
+                  alt={specialist.name}
+                  className="rounded-full mb-4"
+                />
+                <h5 className="text-lg font-bold text-black dark:text-white">{specialist.name}</h5>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{specialist.role}</p>
+              </button>
+            ))
+          : managers.map((manager) => (
+              <button
+                type="button"
+                className="flex cursor-pointer flex-col items-center rounded-lg border border-stroke p-4 transition-shadow hover:shadow-lg dark:border-strokedark dark:bg-boxdark"
+                key={manager.name}
+                onClick={() => handleManagerClick(manager.name)}
+              >
+                <Image
+                  src="/images/user/best-manager.png"
+                  width={250}
+                  height={250}
+                  alt={manager.name}
+                  className="rounded-full mb-4"
+                />
+                <h5 className="text-xl font-bold text-black dark:text-white mb-1 text-center">
+                  {manager.name}
+                </h5>
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                  {manager.role}
+                </p>
+              </button>
+            ))}
       </div>
     </div>
   );

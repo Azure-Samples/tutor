@@ -28,6 +28,10 @@ class CosmosConfig(BaseSettings):
     upskilling_container: str = Field(alias="COSMOS_UPSKILLING_TABLE", default="upskilling_plans")
     insights_report_container: str = Field(alias="COSMOS_INSIGHTS_REPORT_TABLE", default="insights_reports")
     insights_feedback_container: str = Field(alias="COSMOS_INSIGHTS_FEEDBACK_TABLE", default="insights_feedback")
+    learner_record_events_container: str = Field(
+        alias="COSMOS_LEARNER_RECORD_EVENTS_TABLE",
+        default="learner_record_events",
+    )
 
 
 class AzureAIConfig(BaseSettings):
@@ -53,11 +57,21 @@ class AuthConfig(BaseSettings):
     student_secret_salt: str = Field(alias="STUDENT_SECRET_SALT", default="")
 
 
+class ServiceBusConfig(BaseSettings):
+    fully_qualified_namespace: str = Field(alias="SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE", default="")
+    learner_record_topic: str = Field(alias="SERVICE_BUS_LEARNER_RECORD_TOPIC", default="")
+    learner_record_subscription: str = Field(
+        alias="SERVICE_BUS_LEARNER_RECORD_SUBSCRIPTION",
+        default="",
+    )
+
+
 class TutorSettings(BaseSettings):
     cosmos: CosmosConfig = CosmosConfig()  # type: ignore[arg-type]
     azure_ai: AzureAIConfig = AzureAIConfig()  # type: ignore[arg-type]
     storage: StorageConfig | None = None
     auth: AuthConfig = AuthConfig()  # type: ignore[arg-type]
+    service_bus: ServiceBusConfig = ServiceBusConfig()  # type: ignore[arg-type]
     cors_origins: Iterable[str] = Field(default_factory=lambda: ["*"])
 
     model_config = {

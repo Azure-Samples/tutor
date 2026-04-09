@@ -1,11 +1,20 @@
-import { useState } from "react";
+import type { Question } from "@/types/question";
 import { questionsEngine } from "@/utils/api";
-import { Question } from "@/types/question";
-import { FaPen, FaBook, FaPlus, FaQuestionCircle } from "react-icons/fa";
+import { useState } from "react";
+import { FaBook, FaPen, FaPlus, FaQuestionCircle } from "react-icons/fa";
 
-const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }> = ({ questionData, onSuccess }) => {
+const QuestionForm: React.FC<{
+  questionData?: Question;
+  onSuccess?: () => void;
+}> = ({ questionData, onSuccess }) => {
   const [form, setForm] = useState<Question>(
-    questionData || { id: "", topic: "", question: "", explanation: "", answer: "" }
+    questionData || {
+      id: "",
+      topic: "",
+      question: "",
+      explanation: "",
+      answer: "",
+    },
   );
   const [status, setStatus] = useState("");
   const isEdit = !!questionData;
@@ -14,26 +23,34 @@ const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }
     e.preventDefault();
     setStatus("Saving...");
     try {
-      const questionId = form.id?.trim() || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `q-${Date.now()}`);
+      const questionId =
+        form.id?.trim() ||
+        (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `q-${Date.now()}`);
       const payload = {
         ...form,
         id: questionId,
         explanation: form.explanation ?? "",
       };
-      let res;
-      if (isEdit) {
-        res = await questionsEngine.put(`/questions/${questionId}`, payload);
-      } else {
-        res = await questionsEngine.post("/questions", payload);
-      }
+      const res = isEdit
+        ? await questionsEngine.put(`/questions/${questionId}`, payload)
+        : await questionsEngine.post("/questions", payload);
       if (res.status === 200 || res.status === 201) {
         setStatus(isEdit ? "Question updated!" : "Question created!");
         if (onSuccess) onSuccess();
-        if (!isEdit) setForm({ id: "", topic: "", question: "", explanation: "", answer: "" });
+        if (!isEdit)
+          setForm({
+            id: "",
+            topic: "",
+            question: "",
+            explanation: "",
+            answer: "",
+          });
       } else {
         setStatus("Error saving question.");
       }
-    } catch (e) {
+    } catch {
       setStatus("Error saving question.");
     }
   };
@@ -44,42 +61,58 @@ const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }
       id="modal-form"
       onSubmit={handleSubmit}
     >
-      <label className="flex items-center gap-2 text-cyan-700 font-bold">
+      <label
+        htmlFor="question-form-question"
+        className="flex items-center gap-2 text-cyan-700 font-bold"
+      >
         <FaQuestionCircle /> Question
       </label>
       <textarea
+        id="question-form-question"
         value={form.question}
-        onChange={e => setForm({ ...form, question: e.target.value })}
+        onChange={(e) => setForm({ ...form, question: e.target.value })}
         className="w-full rounded-2xl border-2 border-cyan-200 focus:border-green-400 focus:ring-2 focus:ring-green-200 px-4 py-3 text-lg transition-all duration-200 bg-cyan-50 dark:bg-cyan-900 placeholder:text-cyan-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[240px]"
         placeholder="Type the question"
         rows={2}
       />
-      <label className="flex items-center gap-2 text-green-700 font-bold">
+      <label
+        htmlFor="question-form-topic"
+        className="flex items-center gap-2 text-green-700 font-bold"
+      >
         <FaBook /> Topic
       </label>
       <input
+        id="question-form-topic"
         type="text"
         value={form.topic}
-        onChange={e => setForm({ ...form, topic: e.target.value })}
+        onChange={(e) => setForm({ ...form, topic: e.target.value })}
         className="w-full rounded-2xl border-2 border-green-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-green-50 dark:bg-green-900 placeholder:text-green-400 focus:bg-white dark:focus:bg-boxdark"
         placeholder="Topic"
       />
-      <label className="flex items-center gap-2 text-blue-700 font-bold">
+      <label
+        htmlFor="question-form-answer"
+        className="flex items-center gap-2 text-blue-700 font-bold"
+      >
         <FaPen /> Answer
       </label>
       <textarea
+        id="question-form-answer"
         value={form.answer ?? ""}
-        onChange={e => setForm({ ...form, answer: e.target.value })}
+        onChange={(e) => setForm({ ...form, answer: e.target.value })}
         className="w-full rounded-2xl border-2 border-blue-200 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200 px-4 py-3 text-lg transition-all duration-200 bg-blue-50 dark:bg-blue-900 placeholder:text-blue-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[240px]"
         placeholder="Type the answer"
         rows={2}
       />
-      <label className="flex items-center gap-2 text-purple-700 font-bold">
+      <label
+        htmlFor="question-form-explanation"
+        className="flex items-center gap-2 text-purple-700 font-bold"
+      >
         <FaBook /> Explanation / Rubric Hint
       </label>
       <textarea
+        id="question-form-explanation"
         value={form.explanation ?? ""}
-        onChange={e => setForm({ ...form, explanation: e.target.value })}
+        onChange={(e) => setForm({ ...form, explanation: e.target.value })}
         className="w-full rounded-2xl border-2 border-purple-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 px-4 py-3 text-lg transition-all duration-200 bg-purple-50 dark:bg-purple-900 placeholder:text-purple-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[240px]"
         placeholder="Add grading explanation/context"
         rows={2}
@@ -90,7 +123,9 @@ const QuestionForm: React.FC<{ questionData?: Question; onSuccess?: () => void }
       >
         {isEdit ? <FaPen /> : <FaPlus />} {isEdit ? "Update Question" : "Add Question"}
       </button>
-      {status && <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>}
+      {status && (
+        <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>
+      )}
     </form>
   );
 };

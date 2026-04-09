@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
-import { questionsEngine } from "@/utils/api";
-import { Question } from "@/types/question";
-import FormsModal from "@/components/common/Modals";
-import { FaTrash, FaPen, FaPlus } from "react-icons/fa";
 import QuestionForm from "@/components/Forms/Questions";
+import FormsModal from "@/components/common/Modals";
 import { unwrapContent } from "@/types/api";
+import type { Question } from "@/types/question";
+import { questionsEngine } from "@/utils/api";
+import { useCallback, useEffect, useState } from "react";
+import { FaPen, FaPlus, FaTrash } from "react-icons/fa";
 
 const QuestionsList: React.FC = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -22,7 +22,7 @@ const QuestionsList: React.FC = () => {
     setShowDeleteModal(false);
   };
 
-  const fetchQuestions = async () => {
+  const fetchQuestions = useCallback(async () => {
     setLoading(true);
     try {
       const res = await questionsEngine.get("/questions");
@@ -33,11 +33,11 @@ const QuestionsList: React.FC = () => {
       setQuestions([]);
     }
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
-    fetchQuestions();
-  }, []);
+    void fetchQuestions();
+  }, [fetchQuestions]);
 
   const handleEditClick = async (q: Question) => {
     setModalLoading(true);
@@ -71,6 +71,7 @@ const QuestionsList: React.FC = () => {
         <>
           <div className="flex items-center justify-end mb-6">
             <button
+              type="button"
               className="flex items-center gap-2 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
               onClick={() => {
                 closeAllModals();
@@ -91,15 +92,38 @@ const QuestionsList: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {questions.map((q, idx) => (
-                  <tr key={(q.id || q.topic) + idx} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
-                    <td className="py-4 px-2 text-center font-bold text-blue-700 dark:text-cyan-200">{q.topic}</td>
-                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">{q.question}</td>
-                    <td className="py-4 px-2 text-center text-gray-700 dark:text-gray-200">{q.explanation}</td>
+                {questions.map((q) => (
+                  <tr
+                    key={q.id ?? `${q.topic}-${q.question}`}
+                    className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl"
+                  >
+                    <td className="py-4 px-2 text-center font-bold text-blue-700 dark:text-cyan-200">
+                      {q.topic}
+                    </td>
+                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">
+                      {q.question}
+                    </td>
+                    <td className="py-4 px-2 text-center text-gray-700 dark:text-gray-200">
+                      {q.explanation}
+                    </td>
                     <td className="py-4 px-2 text-center">
                       <div className="flex gap-2 justify-center items-center">
-                        <button onClick={() => handleDeleteClick(q)} className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Delete"><FaTrash /></button>
-                        <button onClick={() => handleEditClick(q)} className="bg-gradient-to-br from-blue-400 to-cyan-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Edit"><FaPen /></button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(q)}
+                          className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Delete"
+                        >
+                          <FaTrash />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEditClick(q)}
+                          className="bg-gradient-to-br from-blue-400 to-cyan-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Edit"
+                        >
+                          <FaPen />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -109,20 +133,46 @@ const QuestionsList: React.FC = () => {
             {questions.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16">
                 <span className="text-5xl mb-4">🌈</span>
-                <p className="text-xl text-cyan-700 dark:text-cyan-200 font-bold mb-2">No questions yet!</p>
-                <p className="text-green-700 dark:text-green-200 mb-4">Click <span className="font-bold">New Question</span> to create your first question and make learning magical!</p>
+                <p className="text-xl text-cyan-700 dark:text-cyan-200 font-bold mb-2">
+                  No questions yet!
+                </p>
+                <p className="text-green-700 dark:text-green-200 mb-4">
+                  Click <span className="font-bold">New Question</span> to create your first
+                  question and make learning magical!
+                </p>
               </div>
             )}
           </div>
         </>
       )}
       <FormsModal open={showCreateModal} onClose={closeAllModals} title="Create a New Question">
-        <QuestionForm onSuccess={() => { closeAllModals(); fetchQuestions(); }} />
+        <QuestionForm
+          onSuccess={() => {
+            closeAllModals();
+            fetchQuestions();
+          }}
+        />
       </FormsModal>
-      <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Question">
-        {selectedQuestion && <QuestionForm questionData={selectedQuestion} onSuccess={() => { closeAllModals(); fetchQuestions(); }} />}
+      <FormsModal
+        open={showEditModal && !showCreateModal && !showDeleteModal}
+        onClose={closeAllModals}
+        title="Edit Question"
+      >
+        {selectedQuestion && (
+          <QuestionForm
+            questionData={selectedQuestion}
+            onSuccess={() => {
+              closeAllModals();
+              fetchQuestions();
+            }}
+          />
+        )}
       </FormsModal>
-      <FormsModal open={showDeleteModal && !showCreateModal && !showEditModal} onClose={closeAllModals} title="Confirm Delete">
+      <FormsModal
+        open={showDeleteModal && !showCreateModal && !showEditModal}
+        onClose={closeAllModals}
+        title="Confirm Delete"
+      >
         <div className="p-6">
           <h2 className="text-2xl font-bold text-red-700 mb-2 flex items-center gap-2">
             <span className="inline-block">⚠️</span>
@@ -132,8 +182,20 @@ const QuestionsList: React.FC = () => {
             Are you sure you want to delete this question? This action cannot be undone.
           </p>
           <div className="flex gap-2 mt-4">
-            <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200" onClick={confirmDelete}>Delete</button>
-            <button className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200" onClick={closeAllModals}>Cancel</button>
+            <button
+              type="button"
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200"
+              onClick={confirmDelete}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200"
+              onClick={closeAllModals}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </FormsModal>

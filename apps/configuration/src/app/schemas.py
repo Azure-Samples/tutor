@@ -110,6 +110,56 @@ class ThemeInput(BaseModel):
     criteria: List[str] = Field(default_factory=list)
 
 
+class AccessScope(BaseModel):
+    institution_ids: List[str] = Field(default_factory=list)
+    school_ids: List[str] = Field(default_factory=list)
+    program_ids: List[str] = Field(default_factory=list)
+    course_ids: List[str] = Field(default_factory=list)
+    class_ids: List[str] = Field(default_factory=list)
+    learner_ids: List[str] = Field(default_factory=list)
+    staff_ids: List[str] = Field(default_factory=list)
+
+
+class AccessGrantItem(BaseModel):
+    role: str
+    relationship: str
+    scope: AccessScope
+
+
+class AccessContextItem(BaseModel):
+    context_id: str
+    role: str
+    context_type: str
+    relationship: str
+    label: str
+    scope: AccessScope
+    workspace_path: str
+
+
+class AccessRoleContext(BaseModel):
+    role: str
+    grants: List[AccessGrantItem] = Field(default_factory=list)
+    contexts: List[AccessContextItem] = Field(default_factory=list)
+    default_context_id: Optional[str] = None
+
+
+class AccessActor(BaseModel):
+    subject: str
+    tenant_id: str
+    object_id: str
+    display_name: Optional[str] = None
+    email: Optional[str] = None
+
+
+class AccessContextPayload(BaseModel):
+    actor: AccessActor
+    available_roles: List[str] = Field(default_factory=list)
+    default_role: Optional[str] = None
+    default_context: Optional[AccessContextItem] = None
+    roles: List[AccessRoleContext] = Field(default_factory=list)
+    feature_flags: List[str] = Field(default_factory=list)
+
+
 class BulkRosterSyncRequest(BaseModel):
     students: List[Student] = Field(default_factory=list)
     professors: List[Professor] = Field(default_factory=list)

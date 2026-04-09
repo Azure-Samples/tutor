@@ -1,6 +1,36 @@
 "use client";
-import { useState, useEffect } from "react";
 import { webApi, webApp } from "@/utils/api";
+import { useEffect, useState } from "react";
+
+type ManagerOption = {
+  name: string;
+  specialists: string[];
+};
+
+type ManagersResponse = {
+  detail?: {
+    managers?: ManagerOption[];
+  };
+};
+
+type UploadError = {
+  response?: {
+    data?: {
+      detail?: string;
+    };
+  };
+  message?: string;
+};
+
+const getUploadErrorMessage = (error: unknown) => {
+  if (error && typeof error === "object") {
+    const uploadError = error as UploadError;
+
+    return uploadError.response?.data?.detail ?? uploadError.message ?? "Unknown error";
+  }
+
+  return "Unknown error";
+};
 
 const UploadFile: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -8,8 +38,12 @@ const UploadFile: React.FC = () => {
   const [destinationContainer, setDestinationContainer] = useState<string>("audio-files");
   const [managerName, setManagerName] = useState<string | null>(null);
   const [specialistName, setSpecialistName] = useState<string | null>(null);
-  const [managerOptions, setManagerOptions] = useState<{ name: string; specialists: string[] }[]>([]);
+  const [managerOptions, setManagerOptions] = useState<ManagerOption[]>([]);
   const [specialistOptions, setSpecialistOptions] = useState<string[]>([]);
+  const fileInputId = "upload-file-input";
+  const destinationInputId = "upload-destination-container";
+  const managerSelectId = "upload-manager-select";
+  const specialistSelectId = "upload-specialist-select";
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -20,9 +54,9 @@ const UploadFile: React.FC = () => {
   useEffect(() => {
     const fetchManagerOptions = async () => {
       try {
-        const response = await webApp.get("/managers-names");
+        const response = await webApp.get<ManagersResponse>("/managers-names");
         if (response.status === 200) {
-          setManagerOptions(response?.data?.detail?.managers);
+          setManagerOptions(response.data.detail?.managers ?? []);
         } else {
           console.error("Failed to fetch manager names:", response.statusText);
         }
@@ -36,7 +70,7 @@ const UploadFile: React.FC = () => {
 
   // Update specialists when manager selection changes
   useEffect(() => {
-    const selectedManager = managerOptions.find(manager => manager.name === managerName);
+    const selectedManager = managerOptions.find((manager) => manager.name === managerName);
     setSpecialistOptions(selectedManager ? selectedManager.specialists : []);
     setSpecialistName(null); // Reset specialist selection when manager changes
   }, [managerName, managerOptions]);
@@ -73,7 +107,7 @@ const UploadFile: React.FC = () => {
         setUploadStatus(`There was an error processing the file: ${response?.data?.detail}`);
       }
     } catch (error) {
-      const errorMessage = (error as any)?.response?.data?.detail || (error as any)?.message || "Unknown error";
+      const errorMessage = getUploadErrorMessage(error);
       console.error("There was an error processing the file:", error);
       setUploadStatus(`Error processing the file: ${errorMessage}`);
     }
@@ -86,8 +120,9 @@ const UploadFile: React.FC = () => {
           <h3 className="font-medium text-black dark:text-white">
             File upload for transcription analysis
           </h3>
-          <div className="">
+          <div>
             <svg
+              aria-hidden="true"
               className="w-5 h-5 text-gray-500 cursor-pointer hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -105,10 +140,14 @@ const UploadFile: React.FC = () => {
         </div>
         <div className="flex flex-col gap-5.5 p-6.5">
           <div>
-            <label className="block text-sm font-medium text-black dark:text-white mb-2">
+            <label
+              htmlFor={fileInputId}
+              className="block text-sm font-medium text-black dark:text-white mb-2"
+            >
               Select the file
             </label>
             <input
+              id={fileInputId}
               type="file"
               lang="en-US"
               onChange={handleFileChange}
@@ -116,10 +155,14 @@ const UploadFile: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-black dark:text-white mb-2">
+            <label
+              htmlFor={destinationInputId}
+              className="block text-sm font-medium text-black dark:text-white mb-2"
+            >
               Destination Blob Container:
             </label>
             <input
+              id={destinationInputId}
               type="text"
               value={destinationContainer}
               onChange={(e) => setDestinationContainer(e.target.value)}
@@ -127,37 +170,54 @@ const UploadFile: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-black dark:text-white mb-2">
+            <label
+              htmlFor={managerSelectId}
+              className="block text-sm font-medium text-black dark:text-white mb-2"
+            >
               Manager Name:
             </label>
             <select
+              id={managerSelectId}
               value={managerName || ""}
               onChange={(e) => setManagerName(e.target.value)}
               className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
             >
-              <option value="" disabled>Select a manager</option>
+              <option value="" disabled>
+                Select a manager
+              </option>
               {managerOptions.map((manager) => (
-                <option key={manager.name} value={manager.name}>{manager.name}</option>
+                <option key={manager.name} value={manager.name}>
+                  {manager.name}
+                </option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-black dark:text-white mb-2">
+            <label
+              htmlFor={specialistSelectId}
+              className="block text-sm font-medium text-black dark:text-white mb-2"
+            >
               Specialist Name:
             </label>
             <select
+              id={specialistSelectId}
               value={specialistName || ""}
               onChange={(e) => setSpecialistName(e.target.value)}
               className="w-full rounded-lg border-[1.5px] border-stroke bg-transparent outline-none transition focus:border-primary active:border-primary dark:border-form-strokedark dark:bg-form-input dark:focus:border-primary"
               disabled={!specialistOptions.length}
             >
-              <option value="" disabled>Select a specialist</option>
+              <option value="" disabled>
+                Select a specialist
+              </option>
               {specialistOptions.map((specialist) => (
-                <option key={specialist} value={specialist}>{specialist}</option>
+                <option key={specialist} value={specialist}>
+                  {specialist}
+                </option>
               ))}
             </select>
           </div>
           <button
+            type="button"
             onClick={handleFileUpload}
             className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 w-full"
           >

@@ -26,6 +26,7 @@ const DarkModeSwitcher = () => {
         >
           <span className="dark:hidden">
             <svg
+              aria-hidden="true"
               width="16"
               height="16"
               viewBox="0 0 16 16"
@@ -44,6 +45,7 @@ const DarkModeSwitcher = () => {
           </span>
           <span className="hidden dark:inline-block">
             <svg
+              aria-hidden="true"
               width="16"
               height="16"
               viewBox="0 0 16 16"

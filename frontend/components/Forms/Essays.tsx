@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { FaPen, FaFileAlt, FaListAlt, FaBell, FaHashtag, FaUsersCog, FaLink } from "react-icons/fa";
+import { FaBell, FaFileAlt, FaHashtag, FaLink, FaListAlt, FaPen, FaUsersCog } from "react-icons/fa";
 
-import type { AgentDefinition, Essay, AgentRef, AssemblyDefinition } from "@/types/essays";
 import { unwrapContent } from "@/types/api";
+import type { AgentDefinition, AgentRef, AssemblyDefinition, Essay } from "@/types/essays";
 import { essaysEngine } from "@/utils/api";
 
 const DEFAULT_ESSAY: Essay = {
@@ -26,7 +26,9 @@ type EssayFormProps = {
 };
 
 const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
-  const [form, setForm] = useState<Essay>(essayData ? { ...DEFAULT_ESSAY, ...essayData } : DEFAULT_ESSAY);
+  const [form, setForm] = useState<Essay>(
+    essayData ? { ...DEFAULT_ESSAY, ...essayData } : DEFAULT_ESSAY,
+  );
   const [status, setStatus] = useState<string>("");
   const isEdit = Boolean(essayData);
 
@@ -124,7 +126,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
     };
 
     loadAssembly(essayData.id).catch(() => undefined);
-  }, [essayData?.id]);
+  }, [essayData?.assembly_id, essayData?.id]);
 
   useEffect(() => {
     if (!assemblyTopicTouched && !isEdit) {
@@ -134,7 +136,7 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
 
   const toggleAgentSelection = (agentId: string) => {
     setSelectedAgents((prev) =>
-      prev.includes(agentId) ? prev.filter((id) => id !== agentId) : [...prev, agentId]
+      prev.includes(agentId) ? prev.filter((id) => id !== agentId) : [...prev, agentId],
     );
   };
 
@@ -250,10 +252,14 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       onSubmit={handleSubmit}
     >
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-cyan-700 font-bold">
+        <label
+          htmlFor="essay-form-topic"
+          className="flex items-center gap-2 text-cyan-700 font-bold"
+        >
           <FaPen /> Topic
         </label>
         <input
+          id="essay-form-topic"
           type="text"
           value={form.topic}
           onChange={(event) => setForm({ ...form, topic: event.target.value })}
@@ -263,10 +269,14 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-cyan-700 font-bold">
+        <label
+          htmlFor="essay-form-theme"
+          className="flex items-center gap-2 text-cyan-700 font-bold"
+        >
           <FaBell /> Theme
         </label>
         <input
+          id="essay-form-theme"
           type="text"
           value={form.theme ?? ""}
           onChange={(event) => setForm({ ...form, theme: event.target.value })}
@@ -276,10 +286,14 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-blue-700 font-bold">
+        <label
+          htmlFor="essay-form-content"
+          className="flex items-center gap-2 text-blue-700 font-bold"
+        >
           <FaFileAlt /> Content
         </label>
         <textarea
+          id="essay-form-content"
           value={form.content}
           onChange={(event) => setForm({ ...form, content: event.target.value })}
           className="w-full rounded-2xl border-2 border-blue-200 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200 px-4 py-3 text-lg transition-all duration-200 bg-blue-50 dark:bg-blue-900 placeholder:text-blue-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[320px]"
@@ -289,10 +303,14 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2 text-green-700 font-bold">
+        <label
+          htmlFor="essay-form-explanation"
+          className="flex items-center gap-2 text-green-700 font-bold"
+        >
           <FaListAlt /> Explanation
         </label>
         <textarea
+          id="essay-form-explanation"
           value={form.explanation ?? ""}
           onChange={(event) => setForm({ ...form, explanation: event.target.value })}
           className="w-full rounded-2xl border-2 border-green-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-green-50 dark:bg-green-900 placeholder:text-green-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[320px]"
@@ -310,10 +328,14 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
         </p>
 
         <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-purple-700 font-semibold">
+          <label
+            htmlFor="essay-form-assembly-id"
+            className="flex items-center gap-2 text-purple-700 font-semibold"
+          >
             <FaHashtag /> Assembly ID
           </label>
           <input
+            id="essay-form-assembly-id"
             type="text"
             value={assemblyId}
             onChange={(event) => setAssemblyId(event.target.value)}
@@ -323,16 +345,21 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
           />
           {existingAssemblyId && (
             <p className="text-xs text-purple-600 dark:text-purple-200">
-              This essay already has an assembly. Delete it first if you need to change the identifier.
+              This essay already has an assembly. Delete it first if you need to change the
+              identifier.
             </p>
           )}
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-2 text-purple-700 font-semibold">
+          <label
+            htmlFor="essay-form-assembly-topic"
+            className="flex items-center gap-2 text-purple-700 font-semibold"
+          >
             <FaPen /> Assembly Topic
           </label>
           <input
+            id="essay-form-assembly-topic"
             type="text"
             value={assemblyTopic}
             onChange={(event) => {
@@ -368,8 +395,12 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
                     className="mt-1"
                   />
                   <div className="flex flex-col gap-1 text-sm">
-                    <span className="font-semibold text-purple-700 dark:text-purple-200">{agent.role}</span>
-                    <span className="text-purple-600/80 dark:text-purple-100/80">{agent.deployment}</span>
+                    <span className="font-semibold text-purple-700 dark:text-purple-200">
+                      {agent.role}
+                    </span>
+                    <span className="text-purple-600/80 dark:text-purple-100/80">
+                      {agent.deployment}
+                    </span>
                     <span className="text-xs text-purple-500/80 font-mono">{agent.agent_id}</span>
                   </div>
                 </label>
@@ -383,7 +414,9 @@ const EssayForm: React.FC<EssayFormProps> = ({ essayData, onSuccess }) => {
         {assemblyError && <p className="text-sm text-red-600">{assemblyError}</p>}
       </div>
 
-      {status && <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>}
+      {status && (
+        <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>
+      )}
     </form>
   );
 };

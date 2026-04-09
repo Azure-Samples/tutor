@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { FaCommentDots, FaHashtag, FaPlus, FaUser, FaPen } from "react-icons/fa";
+import { FaCommentDots, FaHashtag, FaPen, FaPlus, FaUser } from "react-icons/fa";
 
 import type { Answer } from "@/types/answer";
 import { questionsEngine } from "@/utils/api";
 
-const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({ answerData, onSuccess }) => {
+const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
+  answerData,
+  onSuccess,
+}) => {
   const [form, setForm] = useState<Answer>(
     answerData || {
       id: "",
@@ -22,8 +25,10 @@ const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
 
     try {
       const answerId =
-        (answerData?.id || form.id || "").trim()
-        || (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `ans-${Date.now()}`);
+        (answerData?.id || form.id || "").trim() ||
+        (typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `ans-${Date.now()}`);
       const payload: Answer = {
         id: answerId,
         text: form.text,
@@ -57,10 +62,11 @@ const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
       id="modal-form"
       onSubmit={handleSubmit}
     >
-      <label className="flex items-center gap-2 text-cyan-700 font-bold">
+      <label htmlFor="answer-id" className="flex items-center gap-2 text-cyan-700 font-bold">
         <FaHashtag /> Answer ID
       </label>
       <input
+        id="answer-id"
         type="text"
         value={form.id}
         onChange={(e) => setForm({ ...form, id: e.target.value })}
@@ -69,10 +75,11 @@ const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
         placeholder="Leave blank to auto-generate"
       />
 
-      <label className="flex items-center gap-2 text-green-700 font-bold">
+      <label htmlFor="answer-text" className="flex items-center gap-2 text-green-700 font-bold">
         <FaCommentDots /> Answer Text
       </label>
       <textarea
+        id="answer-text"
         value={form.text}
         onChange={(e) => setForm({ ...form, text: e.target.value })}
         className="w-full rounded-2xl border-2 border-green-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-green-50 dark:bg-green-900 placeholder:text-green-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[48px] max-h-[240px]"
@@ -80,10 +87,14 @@ const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
         rows={3}
       />
 
-      <label className="flex items-center gap-2 text-blue-700 font-bold">
+      <label
+        htmlFor="answer-question-id"
+        className="flex items-center gap-2 text-blue-700 font-bold"
+      >
         <FaHashtag /> Question ID
       </label>
       <input
+        id="answer-question-id"
         type="text"
         value={form.question_id}
         onChange={(e) => setForm({ ...form, question_id: e.target.value })}
@@ -91,10 +102,14 @@ const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
         placeholder="Question ID reference"
       />
 
-      <label className="flex items-center gap-2 text-purple-700 font-bold">
+      <label
+        htmlFor="answer-respondent"
+        className="flex items-center gap-2 text-purple-700 font-bold"
+      >
         <FaUser /> Respondent
       </label>
       <input
+        id="answer-respondent"
         type="text"
         value={form.respondent}
         onChange={(e) => setForm({ ...form, respondent: e.target.value })}
@@ -109,7 +124,9 @@ const AnswerForm: React.FC<{ answerData?: Answer; onSuccess?: () => void }> = ({
         {isEdit ? <FaPen /> : <FaPlus />} {isEdit ? "Update Answer" : "Create Answer"}
       </button>
 
-      {status && <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>}
+      {status && (
+        <p className="mt-2 text-center text-sm text-gray-700 dark:text-gray-300">{status}</p>
+      )}
     </form>
   );
 };

@@ -1,12 +1,12 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { avatarEngine } from "@/utils/api";
-import { Case } from "@/types/cases";
-import FormsModal from "@/components/common/Modals";
-import { FaTrash, FaPen, FaUser, FaPlus } from "react-icons/fa";
 import CaseForm from "@/components/Forms/Cases";
-import StepsForm from "@/components/Forms/Steps";
 import ProfileForm from "@/components/Forms/Profile";
+import StepsForm from "@/components/Forms/Steps";
+import FormsModal from "@/components/common/Modals";
+import type { Case } from "@/types/cases";
+import { avatarEngine } from "@/utils/api";
+import { useCallback, useEffect, useState } from "react";
+import { FaPen, FaPlus, FaTrash, FaUser } from "react-icons/fa";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -151,6 +151,7 @@ const CasesList: React.FC = () => {
         <>
           <div className="flex items-center justify-end mb-6">
             <button
+              type="button"
               className="flex items-center gap-2 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
               onClick={() => {
                 closeAllModals();
@@ -173,22 +174,52 @@ const CasesList: React.FC = () => {
               </thead>
               <tbody>
                 {cases.map((c) => (
-                  <tr key={c.id} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
+                  <tr
+                    key={c.id}
+                    className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl"
+                  >
                     <td className="hidden">{c.id}</td>
                     <td className="py-4 px-2 text-center font-bold text-blue-700 dark:text-cyan-200">
                       <span className="inline-block">🎭</span> {c.name}
                     </td>
-                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">{c.role}</td>
+                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200 font-semibold">
+                      {c.role}
+                    </td>
                     <td className="py-4 px-2 text-center">
-                      <button className="text-cyan-600 font-bold underline hover:text-yellow-500 transition-colors duration-200" onClick={() => handleStepsClick(c)}>
+                      <button
+                        type="button"
+                        className="text-cyan-600 font-bold underline hover:text-yellow-500 transition-colors duration-200"
+                        onClick={() => handleStepsClick(c)}
+                      >
                         {c.steps?.length || 0}
                       </button>
                     </td>
                     <td className="py-4 px-2 text-center">
                       <div className="flex gap-2 justify-center items-center">
-                        <button onClick={() => handleDeleteClick(c)} className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Delete"><FaTrash /></button>
-                        <button onClick={() => handleEditClick(c.id)} className="bg-gradient-to-br from-blue-400 to-cyan-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Edit"><FaPen /></button>
-                        <button onClick={() => handleProfileClick(c.id)} className="bg-gradient-to-br from-green-400 to-yellow-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Profile"><FaUser /></button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClick(c)}
+                          className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Delete"
+                        >
+                          <FaTrash />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleEditClick(c.id)}
+                          className="bg-gradient-to-br from-blue-400 to-cyan-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Edit"
+                        >
+                          <FaPen />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleProfileClick(c.id)}
+                          className="bg-gradient-to-br from-green-400 to-yellow-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Profile"
+                        >
+                          <FaUser />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -206,7 +237,17 @@ const CasesList: React.FC = () => {
           }}
         />
       </FormsModal>
-      <FormsModal open={showStepsModal && !showCreateModal && !showEditModal && !showProfileModal && !showDeleteModal} onClose={closeAllModals} title="Case Steps">
+      <FormsModal
+        open={
+          showStepsModal &&
+          !showCreateModal &&
+          !showEditModal &&
+          !showProfileModal &&
+          !showDeleteModal
+        }
+        onClose={closeAllModals}
+        title="Case Steps"
+      >
         {selectedCase ? (
           <StepsForm
             steps={selectedCase.steps || []}
@@ -220,7 +261,11 @@ const CasesList: React.FC = () => {
           </div>
         )}
       </FormsModal>
-      <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Case">
+      <FormsModal
+        open={showEditModal && !showCreateModal && !showDeleteModal}
+        onClose={closeAllModals}
+        title="Edit Case"
+      >
         {modalLoading ? (
           <div className="flex justify-center items-center h-40">
             <span className="text-lg text-gray-500">Loading...</span>
@@ -239,20 +284,30 @@ const CasesList: React.FC = () => {
           </div>
         )}
       </FormsModal>
-      <FormsModal open={showProfileModal && !showCreateModal && !showStepsModal && !showEditModal && !showDeleteModal} onClose={closeAllModals} title="Case Profile">
+      <FormsModal
+        open={
+          showProfileModal &&
+          !showCreateModal &&
+          !showStepsModal &&
+          !showEditModal &&
+          !showDeleteModal
+        }
+        onClose={closeAllModals}
+        title="Case Profile"
+      >
         {modalLoading ? (
           <div className="flex justify-center items-center h-40">
             <span className="text-lg text-gray-500">Loading...</span>
           </div>
         ) : selectedCase?.profile ? (
-          <ProfileForm
-            profile={selectedCase.profile}
-            onChange={() => {}}
-            readOnly={true}
-          />
+          <ProfileForm profile={selectedCase.profile} onChange={() => {}} readOnly={true} />
         ) : null}
       </FormsModal>
-      <FormsModal open={showDeleteModal && !showCreateModal && !showEditModal} onClose={closeAllModals} title="Confirm Delete">
+      <FormsModal
+        open={showDeleteModal && !showCreateModal && !showEditModal}
+        onClose={closeAllModals}
+        title="Confirm Delete"
+      >
         <div className="p-6">
           <h2 className="text-2xl font-bold text-red-700 mb-2 flex items-center gap-2">
             <span className="inline-block">⚠️</span>
@@ -262,8 +317,20 @@ const CasesList: React.FC = () => {
             Are you sure you want to delete this case? This action cannot be undone.
           </p>
           <div className="flex gap-2 mt-4">
-            <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200" onClick={confirmDelete}>Delete</button>
-            <button className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200" onClick={closeAllModals}>Cancel</button>
+            <button
+              type="button"
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200"
+              onClick={confirmDelete}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200"
+              onClick={closeAllModals}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </FormsModal>

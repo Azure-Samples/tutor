@@ -5,8 +5,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .settings import get_settings
 from tutor_lib.middleware import configure_entra_auth
+
+from .settings import get_settings
 
 
 def create_app(*, title: str, version: str, description: str, openapi_url: str = "/api/v1/openapi.json") -> FastAPI:

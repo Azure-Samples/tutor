@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
-import { questionsEngine } from "@/utils/api";
 import { unwrapContent } from "@/types/api";
 import type { Question } from "@/types/question";
+import { questionsEngine } from "@/utils/api";
 
 const QuestionDetailPage: React.FC = () => {
   const params = useParams<{ id: string }>();
@@ -41,8 +41,12 @@ const QuestionDetailPage: React.FC = () => {
 
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Question Details" subtitle="Inspect question metadata and grading context." />
+      <Breadcrumb
+        pageName="Question Details"
+        subtitle="Inspect question metadata and grading context."
+      />
       <button
+        type="button"
         onClick={() => router.back()}
         className="mb-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
       >
@@ -56,11 +60,15 @@ const QuestionDetailPage: React.FC = () => {
       ) : question ? (
         <div className="mt-4 max-w-3xl rounded-2xl bg-white p-6 shadow dark:bg-boxdark">
           <h2 className="text-2xl font-bold text-cyan-700">{question.topic}</h2>
-          <p className="mt-4 whitespace-pre-line text-base text-gray-800 dark:text-gray-200">{question.question}</p>
+          <p className="mt-4 whitespace-pre-line text-base text-gray-800 dark:text-gray-200">
+            {question.question}
+          </p>
           {question.explanation && (
             <div className="mt-6">
               <h3 className="text-lg font-semibold text-green-700">Explanation</h3>
-              <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">{question.explanation}</p>
+              <p className="mt-2 whitespace-pre-line text-gray-700 dark:text-gray-300">
+                {question.explanation}
+              </p>
             </div>
           )}
         </div>

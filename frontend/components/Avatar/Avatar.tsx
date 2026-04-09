@@ -1,10 +1,10 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
-import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
-import { avatarEngine } from "@/utils/api";
-import { FaMicrophone, FaMicrophoneSlash, FaChevronDown } from "react-icons/fa";
-import AvatarUserVideo from "./AvatarUserVideo";
 import type { Case } from "@/types/cases";
+import { avatarEngine } from "@/utils/api";
+import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
+import React, { useEffect, useState, useRef } from "react";
+import { FaChevronDown, FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
+import AvatarUserVideo from "./AvatarUserVideo";
 
 type SpeechSessionPayload = {
   authorizationToken: string;
@@ -38,18 +38,36 @@ const extractCasesFromPayload = (data: unknown): Case[] => {
   return [];
 };
 
+const createClientId = (prefix: string) => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+type ChatHistoryEntry = {
+  id: string;
+  user?: string;
+  assistant?: string;
+};
+
 class AvatarHandler {
   public speechConfig!: SpeechSDK.SpeechConfig;
   private avatarConfig: SpeechSDK.AvatarConfig;
   private peerConnection!: RTCPeerConnection;
   private avatarSynthesizer!: SpeechSDK.AvatarSynthesizer;
   private speechRecognizer!: SpeechSDK.SpeechRecognizer;
-  private isSessionActive: boolean = false;
+  private isSessionActive = false;
   private speechSession?: SpeechSessionPayload;
   public onVideoStream?: (stream: MediaStream) => void;
 
   constructor(config: AvatarConfig) {
-    this.avatarConfig = new SpeechSDK.AvatarConfig(config.character, config.style, config.videoFormat);
+    this.avatarConfig = new SpeechSDK.AvatarConfig(
+      config.character,
+      config.style,
+      config.videoFormat,
+    );
   }
 
   public async ensureSpeechReady(forceRefresh = false): Promise<SpeechSDK.SpeechConfig> {
@@ -152,21 +170,21 @@ class AvatarHandler {
       console.error("No case ID provided");
       return null;
     }
-    
+
     try {
       const response = await avatarEngine.post("/response", {
         prompt: spokenText,
         chat_history: chatHistory,
-        case_id: chatId.id
+        case_id: chatId.id,
       });
 
       if (response.status === 200 || response.status === 201) {
         console.log("Avatar response:", response?.data?.text);
         return response?.data?.text;
-      } else {
-        console.error("Error occurred while getting avatar response.");
-        return null;
       }
+
+      console.error("Error occurred while getting avatar response.");
+      return null;
     } catch (error) {
       console.error("Error getting avatar response:", error);
       return "Couldn't understand what you said due to a server problem. Please try again later.";
@@ -187,7 +205,9 @@ class AvatarHandler {
         if (result.reason === SpeechSDK.ResultReason.SynthesizingAudioCompleted) {
           console.log("Speech and avatar synthesized successfully.");
         } else if (result.reason === SpeechSDK.ResultReason.Canceled) {
-          const cancellationDetails = SpeechSDK.CancellationDetails.fromResult(result as SpeechSDK.SpeechSynthesisResult);
+          const cancellationDetails = SpeechSDK.CancellationDetails.fromResult(
+            result as SpeechSDK.SpeechSynthesisResult,
+          );
           console.error("Speech synthesis canceled:", cancellationDetails.errorDetails);
         }
       });
@@ -238,7 +258,7 @@ class AvatarHandler {
 
         this.speechRecognizer.startContinuousRecognitionAsync(
           () => console.log("Microphone recognition started."),
-          (error) => console.error("Failed to start microphone recognition:", error)
+          (error) => console.error("Failed to start microphone recognition:", error),
         );
       })
       .catch((error) => {
@@ -250,7 +270,7 @@ class AvatarHandler {
     if (this.speechRecognizer) {
       this.speechRecognizer.stopContinuousRecognitionAsync(
         () => console.log("Microphone recognition stopped."),
-        (error) => console.error("Failed to stop microphone recognition:", error)
+        (error) => console.error("Failed to stop microphone recognition:", error),
       );
     }
   }
@@ -267,7 +287,7 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   const [spokenText, setSpokenText] = useState("");
   const avatarHandlerRef = useRef<AvatarHandler | null>(null);
   const [isMicrophoneActive, setIsMicrophoneActive] = useState(true);
-  const [chatHistory, setChatHistory] = useState<Array<{ user?: string; assistant?: string }>>([]);
+  const [chatHistory, setChatHistory] = useState<ChatHistoryEntry[]>([]);
   const [availableCases, setAvailableCases] = useState<Case[]>([]);
   const [selectedCase, setSelectedCase] = useState<Case | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -278,11 +298,11 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
   const configRef = React.useRef({
     gender: selectedCase?.profile?.gender || "male",
     language: selectedCase?.profile?.language || "pt-BR",
-    voice: selectedCase?.profile?.voice || (
-      (selectedCase?.profile?.gender || "male") === "feminino"
+    voice:
+      selectedCase?.profile?.voice ||
+      ((selectedCase?.profile?.gender || "male") === "feminino"
         ? "pt-BR-FranciscaNeural"
-        : "pt-BR-AntonioNeural"
-    ),
+        : "pt-BR-AntonioNeural"),
   });
 
   useEffect(() => {
@@ -301,7 +321,7 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        setError("Error fetching available cases: " + msg);
+        setError(`Error fetching available cases: ${msg}`);
         console.error("Error fetching available cases:", err);
       }
     };
@@ -331,11 +351,11 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
 
         configRef.current.gender = selectedCase?.profile?.gender || "male";
         configRef.current.language = selectedCase?.profile?.language || "en-US";
-        configRef.current.voice = selectedCase?.profile?.voice || (
-          (selectedCase?.profile?.gender || "male") === "feminino"
+        configRef.current.voice =
+          selectedCase?.profile?.voice ||
+          ((selectedCase?.profile?.gender || "male") === "feminino"
             ? "en-US-AvaMultilingualNeural"
-            : "en-US-AndrewMultilingualNeural"
-        );
+            : "en-US-AndrewMultilingualNeural");
 
         const { language, voice } = configRef.current;
 
@@ -353,7 +373,7 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
         console.log(`Avatar started with language ${language} and voice ${voice}`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        setError("Failed to set up avatar: " + msg);
+        setError(`Failed to set up avatar: ${msg}`);
         console.error("Failed to set up avatar:", err);
       } finally {
         setIsLoading(false);
@@ -381,7 +401,7 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
 
       setTranscriptText(text);
 
-      const updatedHistory = [...chatHistory, { user: text }];
+      const updatedHistory = [...chatHistory, { id: createClientId("chat"), user: text }];
       setChatHistory(updatedHistory);
 
       setIsSpeaking(true);
@@ -390,11 +410,11 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
         const response = await avatarHandlerRef.current?.getAvatarResponse(
           text,
           JSON.stringify(updatedHistory),
-          selectedCase
+          selectedCase,
         );
 
         if (response) {
-          setChatHistory((prev) => [...prev, { assistant: response }]);
+          setChatHistory((prev) => [...prev, { id: createClientId("chat"), assistant: response }]);
           await avatarHandlerRef.current?.chat(response);
         }
       } catch (error) {
@@ -457,11 +477,14 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
         )}
         {isLoading ? (
           <div className="w-full h-[70vh] flex flex-col items-center justify-center">
-            <div className="w-24 h-24 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <div className="w-24 h-24 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin mb-4" />
             <div className="text-2xl text-cyan-600 font-medium">Loading avatar...</div>
           </div>
         ) : (
-          <div ref={videoRef} className="w-full h-[70vh] rounded-xl bg-gradient-to-b from-gray-50 to-cyan-50 dark:from-boxdark dark:to-gray-800 shadow-xl flex items-center justify-center overflow-hidden">
+          <div
+            ref={videoRef}
+            className="w-full h-[70vh] rounded-xl bg-gradient-to-b from-gray-50 to-cyan-50 dark:from-boxdark dark:to-gray-800 shadow-xl flex items-center justify-center overflow-hidden"
+          >
             {avatarVideoStream ? (
               <video
                 autoPlay
@@ -473,7 +496,9 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
             ) : !selectedCase ? (
               <div className="text-center p-8">
                 <div className="text-6xl text-gray-300 dark:text-gray-600 mb-4">👤</div>
-                <div className="text-2xl text-gray-500 dark:text-gray-400">Select a case to start</div>
+                <div className="text-2xl text-gray-500 dark:text-gray-400">
+                  Select a case to start
+                </div>
                 <p className="text-gray-400 dark:text-gray-500 mt-2 max-w-md">
                   Choose from available cases to begin your avatar interaction experience
                 </p>
@@ -484,10 +509,12 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
 
         {chatHistory.length > 0 && (
           <div className="mt-6 w-full max-w-4xl mx-auto bg-white dark:bg-boxdark rounded-xl shadow-md p-4 max-h-[30vh] overflow-y-auto">
-            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-3 border-b pb-2">Conversation History</h3>
+            <h3 className="text-lg font-medium text-gray-700 dark:text-gray-300 mb-3 border-b pb-2">
+              Conversation History
+            </h3>
             <div className="space-y-4">
-              {chatHistory.map((msg, index) => (
-                <div key={index} className="flex flex-col">
+              {chatHistory.map((msg) => (
+                <div key={msg.id} className="flex flex-col">
                   {msg.user && (
                     <div className="flex items-start mb-2">
                       <div className="bg-blue-100 dark:bg-blue-900 rounded-lg py-2 px-4 max-w-[80%] text-gray-800 dark:text-gray-200">
@@ -511,20 +538,23 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
         <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-10">
           {transcriptText && (
             <div className="mb-6 p-4 bg-white dark:bg-boxdark rounded-lg border border-cyan-200 shadow-lg max-w-lg">
-              <p className="text-sm font-medium text-cyan-600 dark:text-cyan-400 mb-1">Transcribing...</p>
+              <p className="text-sm font-medium text-cyan-600 dark:text-cyan-400 mb-1">
+                Transcribing...
+              </p>
               <p className="text-lg">{transcriptText}</p>
             </div>
           )}
 
           <button
+            type="button"
             onClick={() => setIsMicrophoneActive((prev) => !prev)}
             disabled={!selectedCase}
             className={`p-6 rounded-full shadow-lg text-white text-4xl transition-all transform hover:scale-105 ${
               !selectedCase
                 ? "bg-gray-400 cursor-not-allowed opacity-50"
                 : isMicrophoneActive
-                ? "bg-green-500 hover:bg-green-600 ring-4 ring-green-200 dark:ring-green-900"
-                : "bg-red-500 hover:bg-red-600 ring-4 ring-red-200 dark:ring-red-900"
+                  ? "bg-green-500 hover:bg-green-600 ring-4 ring-green-200 dark:ring-green-900"
+                  : "bg-red-500 hover:bg-red-600 ring-4 ring-red-200 dark:ring-red-900"
             }`}
             title={isMicrophoneActive ? "Disable Microphone" : "Enable Microphone"}
           >
@@ -534,8 +564,8 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
             {!selectedCase
               ? "Select a case first"
               : isMicrophoneActive
-              ? "Microphone Active - Speak Now"
-              : "Microphone Disabled"}
+                ? "Microphone Active - Speak Now"
+                : "Microphone Disabled"}
           </span>
         </div>
       </div>
@@ -547,21 +577,21 @@ const AvatarChat: React.FC<AvatarChatProps> = ({ initialCaseId }) => {
           </h3>
           <div className="space-y-2">
             <p className="flex items-center">
-              <span className="font-medium w-24">Name:</span> 
+              <span className="font-medium w-24">Name:</span>
               <span className="flex-1">{selectedCase.name}</span>
             </p>
             <p className="flex items-center">
-              <span className="font-medium w-24">Role:</span> 
+              <span className="font-medium w-24">Role:</span>
               <span className="flex-1">{selectedCase.role}</span>
             </p>
             {selectedCase.profile && (
               <>
                 <p className="flex items-center">
-                  <span className="font-medium w-24">Character:</span> 
+                  <span className="font-medium w-24">Character:</span>
                   <span className="flex-1">{selectedCase.profile.name}</span>
                 </p>
                 <p className="flex items-center">
-                  <span className="font-medium w-24">Gender:</span> 
+                  <span className="font-medium w-24">Gender:</span>
                   <span className="flex-1">{selectedCase.profile.gender}</span>
                 </p>
               </>

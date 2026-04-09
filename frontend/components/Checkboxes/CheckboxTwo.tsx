@@ -5,17 +5,14 @@ const CheckboxTwo = () => {
 
   return (
     <div>
-      <label
-        htmlFor="checkboxLabelTwo"
-        className="flex cursor-pointer select-none items-center"
-      >
+      <label htmlFor="checkboxLabelTwo" className="flex cursor-pointer select-none items-center">
         <div className="relative">
           <input
             type="checkbox"
             id="checkboxLabelTwo"
             className="sr-only"
             onChange={() => {
-              setIsChecked(!isChecked);
+              setIsChecked((checked) => !checked);
             }}
           />
           <div
@@ -25,6 +22,7 @@ const CheckboxTwo = () => {
           >
             <span className={`opacity-0 ${isChecked && "!opacity-100"}`}>
               <svg
+                aria-hidden="true"
                 width="11"
                 height="8"
                 viewBox="0 0 11 8"
@@ -36,7 +34,7 @@ const CheckboxTwo = () => {
                   fill="#3056D3"
                   stroke="#3056D3"
                   strokeWidth="0.4"
-                ></path>
+                />
               </svg>
             </span>
           </div>

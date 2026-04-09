@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 // FormsModal with header, rounded close button, and default Submit/Cancel buttons
 const FormsModal = ({
@@ -39,6 +39,7 @@ const FormsModal = ({
         <div className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-cyan-100 dark:border-cyan-900 rounded-t-3xl bg-gradient-to-r from-cyan-100 via-blue-50 to-green-100 dark:from-cyan-900 dark:via-blue-950 dark:to-green-900">
           <h2 className="text-xl font-bold text-cyan-700 dark:text-cyan-200 flex-1">{title}</h2>
           <button
+            type="button"
             className="ml-4 w-10 h-10 flex items-center justify-center rounded-full bg-cyan-200 dark:bg-cyan-800 text-cyan-700 dark:text-cyan-100 hover:bg-cyan-300 hover:scale-110 transition-all text-2xl shadow"
             onClick={onClose}
             aria-label="Close modal"
@@ -47,9 +48,7 @@ const FormsModal = ({
           </button>
         </div>
         <div className="flex-1 flex flex-col justify-between px-6 py-6 h-full overflow-y-auto">
-          <div className="flex-1 flex flex-col justify-center">
-            {children}
-          </div>
+          <div className="flex-1 flex flex-col justify-center">{children}</div>
         </div>
         <div className="sticky bottom-0 z-20 flex gap-4 justify-end px-6 py-6 bg-white dark:bg-boxdark rounded-b-3xl border-t border-cyan-100 dark:border-cyan-900">
           <button

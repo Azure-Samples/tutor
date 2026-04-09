@@ -114,6 +114,11 @@ output "COSMOS_ASSEMBLY_TABLE" {
   value       = "assemblies"
 }
 
+output "COSMOS_UPSKILLING_TABLE" {
+  description = "Cosmos DB container name for upskilling plans."
+  value       = "upskilling_plans"
+}
+
 output "COSMOS_STUDENT_TABLE" {
   description = "Cosmos DB container name for students."
   value       = "students"
@@ -164,6 +169,11 @@ output "COSMOS_AVATAR_CASE_TABLE" {
   value       = "avatar_case"
 }
 
+output "COSMOS_LEARNER_RECORD_EVENTS_TABLE" {
+  description = "Cosmos DB container name for learner-record append-only events."
+  value       = "learner_record_events"
+}
+
 output "COSMOS_INSIGHTS_REPORT_TABLE" {
   description = "Cosmos DB container name for insights reports."
   value       = "insights_reports"
@@ -183,6 +193,21 @@ output "BLOB_CONNECTION_STRING" {
 output "BLOB_CONTAINER_NAME" {
   description = "Blob container name used by services."
   value       = azurerm_storage_container.uploads.name
+}
+
+output "SERVICE_BUS_FULLY_QUALIFIED_NAMESPACE" {
+  description = "Fully qualified namespace used by managed-identity Service Bus clients."
+  value       = "${azurerm_servicebus_namespace.main.name}.servicebus.windows.net"
+}
+
+output "SERVICE_BUS_LEARNER_RECORD_TOPIC" {
+  description = "Service Bus topic used to distribute learner-record integration events."
+  value       = azurerm_servicebus_topic.learner_record.name
+}
+
+output "SERVICE_BUS_LEARNER_RECORD_SUBSCRIPTION" {
+  description = "Default Service Bus subscription used for learner-record integration backlog inspection."
+  value       = azurerm_servicebus_subscription.learner_record_integration_backlog.name
 }
 
 output "PROJECT_ENDPOINT" {

@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { FaRobot, FaInfoCircle, FaTerminal, FaTemperatureLow, FaUserTag } from "react-icons/fa";
+import { FaInfoCircle, FaRobot, FaTemperatureLow, FaTerminal, FaUserTag } from "react-icons/fa";
 
-import { essaysEngine } from "@/utils/api";
 import type { AgentDefinition, AgentRef } from "@/types/essays";
+import { essaysEngine } from "@/utils/api";
 
 interface AgentFormProps {
   onSuccess?: (agent: AgentRef) => void;
@@ -61,10 +61,11 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
       className="flex flex-col gap-4 w-full max-w-xl mx-auto p-0 form-dot-scrollbar overflow-y-auto"
       onSubmit={handleSubmit}
     >
-      <label className="flex items-center gap-2 text-cyan-700 font-bold">
+      <label htmlFor="agent-name" className="flex items-center gap-2 text-cyan-700 font-bold">
         <FaRobot /> Agent Name
       </label>
       <input
+        id="agent-name"
         type="text"
         value={form.name}
         onChange={(event) => updateField("name", event.target.value)}
@@ -73,10 +74,14 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
         required
       />
 
-      <label className="flex items-center gap-2 text-blue-700 font-bold">
+      <label
+        htmlFor="agent-instructions"
+        className="flex items-center gap-2 text-blue-700 font-bold"
+      >
         <FaInfoCircle /> Instructions
       </label>
       <textarea
+        id="agent-instructions"
         value={form.instructions}
         onChange={(event) => updateField("instructions", event.target.value)}
         className="w-full rounded-2xl border-2 border-blue-200 focus:border-yellow-400 focus:ring-2 focus:ring-yellow-200 px-4 py-3 text-lg transition-all duration-200 bg-blue-50 dark:bg-blue-900 placeholder:text-blue-400 focus:bg-white dark:focus:bg-boxdark resize-y min-h-[96px] max-h-[320px]"
@@ -84,10 +89,14 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
         required
       />
 
-      <label className="flex items-center gap-2 text-green-700 font-bold">
+      <label
+        htmlFor="agent-deployment"
+        className="flex items-center gap-2 text-green-700 font-bold"
+      >
         <FaTerminal /> Deployment Name
       </label>
       <input
+        id="agent-deployment"
         type="text"
         value={form.deployment}
         onChange={(event) => updateField("deployment", event.target.value)}
@@ -96,24 +105,31 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
         required
       />
 
-      <label className="flex items-center gap-2 text-orange-700 font-bold">
+      <label htmlFor="agent-role" className="flex items-center gap-2 text-orange-700 font-bold">
         <FaUserTag /> Role
       </label>
       <select
+        id="agent-role"
         value={form.role}
         onChange={(event) => updateField("role", event.target.value)}
         className="w-full rounded-2xl border-2 border-orange-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-200 px-4 py-3 text-lg transition-all duration-200 bg-orange-50 dark:bg-orange-900 focus:bg-white dark:focus:bg-boxdark"
         required
       >
         {ROLE_OPTIONS.map((r) => (
-          <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>
+          <option key={r} value={r}>
+            {r.charAt(0).toUpperCase() + r.slice(1)}
+          </option>
         ))}
       </select>
 
-      <label className="flex items-center gap-2 text-purple-700 font-bold">
+      <label
+        htmlFor="agent-temperature"
+        className="flex items-center gap-2 text-purple-700 font-bold"
+      >
         <FaTemperatureLow /> Temperature (optional)
       </label>
       <input
+        id="agent-temperature"
         type="number"
         min="0"
         max="2"
@@ -127,9 +143,15 @@ const AgentForm: React.FC<AgentFormProps> = ({ onSuccess }) => {
         placeholder="Leave blank to use the deployment default"
       />
 
-      {status && <p className="mt-2 text-center text-sm text-green-700 dark:text-green-300">{status}</p>}
+      {status && (
+        <p className="mt-2 text-center text-sm text-green-700 dark:text-green-300">{status}</p>
+      )}
       {error && <p className="mt-2 text-center text-sm text-red-600 dark:text-red-300">{error}</p>}
-      {submitting && <p className="mt-2 text-center text-sm text-cyan-700 dark:text-cyan-300">Provisioning agent...</p>}
+      {submitting && (
+        <p className="mt-2 text-center text-sm text-cyan-700 dark:text-cyan-300">
+          Provisioning agent...
+        </p>
+      )}
     </form>
   );
 };

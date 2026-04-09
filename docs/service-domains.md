@@ -1,393 +1,147 @@
 # Service Domains
 
-> Business-domain decomposition of **The Tutor** platform, defining clear ownership boundaries between agentic and non-agentic services. Aligned with the Supervisor Insights and Pedagogical business agendas.
+> Business-domain decomposition of **The Tutor** as a learner-record-centered standalone lifelong-learning platform. The deterministic core owns the systems of record and governance boundaries; agentic services contribute high-value reasoning and append governed evidence back into the learner record.
 
 ---
 
 ## 1. Domain Map
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
-    subgraph PLATFORM["PLATFORM DOMAIN (Non-Agentic)"]
-        direction TB
-        CONFIG["config-svc\n━━━━━━━━━━━━\nStudents, Professors\nCourses, Classes, Groups\nPedagogical Rules"]
-        LMS_GW["lms-gateway\n━━━━━━━━━━━━\nExternal LMS Adapters\nSync Scheduler"]
-        CONTENT["content-svc\n━━━━━━━━━━━━\nPedagogical Materials\nIngestion → AI Search\nRubrics, Exemplars"]
-        IDENTITY["identity\n━━━━━━━━━━━━\n(via tutor-lib middleware)\nEntra ID Auth, RBAC\nSupervisor scoping"]
+    EXT["External Systems\nLMS, SIS, CRM, Wallets, Analytics"]
+
+    subgraph CORE["Deterministic Core / Systems of Record"]
+        ID["Identity & Tenancy"]
+        INTEGRATION["Integration Hub"]
+        CATALOG["Catalog & Pathways"]
+        LIFECYCLE["Enrollment & Lifecycle"]
+        RECORD["Learner Record"]
+        CONTENT["Content & Knowledge"]
+        CREDENTIALS["Credentialing & Portfolio"]
+        COMMUNITY["Community & Network"]
     end
 
-    subgraph ASSESSMENT["ASSESSMENT DOMAIN (Agentic)"]
-        direction TB
-        ESSAYS["essays-svc\n━━━━━━━━━━━━\nStrategy Pattern\nOCR + ENEM Rubrics\nFoundry Agents\nRAG over materials"]
-        QUESTIONS["questions-svc\n━━━━━━━━━━━━\nState Machine\nReal-time Grading\nDiscursive + MC"]
+    subgraph AGENTIC["Agentic Services"]
+        ASSESS["Assessment & Evidence"]
+        COACH["Coaching & Interaction"]
+        ADVISE["Advising & Success"]
+        NARRATIVE["Institutional Insights"]
+        EVAL["Agent Evaluation & Governance"]
     end
 
-    subgraph INTERACTION["INTERACTION DOMAIN (Agentic)"]
-        direction TB
-        AVATAR["avatar-svc\n━━━━━━━━━━━━\nSpeech SDK\nWebRTC\nAgent Memory"]
-        CHAT["chat-svc\n━━━━━━━━━━━━\nGuided Tutoring\nInline Writing Support\nGuardrails & Rules"]
+    subgraph PROJECTIONS["Read Models / Workspace Projections"]
+        ANALYTICS["Institutional Analytics & Read Models"]
+        LEARNER_VIEW["Learner Timelines"]
+        FACULTY_VIEW["Review Queues & Cohort Views"]
+        LEADER_VIEW["School / Program Briefings"]
+        ADMIN_VIEW["Operations / Audit Views"]
+        ALUMNI_VIEW["Alumni Re-Entry Views"]
     end
 
-    subgraph ANALYTICS["ANALYTICS DOMAIN (Agentic)"]
-        direction TB
-        UPSKILLING["upskilling-svc\n━━━━━━━━━━━━\nVisitor Pattern\nLearning Paths\nPerformance Analysis"]
-        EVALUATION["evaluation-svc\n━━━━━━━━━━━━\nFoundry Evaluators\nGolden Datasets\nENEM Alignment Metrics"]
-    end
-
-    subgraph SUPERVISION["SUPERVISION DOMAIN (Agentic)"]
-        direction TB
-        INSIGHTS["insights-svc\n━━━━━━━━━━━━\nFabric Indicators\nNarrative Briefings\nSchool Scoping"]
-    end
-
-    PLATFORM -.->|"data read"| ASSESSMENT
-    PLATFORM -.->|"data read"| INTERACTION
-    PLATFORM -.->|"materials index"| ASSESSMENT
-    PLATFORM -.->|"materials index"| INTERACTION
-    ASSESSMENT -.->|"results feed"| ANALYTICS
-    INTERACTION -.->|"transcripts feed"| ANALYTICS
-    SUPERVISION -.->|"reads config"| PLATFORM
+    EXT --> INTEGRATION
+    ID --> LIFECYCLE
+    INTEGRATION --> CATALOG
+    INTEGRATION --> LIFECYCLE
+    INTEGRATION --> RECORD
+    CONTENT --> ASSESS
+    CONTENT --> COACH
+    EVAL --> ASSESS
+    EVAL --> COACH
+    EVAL --> ADVISE
+    EVAL --> NARRATIVE
+    ASSESS --> RECORD
+    COACH --> RECORD
+    ADVISE --> RECORD
+    NARRATIVE --> RECORD
+    CREDENTIALS --> RECORD
+    COMMUNITY --> RECORD
+    RECORD --> ANALYTICS
+    ANALYTICS --> LEARNER_VIEW
+    ANALYTICS --> FACULTY_VIEW
+    ANALYTICS --> LEADER_VIEW
+    ANALYTICS --> ADMIN_VIEW
+    ANALYTICS --> ALUMNI_VIEW
 ```
 
 ---
 
 ## 2. Domain Definitions
 
-### 2.1 Platform Domain (Non-Agentic)
+The target platform uses DDD bounded contexts. Several of these contexts can begin as modules inside existing services or shared libraries and become dedicated services only when ownership, governance, or scale requires it.
 
-**Purpose**: Core data management, external integrations, content ingestion, and identity. No AI inference occurs in this domain.
-
-**Why non-agentic?**
-- CRUD operations are deterministic — no LLM needed
-- LMS sync is data transformation — adapters, not agents
-- Content ingestion uses Document Intelligence and AI Search (no agent orchestration)
-- Identity is framework-level — middleware, not a service
-
-#### config-svc
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | CRUD for students, professors, courses, classes, groups, **pedagogical rules** |
-| **Port** | 8081 |
-| **Data owned** | `platform_db`: students, professors, courses, classes, groups, **pedagogical_rules**, **feature_flags** |
-| **Depends on** | Cosmos DB |
-| **Called by** | All other services (to resolve student/course context and pedagogical rules) |
-| **Scaling** | min: 1, max: 3 (steady, low-CPU) |
-| **Patterns** | Repository pattern with CosmosCRUD base |
-| **Business Need** | BN-PED-5 (configurable rules), BN-PED-6 (pilot feature flags), BN-SUP-5 (governance) |
-
-#### lms-gateway
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | External LMS sync (Moodle, Canvas, and custom adapters) |
-| **Port** | 8087 |
-| **Data owned** | `platform_db`: sync_logs |
-| **Depends on** | Cosmos DB, External LMS APIs, config-svc |
-| **Called by** | Timer trigger, admin manual trigger |
-| **Scaling** | min: 0, max: 2 (burst during sync, idle otherwise) |
-| **Patterns** | Adapter pattern, Scheduler |
-
-#### content-svc (NEW)
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Pedagogical material ingestion, OCR extraction, AI Search indexing for RAG |
-| **Port** | 8089 |
-| **Data owned** | `platform_db`: materials |
-| **Depends on** | Azure Blob Storage, Azure AI Document Intelligence, Azure AI Search, Cosmos DB |
-| **Called by** | Frontend (teachers upload materials), Assessment/Interaction services (query AI Search) |
-| **Scaling** | min: 0, max: 2 (burst during uploads, idle otherwise) |
-| **Patterns** | Pipeline pattern: Upload → Extract → Chunk → Index |
-| **Business Need** | BN-PED-2 (curated material ingestion for AI grounding) |
-
-### 2.2 Assessment Domain (Agentic)
-
-**Purpose**: Evaluate student submissions (essays, questions) using AI agents with OCR support, ENEM rubric alignment, and RAG over pedagogical materials.
-
-#### essays-svc
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Essay submission, OCR for handwritten essays, strategy-based evaluation with ENEM alignment, Foundry agent provisioning |
-| **Port** | 8083 |
-| **Data owned** | `assessment_db`: essays, essay_configs |
-| **Depends on** | Cosmos DB, Blob Storage, Azure AI Foundry, AI Document Intelligence (OCR — Phase A: SDK in service, Phase B: via tutor-lib), AI Search (RAG — Phase B), config-svc (pedagogical rules) |
-| **Called by** | Frontend (students submit essays), evaluation-svc |
-| **Scaling** | min: 0, max: 5 (token-heavy, medium latency) |
-| **Patterns** | Strategy (ENEM/Analytical/Narrative/Default — Phase B), Orchestrator |
-| **Business Need** | BN-PED-1 (AI essay correction with OCR + ENEM rubrics) |
-
-> **Phase A (issue #18, branch `feat/ocr-essay-ingestion`)**: Document Intelligence SDK wired directly into `apps/essays/src/app/file_processing.py`. Introduces `DocumentIntelligenceConfig` in `config.py`. Falls back to `pypdf`/PIL when `DOCUMENT_INTELLIGENCE_ENDPOINT` is unset (local development). ENEM strategy and RAG remain pending (Phase B).
->
-> **Essay partial-update endpoint**: `PATCH /essays/{essay_id}` accepts partial payloads via `EssayPatch` model (`exclude_unset=True`). The `PUT` handler now filters `None` values before merging to prevent destructive overwrites of `assembly_id`. The seed script uses PATCH to link essays to assemblies after initial creation.
-
-#### questions-svc
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Real-time question grading with state machine pipeline; supports both multiple-choice and discursive questions |
-| **Port** | 8082 |
-| **Data owned** | `assessment_db`: questions, evaluations |
-| **Depends on** | Cosmos DB, Azure AI Foundry, AI Search (RAG for discursive), config-svc (pedagogical rules) |
-| **Called by** | Frontend (debounced as student types), evaluation-svc |
-| **Scaling** | min: 0, max: 5 (low-latency required, high concurrency) |
-| **Patterns** | State Machine (Pending → Evaluating → Completed), DiscursiveState for open-ended |
-| **Business Need** | BN-PED-1 (AI question correction) |
-
-### 2.3 Interaction Domain (Agentic)
-
-**Purpose**: Real-time conversational experiences (voice and text) with AI tutors. The chat service functions as a **guided tutor** embedded in the writing experience, not a generic chatbot.
-
-#### avatar-svc
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Speech-driven avatar tutoring with WebRTC |
-| **Port** | 8084 |
-| **Data owned** | `interaction_db`: conversations, transcripts, agent_configs |
-| **Depends on** | Cosmos DB, Azure OpenAI, Azure Speech, config-svc |
-| **Called by** | Frontend (WebRTC sessions) |
-| **Scaling** | min: 1, max: 3 (always-on for WebRTC, connection-based) |
-| **Patterns** | Agent + Speech pipeline |
-| **Business Need** | BN-PED-3 (virtual tutor/mentor) |
-
-#### chat-svc (NEW — Guided Tutor)
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Guided text tutoring embedded in essay/question pages; provides hints, feedback, and pedagogical prompts during writing — never gives direct answers |
-| **Port** | 8088 |
-| **Data owned** | `interaction_db`: conversations (shared with avatar) |
-| **Depends on** | Cosmos DB, Azure OpenAI, AI Search (RAG for pedagogical context), config-svc (pedagogical rules: guardrails, triggers, limits) |
-| **Called by** | Frontend (inline in essay/question pages) |
-| **Scaling** | min: 0, max: 3 (session-based) |
-| **Patterns** | Conversational agent with RAG, guardrail enforcement, proactive triggers |
-| **Business Need** | BN-PED-3 (virtual tutor during writing), BN-PED-5 (configurable rules and guardrails) |
-
-### 2.4 Analytics Domain (Agentic)
-
-**Purpose**: Analyze learning outcomes, evaluate agent quality, and measure ENEM competency alignment.
-
-#### upskilling-svc
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Stateful teaching plan management with CRUD lifecycle, multi-agent evaluation via visitor pattern, professor-scoped persistence, and ENEM competency alignment |
-| **Port** | 8085 |
-| **Data owned** | Cosmos DB container `upskilling_plans` (partition key: `/professor_id`, documents with `docType: "plan"`) |
-| **Depends on** | Cosmos DB, Azure AI Foundry, config-svc (pedagogical rules) |
-| **Called by** | Frontend (professor upskilling dashboard — plan creation, listing, evaluation) |
-| **Scaling** | min: 0, max: 3 (CRUD is lightweight; evaluation requests are token-heavy) |
-| **Patterns** | Repository (CosmosCRUD-backed), Visitor (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment agents), Status lifecycle (draft → evaluated → revised → archived) |
-| **Business Need** | BN-PED-6 (pilot validation metrics for 3rd-year physics), BN-PED-5 (configurable pedagogical rules) |
-
-#### evaluation-svc (NEW)
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Agent quality evaluation using Foundry evaluators; ENEM rubric fidelity checks |
-| **Port** | 8086 |
-| **Data owned** | `analytics_db`: eval_runs, golden_datasets |
-| **Depends on** | Cosmos DB, Azure AI Foundry, all agentic services |
-| **Called by** | Admin (manual), CI/CD (automated), Scheduler (nightly) |
-| **Scaling** | min: 0, max: 2 (batch, high token usage) |
-| **Patterns** | Evaluator pipeline, Golden dataset management, ENEM competency evaluators |
-| **Business Need** | BN-PED-1 (ENEM rubric fidelity), BN-PED-6 (pilot validation metrics) |
-
-### 2.5 Supervision Domain (Agentic) — NEW
-
-**Purpose**: Generate actionable insight reports for regional supervisors by consuming educational indicators from Microsoft Fabric and synthesizing narrative briefings via Azure OpenAI.
-
-#### insights-svc (NEW)
-
-| Aspect | Detail |
-|--------|--------|
-| **Responsibility** | Consume Fabric semantic model indicators (standardized assessments, attendance, task completion), run narrative synthesis via Azure OpenAI, generate per-school briefing reports |
-| **Port** | 8090 |
-| **Data owned** | `supervision_db`: insight_reports, indicator_configs, school_profiles |
-| **Depends on** | Microsoft Fabric (read-only semantic model via REST), Azure OpenAI, Cosmos DB, config-svc (school ↔ supervisor mapping) |
-| **Called by** | Frontend (supervisor dashboard), Scheduler (weekly pre-visit briefing) |
-| **Scaling** | min: 0, max: 3 (burst before supervisor visits) |
-| **Patterns** | Strategy per indicator type (StandardizedTestStrategy, AttendanceStrategy, TaskCompletionStrategy), narrative synthesis pipeline, school-scoped data isolation |
-| **Business Need** | BN-SUP-1 (automated insights), BN-SUP-2 (pre-visit briefings), BN-SUP-3 (modular indicators), BN-SUP-4 (supervisor UX validation) |
-
-**Indicator Strategy Pattern**:
-
-```python
-class IndicatorStrategy(ABC):
-    @abstractmethod
-    async def fetch(self, school_id: str, period: str) -> IndicatorData: ...
-    @abstractmethod
-    async def summarize(self, data: IndicatorData) -> str: ...
-
-class StandardizedTestStrategy(IndicatorStrategy): ...    # Reads from Fabric semantic model
-class AttendanceStrategy(IndicatorStrategy): ... # Reads from Fabric semantic model
-class TaskCompletionStrategy(IndicatorStrategy): ... # Reads from external LMS via Fabric
-```
-
-**Report Generation Flow**:
-
-1. Scheduler or supervisor triggers report for a school
-2. insights-svc fetches configured indicators via their strategies
-3. Each strategy queries Fabric REST API for its slice of the semantic model
-4. Raw data is assembled into a structured payload
-5. Azure OpenAI synthesizes a Strava-like narrative report
-6. Report is stored in `supervision_db.insight_reports` with school partition key
-7. Supervisor accesses the report via the frontend dashboard
+| Bounded context | Type | Owns | Current repo anchor |
+| ---------------- | ---- | ---- | ------------------- |
+| **Identity and Tenancy** | Deterministic core | Institution, school, program, user, alumni, and relationship scope used for authorization and lifecycle policy. | Shared Entra/JWT middleware plus configuration data today. |
+| **Integration Hub** | Deterministic core | Anti-corruption layers, canonical import/export contracts, sync audit, and schema normalization for LMS, SIS, CRM, analytics, and wallet ecosystems. | `lms-gateway` and the current Fabric/LMS adapter patterns. |
+| **Catalog and Pathways** | Deterministic core | Program catalog, pathway definitions, milestones, curriculum graph, and offering structure. | Future context; partially implied by configuration data today. |
+| **Enrollment and Lifecycle** | Deterministic core | Affiliations, cohort membership, enrollment state, institution relationships, and alumni transitions. | `config-svc` plus LMS sync today. |
+| **Learner Record** | Deterministic core | Append-only history of learning, assessment, tutoring, advising, credential, and community events with provenance. | Future context; initially projected from current services. |
+| **Content and Knowledge** | Deterministic core | Approved content corpus, rubrics, exemplars, pedagogical rules, and grounding policies. | `content-svc` and `config-svc`. |
+| **Assessment and Evidence** | Agentic service | Draft evaluations, rubric-grounded evidence, feedback artifacts, and submission-specific evidence links. | `essays-svc` and `questions-svc`. |
+| **Coaching and Interaction** | Agentic service | Guided tutoring, hinting, session transcripts, and interaction summaries. | `avatar-svc` and `chat-svc`. |
+| **Advising and Success** | Hybrid context | Advising cases, recommended interventions, next-best actions, and success summaries. | `upskilling-svc` today; future advising core later. |
+| **Credentialing and Portfolio** | Deterministic core | Credential definitions, eligibility, awards, verification, revocation, and portfolio artifacts. | Future context. |
+| **Community and Network** | Deterministic core | Groups, mentoring links, alumni/community membership, and moderation state. | Future context. |
+| **Institutional Analytics and Read Models** | Projection context | Learner, cohort, school, and program projections for workspaces and interventions. | `insights-svc` plus future read-model projections. |
+| **Agent Evaluation and Governance** | Governance context | Evaluation datasets, policy gates, provenance contracts, degraded-mode policy, and release approval for high-impact AI features. | `evaluation-svc` and [agent-evaluation.md](./agent-evaluation.md). |
 
 ---
 
-## 3. Inter-Service Communication Contract
+## 3. System-of-Record Boundaries
 
-All communication is **synchronous REST** over ACA internal DNS. Each service exposes a health endpoint and a versioned API.
+All external data enters Tutor through the **Integration Hub**. After normalization, every durable record belongs to exactly one bounded context, even if multiple services contribute derived evidence or read models.
 
-```
-Service DNS pattern: <service-name>.<aca-env-name>.internal
-Example: config-svc.tutor-aca-env.internal:8081
-```
-
-### API Contract Rules
-
-1. **No direct database cross-reads** — Services call each other's APIs, never query another service's Cosmos containers.
-2. **Response envelope** — All responses use `ApiEnvelope<T>` from `tutor-lib`.
-3. **Error propagation** — Upstream errors return the original status code + detail.
-4. **Idempotency** — All write operations support idempotency keys.
-5. **Versioning** — `/api/v1/` prefix on all routes; breaking changes go to `/api/v2/`.
-
-### Dependency Graph
-
-```mermaid
-graph LR
-    subgraph "← depends on"
-        ESSAYS["essays-svc"]
-        QUESTIONS["questions-svc"]
-        AVATAR["avatar-svc"]
-        CHAT["chat-svc"]
-        UPSKILLING["upskilling-svc"]
-        EVAL["evaluation-svc"]
-        LMS["lms-gateway"]
-        CONTENT["content-svc"]
-        INSIGHTS["insights-svc"]
-    end
-
-    CONFIG["config-svc"]
-    AISEARCH["AI Search"]
-    DOCINTEL["Document Intelligence"]
-    FABRIC["Microsoft Fabric"]
-
-    ESSAYS --> CONFIG
-    ESSAYS --> AISEARCH
-    ESSAYS --> DOCINTEL
-    QUESTIONS --> CONFIG
-    QUESTIONS --> AISEARCH
-    AVATAR --> CONFIG
-    CHAT --> CONFIG
-    CHAT --> AISEARCH
-    UPSKILLING --> CONFIG
-    UPSKILLING --> ESSAYS
-    UPSKILLING --> QUESTIONS
-    EVAL --> ESSAYS
-    EVAL --> QUESTIONS
-    EVAL --> AVATAR
-    LMS --> CONFIG
-    CONTENT --> CONFIG
-    CONTENT --> DOCINTEL
-    CONTENT --> AISEARCH
-    INSIGHTS --> CONFIG
-    INSIGHTS --> FABRIC
-```
+| Product area | Target source of truth | Migration-era external authority | Boundary rule |
+| ------------ | ---------------------- | -------------------------------- | ------------- |
+| **Identity and relationship scope** | Identity and Tenancy + Enrollment and Lifecycle | Entra ID, LMS/SIS rosters, institutional directories | Role plus relationship checks must be enforced at API and query layers; no service-local override becomes authoritative. |
+| **Program, catalog, and pathway structure** | Catalog and Pathways | LMS/SIS catalogs until imported | External schemas are normalized through anti-corruption layers before they affect internal models. |
+| **Learner affiliations and enrollment state** | Enrollment and Lifecycle | LMS/SIS/registrar during migration | Agentic services may read normalized context but do not own authoritative roster state. |
+| **Learner history and evidence timeline** | Learner Record | Current services backfill through normalized events | The record is append-oriented; corrections are compensating entries, not destructive overwrites. |
+| **Rubrics, exemplars, and grounded knowledge** | Content and Knowledge | Approved LMS/file repositories if imported | Only approved content can ground assessment, tutoring, or advising outputs. |
+| **Assessment outcomes** | Assessment and Evidence for draft workflow; Learner Record for durable history | LMS gradebooks may receive published results | High-impact scoring remains human-reviewable and must carry provenance. |
+| **Advising interventions** | Advising and Success | CRM notes or case tools during migration | Agentic recommendations remain advisory until a human confirms the action. |
+| **Credentials and portfolio artifacts** | Credentialing and Portfolio | External wallets and verifier ecosystems distribute only | Issuance, verification, revocation, and minimal-PII policy stay inside Tutor. |
+| **Community and mentorship relationships** | Community and Network | Alumni CRM/community systems during migration | Lifecycle separation and moderation state are required. |
+| **Institutional projections and briefings** | Institutional Analytics and Read Models | Fabric, CRM, and LMS analytics may seed projections | Projections are read models, never the authoritative write model. |
+| **Safety, evaluation, and provenance policy** | Agent Evaluation and Governance | None | High-impact features do not ship without provenance coverage, evaluation evidence, and degraded-mode policy. |
 
 ---
 
-## 4. Migration from Current to Target
+## 4. Integration, CQRS, and Workspace Rules
 
-### What Stays
-
-| Service | Changes |
-|---------|---------|
-| **config-svc** | Remove agent configs (→ assessment domain), remove cases/steps (→ assessment domain) |
-| **essays-svc** | Keep as-is, update imports to `tutor-lib` |
-| **questions-svc** | Move from `app/` to `src/app/`, update imports to `tutor-lib` |
-| **avatar-svc** | Extract text chat → `chat-svc`, add avatar config persistence |
-| **upskilling-svc** | Move from `app/` to `src/app/`, update imports to `tutor-lib` |
-
-### What's New
-
-| Service | Origin |
-|---------|--------|
-| **chat-svc** | Extracted from avatar-svc (text-only guided tutoring) |
-| **evaluation-svc** | New service for Foundry evaluation + ENEM rubric fidelity |
-| **lms-gateway** | New service for external LMS sync |
-| **content-svc** | New service for pedagogical material ingestion (OCR + AI Search RAG) |
-| **insights-svc** | New service for supervisor insight reports (Fabric indicators + narrative synthesis) |
-
-### What's Removed
-
-| Component | Reason |
-|-----------|--------|
-| `common/` module references | Replaced by `tutor-lib` |
-| `tutor.egg-info/` | Stale artifact from monolithic layout |
-| Duplicated `config.py` across services | Consolidated in `tutor-lib` |
-| Duplicated `agents/*.py` across services | Consolidated in `tutor-lib` |
+| Rule | Pattern guidance | Practical implication |
+| ---- | ---------------- | --------------------- |
+| **External integration uses anti-corruption layers** | DDD Anti-Corruption Layer | LMS, SIS, CRM, analytics, and wallet schema changes are isolated inside the Integration Hub. |
+| **Migration follows Strangler Fig** | Strangler Fig pattern | Current services remain the runtime substrate while learner-record-centered contexts are introduced wave by wave. |
+| **The learner record is append-oriented** | Append-only record and event-backbone thinking | Durable educational history is never rewritten in place; provenance and corrections remain visible. |
+| **Read models follow CQRS thinking** | CQRS / projection pattern | Role workspaces read optimized projections such as timelines, work queues, and briefings instead of querying write models directly. |
+| **Workspace routing is strategy-driven** | Strategy and data-driven routing | Role, relationship, lifecycle state, and feature flags determine which modules, queues, and actions a user sees. |
+| **Agentic services operate inside a governance envelope** | NIST AI RMF-aligned control boundary | No autonomous high-impact educational action is allowed; degraded mode is explicit and auditable. |
+| **No cross-context database reads** | DDD ownership rule | Services and contexts integrate through APIs, events, and normalized contracts rather than shared container access. |
 
 ---
 
-## 5. Cosmos DB Container Ownership
+## 5. Current Repo Mapping and Migration
 
-Each domain gets its own logical database to enforce data isolation:
+| Current repo asset | Target bounded contexts it advances | Wave fit | Notes |
+| ------------------ | ----------------------------------- | -------- | ----- |
+| **config-svc** | Identity and Tenancy (partial), Enrollment and Lifecycle, Content and Knowledge (rules/flags) | Wave 1 | Transitional control-plane service until learner-record-centered contexts are separated further. |
+| **lms-gateway** | Integration Hub | Wave 1 | The existing adapter model becomes the anti-corruption seam for LMS first, then SIS/CRM later. |
+| **content-svc** | Content and Knowledge | Wave 1 / Wave 2 | Owns approved corpora and grounding policy for assessment and tutoring. |
+| **essays-svc + questions-svc** | Assessment and Evidence | Wave 1 | Continue generating draft evaluations and evidence, then append governed outcomes into the learner record. |
+| **avatar-svc + chat-svc** | Coaching and Interaction | Wave 1 / Wave 2 | Stay in coaching mode and feed transcripts and evidence into governed projections. |
+| **upskilling-svc** | Advising and Success (early), Institutional Analytics and Read Models (partial) | Wave 2 | Evolves from analysis toward advising cases, interventions, and next-best-action workflows. |
+| **insights-svc** | Institutional Analytics and Read Models plus narrative institutional insights | Wave 2 | Narrative briefings sit on top of deterministic projections and scope controls. |
+| **evaluation-svc** | Agent Evaluation and Governance | Wave 1 | Becomes the release gate for provenance, evaluation, and degraded-mode policy on high-impact AI. |
+| **Future learner-record context** | Learner Record | Wave 1 | Can start as an append-only event and projection layer before a dedicated service is justified. |
+| **Future catalog/pathways, credentials, and community contexts** | Catalog and Pathways, Credentialing and Portfolio, Community and Network | Waves 2-3 | These contexts can begin inside existing services or shared libraries and split later when ownership or scale requires it. |
 
-```mermaid
-graph TB
-    subgraph COSMOS["Azure Cosmos DB Account"]
-        subgraph PLATFORM_DB["platform_db"]
-            STUDENTS["students\nPK: tenantId,courseId"]
-            PROFESSORS["professors\nPK: tenantId"]
-            COURSES["courses\nPK: tenantId"]
-            CLASSES["classes\nPK: courseId"]
-            GROUPS["groups\nPK: classId"]
-            SYNC_LOGS["sync_logs\nPK: tenantId"]
-            PED_RULES["pedagogical_rules\nPK: tenantId,subject"]
-            FEATURE_FLAGS["feature_flags\nPK: tenantId"]
-            MATERIALS_META["materials_metadata\nPK: tenantId,subject"]
-        end
-
-        subgraph ASSESSMENT_DB["assessment_db"]
-            ESSAYS_C["essays\nPK: courseId,studentId"]
-            ESSAY_CONFIGS["essay_configs\nPK: courseId"]
-            QUESTIONS_C["questions\nPK: courseId,studentId"]
-            EVALUATIONS_C["evaluations\nPK: courseId,studentId"]
-        end
-
-        subgraph INTERACTION_DB["interaction_db"]
-            CONVERSATIONS["conversations\nPK: sessionId"]
-            TRANSCRIPTS["transcripts\nPK: sessionId"]
-            AGENT_CONFIGS["agent_configs\nPK: tenantId"]
-        end
-
-        subgraph ANALYTICS_DB["analytics_db"]
-            ANALYSES["analyses\nPK: studentId"]
-            COMPETENCY["competency_scores\nPK: studentId,subject"]
-            EVAL_RUNS["eval_runs\nPK: agentId"]
-            GOLDEN["golden_datasets\nPK: agentType"]
-        end
-
-        subgraph SUPERVISION_DB["supervision_db"]
-            INSIGHT_REPORTS["insight_reports\nPK: schoolId,period"]
-            INDICATOR_CONFIGS["indicator_configs\nPK: tenantId"]
-            SCHOOL_PROFILES["school_profiles\nPK: regionId,schoolId"]
-        end
-    end
-
-    CONFIG_SVC["config-svc"] --> PLATFORM_DB
-    LMS_SVC["lms-gateway"] --> PLATFORM_DB
-    CONTENT_SVC["content-svc"] --> PLATFORM_DB
-    ESSAYS_SVC["essays-svc"] --> ASSESSMENT_DB
-    QUESTIONS_SVC["questions-svc"] --> ASSESSMENT_DB
-    AVATAR_SVC["avatar-svc"] --> INTERACTION_DB
-    CHAT_SVC["chat-svc"] --> INTERACTION_DB
-    UPSKILLING_SVC["upskilling-svc"] --> ANALYTICS_DB
-    EVAL_SVC["evaluation-svc"] --> ANALYTICS_DB
-    INSIGHTS_SVC["insights-svc"] --> SUPERVISION_DB
-```
-
-All partition keys use **Hierarchical Partition Keys** (HPK) where two levels are shown (e.g., `tenantId,courseId`), following Cosmos DB best practices to avoid the 20 GB single-partition limit and optimize cross-partition queries.
+Dedicated services are optional until domain ownership, operational load, or governance pressure makes a split necessary. The bounded contexts above are the architectural contract; the current service mesh is the transitional implementation.

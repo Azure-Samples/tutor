@@ -1,43 +1,48 @@
-"use client"
-import React, { useState, useRef } from "react";
-import { Message } from "@/types/message";
+"use client";
+import type { Message } from "@/types/message";
 import { chatApi } from "@/utils/api";
-
+import type React from "react";
+import { useRef, useState } from "react";
 
 const ChatCard = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [studentId, setStudentId] = useState("showcase-student");
   const [courseId, setCourseId] = useState("showcase-course");
   const chatMessageStreamEnd = useRef<HTMLDivElement | null>(null);
   const nextMessageId = useRef(1);
 
   const sendMessage = async () => {
-    if (input.trim() === '') return;
-    const userMessage: Message = { id: nextMessageId.current, sender: 'user', content: input };
-    setMessages([...messages, userMessage]);
-    setInput('');
+    if (input.trim() === "") return;
+    const userMessage: Message = { id: nextMessageId.current, sender: "user", content: input };
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
+    setInput("");
     nextMessageId.current += 1;
 
     try {
-      const response = await chatApi.post('/guide', {
+      const response = await chatApi.post("/guide", {
         student_id: studentId,
         course_id: courseId,
         prompt: input,
       });
-      const guidance = typeof response.data?.guidance === "string"
-        ? response.data.guidance
-        : "No guidance was returned.";
+      const guidance =
+        typeof response.data?.guidance === "string"
+          ? response.data.guidance
+          : "No guidance was returned.";
 
-      setMessages(prevMessages => [
+      setMessages((prevMessages) => [
         ...prevMessages,
-        { id: nextMessageId.current, sender: 'bot', content: guidance }
+        { id: nextMessageId.current, sender: "bot", content: guidance },
       ]);
     } catch (error) {
-      console.error('Error streaming from API:', error);
-      setMessages(prevMessages => [
+      console.error("Error streaming from API:", error);
+      setMessages((prevMessages) => [
         ...prevMessages,
-        { id: nextMessageId.current, sender: 'bot', content: 'Ocorreu um erro. Tente novamente mais tarde.' }
+        {
+          id: nextMessageId.current,
+          sender: "bot",
+          content: "Ocorreu um erro. Tente novamente mais tarde.",
+        },
       ]);
     } finally {
       nextMessageId.current += 1;
@@ -46,7 +51,7 @@ const ChatCard = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       sendMessage();
     }
   };
@@ -55,14 +60,14 @@ const ChatCard = () => {
     <div className="h-full w-full">
       <div className="h-full w-full flex flex-col">
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          {messages.map((message, index) => (
+          {messages.map((message) => (
             <div
-              key={index}
-              className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              key={message.id}
+              className={`flex ${message.sender === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
                 className={`p-2 max-w-xs rounded-lg ${
-                  message.sender === 'user' ? 'bg-blue-200 text-black' : 'bg-gray-200 text-gray-800'
+                  message.sender === "user" ? "bg-blue-200 text-black" : "bg-gray-200 text-gray-800"
                 }`}
               >
                 {message.content}
@@ -100,10 +105,13 @@ const ChatCard = () => {
               placeholder="Pergunte sobre os dados..."
             />
             <button
-              className="ml-2 p-2 text-white rounded-lg"
+              type="button"
+              aria-label="Send message"
+              className="ml-2 rounded-lg p-2 text-white"
               onClick={sendMessage}
             >
               <svg
+                aria-hidden="true"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="red"

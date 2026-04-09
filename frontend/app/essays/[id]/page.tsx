@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { unwrapContent } from "@/types/api";
 import type { Essay } from "@/types/essays";
 import { essaysEngine } from "@/utils/api";
-import { unwrapContent } from "@/types/api";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const EssayDetailPage: React.FC = () => {
   const params = useParams<{ id: string }>();
@@ -33,7 +33,10 @@ const EssayDetailPage: React.FC = () => {
 
   return (
     <DefaultLayout>
-      <Breadcrumb pageName="Essay Details" subtitle="Review the essay theme, content, and explanation." />
+      <Breadcrumb
+        pageName="Essay Details"
+        subtitle="Review the essay theme, content, and explanation."
+      />
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <span className="text-lg text-cyan-500 animate-pulse">Loading essay...</span>
@@ -45,12 +48,16 @@ const EssayDetailPage: React.FC = () => {
           <h2 className="text-3xl font-bold text-cyan-700 mb-4">{essay.topic}</h2>
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-blue-700 mb-2">Content</h3>
-            <p className="text-base text-gray-800 dark:text-gray-200 whitespace-pre-line">{essay.content}</p>
+            <p className="text-base text-gray-800 dark:text-gray-200 whitespace-pre-line">
+              {essay.content}
+            </p>
           </div>
           {essay.explanation && (
             <div>
               <h3 className="text-lg font-semibold text-green-700 mb-2">Explanation</h3>
-              <p className="text-base text-gray-700 dark:text-gray-300 whitespace-pre-line">{essay.explanation}</p>
+              <p className="text-base text-gray-700 dark:text-gray-300 whitespace-pre-line">
+                {essay.explanation}
+              </p>
             </div>
           )}
         </div>

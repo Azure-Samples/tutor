@@ -61,6 +61,7 @@ const GradersList: React.FC = () => {
               Manage question grader agents referenced by assemblies.
             </p>
             <button
+              type="button"
               className="flex items-center gap-2 bg-gradient-to-br from-green-400 to-cyan-400 hover:from-cyan-400 hover:to-yellow-300 text-white font-bold px-6 py-3 rounded-full shadow-lg hover:scale-105 transition-all duration-200 text-lg"
               onClick={() => {
                 closeAllModals();
@@ -86,14 +87,37 @@ const GradersList: React.FC = () => {
               </thead>
               <tbody>
                 {graders.map((grader) => (
-                  <tr key={grader.agent_id} className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl">
-                    <td className="py-4 px-2 text-center font-semibold text-cyan-700 dark:text-cyan-200">{grader.agent_id}</td>
-                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200">{grader.dimension}</td>
-                    <td className="py-4 px-2 text-center text-blue-700 dark:text-blue-200">{grader.deployment}</td>
+                  <tr
+                    key={grader.agent_id}
+                    className="hover:bg-cyan-50 dark:hover:bg-cyan-900 transition-colors rounded-xl"
+                  >
+                    <td className="py-4 px-2 text-center font-semibold text-cyan-700 dark:text-cyan-200">
+                      {grader.agent_id}
+                    </td>
+                    <td className="py-4 px-2 text-center text-green-700 dark:text-green-200">
+                      {grader.dimension}
+                    </td>
+                    <td className="py-4 px-2 text-center text-blue-700 dark:text-blue-200">
+                      {grader.deployment}
+                    </td>
                     <td className="py-4 px-2 text-center">
                       <div className="flex gap-2 justify-center items-center">
-                        <button onClick={() => handleEdit(grader)} className="bg-gradient-to-br from-blue-400 to-cyan-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Edit"><FaPen /></button>
-                        <button onClick={() => handleDelete(grader)} className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200" title="Delete"><FaTrash /></button>
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(grader)}
+                          className="bg-gradient-to-br from-blue-400 to-cyan-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Edit"
+                        >
+                          <FaPen />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(grader)}
+                          className="bg-gradient-to-br from-red-400 to-orange-400 text-white rounded-full p-2 shadow hover:scale-110 transition-all duration-200"
+                          title="Delete"
+                        >
+                          <FaTrash />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -104,8 +128,12 @@ const GradersList: React.FC = () => {
             {graders.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16">
                 <span className="text-5xl mb-4">🧠</span>
-                <p className="text-xl text-cyan-700 dark:text-cyan-200 font-bold mb-2">No graders yet!</p>
-                <p className="text-green-700 dark:text-green-200 mb-4">Create graders to compose evaluator assemblies.</p>
+                <p className="text-xl text-cyan-700 dark:text-cyan-200 font-bold mb-2">
+                  No graders yet!
+                </p>
+                <p className="text-green-700 dark:text-green-200 mb-4">
+                  Create graders to compose evaluator assemblies.
+                </p>
               </div>
             )}
           </div>
@@ -113,20 +141,57 @@ const GradersList: React.FC = () => {
       )}
 
       <FormsModal open={showCreateModal} onClose={closeAllModals} title="Create a New Grader">
-        <GraderForm onSuccess={() => { closeAllModals(); void refresh(); }} />
+        <GraderForm
+          onSuccess={() => {
+            closeAllModals();
+            void refresh();
+          }}
+        />
       </FormsModal>
 
-      <FormsModal open={showEditModal && !showCreateModal && !showDeleteModal} onClose={closeAllModals} title="Edit Grader">
-        {selectedGrader && <GraderForm graderData={selectedGrader} onSuccess={() => { closeAllModals(); void refresh(); }} />}
+      <FormsModal
+        open={showEditModal && !showCreateModal && !showDeleteModal}
+        onClose={closeAllModals}
+        title="Edit Grader"
+      >
+        {selectedGrader && (
+          <GraderForm
+            graderData={selectedGrader}
+            onSuccess={() => {
+              closeAllModals();
+              void refresh();
+            }}
+          />
+        )}
       </FormsModal>
 
-      <FormsModal open={showDeleteModal && !showCreateModal && !showEditModal} onClose={closeAllModals} title="Confirm Delete">
+      <FormsModal
+        open={showDeleteModal && !showCreateModal && !showEditModal}
+        onClose={closeAllModals}
+        title="Confirm Delete"
+      >
         <div className="p-6">
-          <h2 className="text-2xl font-bold text-red-700 mb-2 flex items-center gap-2"><span className="inline-block">⚠️</span>Confirm Delete</h2>
-          <p className="mb-4 text-red-700 dark:text-red-300 font-medium">Are you sure you want to delete this grader? This action cannot be undone.</p>
+          <h2 className="text-2xl font-bold text-red-700 mb-2 flex items-center gap-2">
+            <span className="inline-block">⚠️</span>Confirm Delete
+          </h2>
+          <p className="mb-4 text-red-700 dark:text-red-300 font-medium">
+            Are you sure you want to delete this grader? This action cannot be undone.
+          </p>
           <div className="flex gap-2 mt-4">
-            <button className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200" onClick={confirmDelete}>Delete</button>
-            <button className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200" onClick={closeAllModals}>Cancel</button>
+            <button
+              type="button"
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors duration-200"
+              onClick={confirmDelete}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
+              className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition-colors duration-200"
+              onClick={closeAllModals}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </FormsModal>

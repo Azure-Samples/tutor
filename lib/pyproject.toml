@@ -11,6 +11,7 @@ dependencies = [
     "PyJWT[crypto]>=2.10.1",
     "azure-cosmos>=4.10.0",
     "azure-identity>=1.21.0",
+    "azure-servicebus>=7.14.2",
     "agent-framework>=1.0.0rc4",
     "agent-framework-azure-ai>=1.0.0rc4",
     "azure-ai-projects>=2.0.0",

@@ -5,8 +5,16 @@ import { type FormEvent, useCallback, useEffect, useState } from "react";
 
 import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { humanizeIdentifier } from "@/utils/workspace-api";
 
 import { type InsightReport, createInsightBriefing, listInsightReports } from "./api";
+
+const freshnessStyles = {
+  fresh: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  derived: "border-sky-200 bg-sky-50 text-sky-900",
+  stale: "border-amber-200 bg-amber-50 text-amber-900",
+  degraded: "border-rose-200 bg-rose-50 text-rose-900",
+} as const;
 
 const formatDate = (value: string) => {
   const parsed = new Date(value);
@@ -14,6 +22,20 @@ const formatDate = (value: string) => {
     return value;
   }
   return parsed.toLocaleString();
+};
+
+const renderFreshnessBadge = (report: InsightReport) => {
+  if (!report.freshness) {
+    return <span className="text-gray-500 dark:text-gray-400">-</span>;
+  }
+
+  return (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${freshnessStyles[report.freshness.status]}`}
+    >
+      {humanizeIdentifier(report.freshness.status)}
+    </span>
+  );
 };
 
 const SupervisorConfigurationPage = () => {
@@ -216,6 +238,8 @@ const SupervisorConfigurationPage = () => {
                     <th className="px-4 py-3 font-medium text-black dark:text-white">Week Of</th>
                     <th className="px-4 py-3 font-medium text-black dark:text-white">Generated</th>
                     <th className="px-4 py-3 font-medium text-black dark:text-white">Source</th>
+                    <th className="px-4 py-3 font-medium text-black dark:text-white">Freshness</th>
+                    <th className="px-4 py-3 font-medium text-black dark:text-white">Trust</th>
                     <th className="px-4 py-3 font-medium text-black dark:text-white">Feedback</th>
                     <th className="px-4 py-3 font-medium text-black dark:text-white">Actions</th>
                   </tr>
@@ -236,16 +260,31 @@ const SupervisorConfigurationPage = () => {
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {report.source}
                       </td>
+                      <td className="px-4 py-3">{renderFreshnessBadge(report)}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                        {report.trust ? humanizeIdentifier(report.trust.human_review.status) : "-"}
+                      </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
                         {report.feedback_count}
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          href={`/configuration/supervisor/${encodeURIComponent(report.school_id)}`}
-                          className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
-                        >
-                          Open School View
-                        </Link>
+                        <div className="flex flex-col gap-2">
+                          <Link
+                            href={`/configuration/supervisor/${encodeURIComponent(report.school_id)}`}
+                            className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
+                          >
+                            Open School View
+                          </Link>
+                          {report.deep_links?.map((link) => (
+                            <Link
+                              key={`${report.report_id}-${link.href}`}
+                              href={link.href}
+                              className="text-xs font-medium text-cyan-700 hover:text-cyan-800 dark:text-cyan-300 dark:hover:text-cyan-200"
+                            >
+                              {link.label}
+                            </Link>
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   ))}
