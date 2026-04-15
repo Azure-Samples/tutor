@@ -34,7 +34,7 @@ dependencies = [
     "scikit-learn>=1.5.2",
     "openpyxl>=3.1.5",
     "orjson>=3.10.7",
-    "python-multipart>=0.0.22",
+    "python-multipart>=0.0.26",
     "rapidfuzz>=3.10.0"
 ]
 
