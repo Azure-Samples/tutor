@@ -24,7 +24,7 @@ dependencies = [
     "agent-framework-azure-ai>=1.0.0rc4",
     "azure-ai-projects>=2.0.0",
     "azure-ai-documentintelligence>=1.0.2",
-    "pypdf>=4.0.0",
+    "pypdf>=6.10.1",
     "pydantic>=2.9.2",
     "pydantic-settings>=2.4.0",
     "PyJWT[crypto]>=2.10.1",
@@ -38,7 +38,7 @@ dependencies = [
     "python-multipart>=0.0.22",
     "rapidfuzz>=3.10.0",
     "azure-ai-vision-imageanalysis>=1.0.0",
-    "pypdf>=4.2.0",
+    "pypdf>=6.10.1",
     "Pillow>=10.0.0",
 ]
 
