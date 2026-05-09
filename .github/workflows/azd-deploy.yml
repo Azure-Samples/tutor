@@ -2344,13 +2344,7 @@ jobs:
       - name: Validate APIM policy and remediate drift (non-prod)
         env:
           SERVICE: ${{ matrix.service }}
-          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          ARM_USE_OIDC: true
-          TFSTATE_RESOURCE_GROUP: ${{ secrets.TERRAFORM_STATE_RESOURCE_GROUP }}
-          TFSTATE_STORAGE_ACCOUNT: ${{ secrets.TERRAFORM_STATE_STORAGE_ACCOUNT }}
-          TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
         run: |
           set -euo pipefail
 
@@ -2407,18 +2401,64 @@ jobs:
               exit 1
             fi
 
-            echo "APIM policy drift detected for ${API_ID}. Applying one-shot Terraform remediation in ${RELEASE_TIER}."
+            echo "APIM policy drift detected for ${API_ID}. Remediating APIM policy via ARM REST in non-prod ${RELEASE_TIER}."
 
-            export TF_VAR_allowed_origins="$REQUIRED_CORS_ORIGINS_JSON"
-            STACK_STATE_KEY="stacks/services/${SERVICE}-${AZURE_ENV_NAME}.tfstate"
-            terraform -chdir="$STACK_DIR" init -reconfigure -input=false \
-              -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
-              -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
-              -backend-config="container_name=${TFSTATE_CONTAINER}" \
-              -backend-config="key=${STACK_STATE_KEY}" \
-              -backend-config="use_azuread_auth=true" \
-              -backend-config="use_oidc=true"
-            terraform -chdir="$STACK_DIR" apply -auto-approve
+            policy_payload="$(
+              python - <<'PY'
+          import json
+          import os
+          from xml.sax.saxutils import escape
+
+          required_origins = [
+            origin
+            for origin in json.loads(os.environ.get("REQUIRED_CORS_ORIGINS_JSON", "[]"))
+            if origin
+          ]
+          origin_lines = [
+            "            <origin>http://localhost:3000</origin>",
+            "            <origin>http://localhost:5173</origin>",
+            *[f"            <origin>{escape(origin)}</origin>" for origin in required_origins],
+          ]
+
+          xml = "\n".join(
+            [
+              "<policies>",
+              "  <inbound>",
+              "    <base />",
+              "    <cors allow-credentials=\"false\">",
+              "      <allowed-origins>",
+              *origin_lines,
+              "      </allowed-origins>",
+              "      <allowed-methods preflight-result-max-age=\"86400\">",
+              "        <method>*</method>",
+              "      </allowed-methods>",
+              "      <allowed-headers>",
+              "        <header>*</header>",
+              "      </allowed-headers>",
+              "    </cors>",
+              "  </inbound>",
+              "  <backend>",
+              "    <base />",
+              "  </backend>",
+              "  <outbound>",
+              "    <base />",
+              "  </outbound>",
+              "  <on-error>",
+              "    <base />",
+              "  </on-error>",
+              "</policies>",
+            ]
+          ) + "\n"
+
+          print(json.dumps({"properties": {"format": "rawxml", "value": xml}}))
+          PY
+            )"
+            az rest \
+              --method put \
+              --url "$policy_url" \
+              --headers 'Content-Type=application/json' \
+              --body "$policy_payload" \
+              --only-show-errors >/dev/null
 
             live_policy="$(az rest --method get --url "$policy_url" --query 'properties.value' -o tsv)"
             if [ -z "$live_policy" ] || ! grep -q '<cors' <<<"$live_policy"; then
