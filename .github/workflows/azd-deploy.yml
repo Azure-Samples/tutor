@@ -1487,7 +1487,6 @@ jobs:
           azd env set RS_KEY "$TFSTATE_KEY"
 
       - name: Initialize Terraform backend for environment refresh
-        continue-on-error: true
         env:
           ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -1539,12 +1538,74 @@ jobs:
               echo "access_key           = \"$TFSTATE_ACCESS_KEY\""
             } > backend.hcl
 
-            terraform init -reconfigure -backend-config=backend.hcl
+            if ! terraform init -reconfigure -backend-config=backend.hcl; then
+              echo "::error::Terraform backend initialization failed with both OIDC auth and storage account key fallback."
+              exit 1
+            fi
           fi
 
       - name: Refresh deployment environment outputs
-        continue-on-error: true
-        run: azd env refresh -e "$AZURE_ENV_NAME" --no-prompt
+        run: |
+          set -euo pipefail
+
+          azd env select "$AZURE_ENV_NAME" || azd env new "$AZURE_ENV_NAME" --no-prompt
+
+          if ! azd env refresh -e "$AZURE_ENV_NAME" --no-prompt; then
+            echo "::warning::azd env refresh failed; attempting to hydrate required non-secret outputs from Terraform state."
+          fi
+
+          azd_env_has_nonempty_value() {
+            local name="$1"
+            local value=""
+
+            value="$(azd env get-values -e "$AZURE_ENV_NAME" --no-prompt 2>/dev/null \
+              | awk -F= -v name="$name" '$1 == name { print substr($0, index($0, "=") + 1); found=1; exit } END { if (!found) exit 1 }' \
+              || true)"
+            value="${value%\"}"
+            value="${value#\"}"
+
+            [ -n "$value" ]
+          }
+
+          hydrate_nonsecret_output() {
+            local output_name="$1"
+            local required="$2"
+            local output_value=""
+
+            if azd_env_has_nonempty_value "$output_name"; then
+              echo "azd env already contains $output_name."
+              return 0
+            fi
+
+            if [ "$output_name" = "PROJECT_ENDPOINT" ]; then
+              output_value="$(terraform -chdir=infra/terraform output -raw PROJECT_ENDPOINT 2>/dev/null || true)"
+            else
+              output_value="$(terraform -chdir=infra/terraform output -raw "$output_name" 2>/dev/null || true)"
+            fi
+
+            if [ -n "$output_value" ]; then
+              azd env set "$output_name" "$output_value"
+              echo "Hydrated $output_name from Terraform output."
+              return 0
+            fi
+
+            if [ "$required" = "true" ]; then
+              echo "::error::Missing required non-secret output $output_name after azd env refresh and Terraform fallback."
+              return 1
+            fi
+
+            echo "::warning::Optional non-secret Terraform output $output_name is unavailable; continuing."
+          }
+
+          hydrate_nonsecret_output PROJECT_ENDPOINT true
+          hydrate_nonsecret_output AI_SERVICES_ENDPOINT false
+          hydrate_nonsecret_output MODEL_DEPLOYMENT_NAME false
+          hydrate_nonsecret_output MODEL_REASONING_DEPLOYMENT false
+
+          if ! azd_env_has_nonempty_value PROJECT_ENDPOINT; then
+            echo "::error::PROJECT_ENDPOINT is still unavailable after azd env refresh and Terraform fallback."
+            exit 1
+          fi
 
       - name: Build and deploy service image
         env:
