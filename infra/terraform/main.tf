@@ -382,8 +382,8 @@ resource "azurerm_servicebus_subscription" "learner_record_integration_backlog" 
 # ── Azure AI Foundry (AVM module, Agent Service enabled) ────────────────────
 
 module "ai_foundry" {
-  source  = "Azure/avm-ptn-aiml-ai-foundry/azurerm"
-  version = "0.10.1"
+  # Vendored from Azure/avm-ptn-aiml-ai-foundry/azurerm v0.10.1 with Agent Service output guard patch.
+  source = "./modules/avm-ptn-aiml-ai-foundry-v0.10.1-patched"
 
   base_name                  = substr("${local.normalized_prefix}${random_string.suffix.result}", 0, 9)
   location                   = var.foundry_location
