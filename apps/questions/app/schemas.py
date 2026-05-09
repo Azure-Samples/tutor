@@ -2,10 +2,9 @@
 A package that manages the response bodies.
 """
 from dataclasses import dataclass
+from typing import Any
 
-from typing import Dict, List, Optional, Union
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, model_validator
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -19,6 +18,7 @@ from starlette.status import (
     HTTP_418_IM_A_TEAPOT,
     HTTP_422_UNPROCESSABLE_ENTITY,
 )
+from tutor_lib.agents import AgentReference
 
 
 class BodyMessage(BaseModel):
@@ -27,9 +27,9 @@ class BodyMessage(BaseModel):
     """
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    type: str | None
+    title: str | None
+    detail: dict[str, str | list] | list[dict[str, str | list]] | None
 
 
 @dataclass
@@ -38,9 +38,9 @@ class SuccessMessage:
     The base message body for HTTP responses
     """
 
-    title: Optional[str]
-    message: Optional[str]
-    content: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    title: str | None
+    message: str | None
+    content: dict[str, str | list] | list[dict[str, str | list]] | None
 
 
 @dataclass
@@ -50,16 +50,16 @@ class ErrorMessage:
     """
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    type: str | None
+    title: str | None
+    detail: dict[str, str | list] | list[dict[str, str | list]] | None
 
 
 class Question(BaseModel):
     id: str = Field(..., description="Question ID")
     topic: str
     question: str
-    explanation: Optional[str] = Field(..., description="Question Explanation")
+    explanation: str | None = Field(..., description="Question Explanation")
 
 
 class Answer(BaseModel):
@@ -78,20 +78,96 @@ class ChatResponse(BaseModel):
     answer: Answer
 
 
+def _native_agent_payload(value: Any, *, role_field: str) -> Any:
+    if isinstance(value, str):
+        return {
+            "agent_name": value,
+            "legacy_agent_id": value,
+            role_field: "default",
+            "deployment": "",
+        }
+    if not isinstance(value, dict):
+        return value
+
+    payload = dict(value)
+    legacy_agent_id = payload.get("legacy_agent_id") or payload.get("agent_id") or payload.get("id")
+    agent_name = payload.get("agent_name") or legacy_agent_id
+    if agent_name is not None:
+        payload["agent_name"] = str(agent_name)
+    if legacy_agent_id is not None and not payload.get("legacy_agent_id"):
+        payload["legacy_agent_id"] = str(legacy_agent_id)
+    if not payload.get(role_field):
+        payload[role_field] = payload.get("role") or payload.get("dimension") or "default"
+    if payload.get("deployment") is None:
+        payload["deployment"] = ""
+    return payload
+
+
 class Grader(BaseModel):
-    agent_id: str = Field(..., description="Azure AI Foundry agent ID")
-    dimension: str = Field(..., description="Evaluation dimension handled by this agent")
-    deployment: str = Field(..., description="Azure AI Foundry model deployment")
+    agent_name: str = Field(..., description="Azure AI Foundry agent name")
+    agent_version: str | None = Field(None, description="Azure AI Foundry agent version")
+    legacy_agent_id: str | None = Field(None, description="Legacy Azure AI Foundry agent ID")
+    dimension: str = Field(default="default", description="Evaluation dimension handled by this agent")
+    deployment: str = Field(default="", description="Azure AI Foundry model deployment")
+
+    @model_validator(mode="before")
+    @classmethod
+    def hydrate_legacy_reference(cls, value: Any) -> Any:
+        return _native_agent_payload(value, role_field="dimension")
+
+    @property
+    def agent_id(self) -> str:
+        """Compatibility alias for legacy read-only callers."""
+
+        return self.legacy_agent_id or self.agent_name
+
+    @property
+    def id(self) -> str:
+        """Compatibility alias for legacy assembly documents."""
+
+        return self.agent_id
+
+    def to_agent_reference(self) -> AgentReference:
+        return AgentReference(
+            agent_name=self.agent_name,
+            agent_version=self.agent_version,
+            dimension=self.dimension,
+            model_name=self.deployment or None,
+            legacy_agent_id=self.legacy_agent_id,
+            metadata={"deployment": self.deployment} if self.deployment else {},
+        )
 
 
 class GraderDefinition(BaseModel):
     """Payload for creating or referencing a Foundry grader agent."""
 
-    agent_id: Optional[str] = Field(None, description="Existing Foundry agent ID (omit to create new)")
+    agent_name: str | None = Field(None, description="Existing Foundry agent name (omit to create new)")
+    agent_version: str | None = Field(None, description="Existing Foundry agent version")
+    legacy_agent_id: str | None = Field(None, description="Existing legacy Foundry agent ID")
     name: str = Field(..., description="Evaluator name", max_length=32)
     instructions: str = Field(..., description="System prompt for the evaluator")
     deployment: str = Field(..., description="Azure AI Foundry model deployment")
     dimension: str = Field(..., description="Evaluation dimension handled by this agent")
+
+    @model_validator(mode="before")
+    @classmethod
+    def hydrate_legacy_reference(cls, value: Any) -> Any:
+        return _native_agent_payload(value, role_field="dimension")
+
+    @property
+    def agent_id(self) -> str | None:
+        """Compatibility alias for legacy read-only callers."""
+
+        return self.legacy_agent_id or self.agent_name
+
+    def to_grader(self) -> Grader:
+        return Grader(
+            agent_name=self.agent_name or self.name,
+            agent_version=self.agent_version,
+            legacy_agent_id=self.legacy_agent_id,
+            dimension=self.dimension,
+            deployment=self.deployment,
+        )
 
 
 class Assembly(BaseModel):
@@ -105,7 +181,7 @@ class Assembly(BaseModel):
     """
 
     id: str = Field(..., description="Assembly ID")
-    agents: List[Grader] = Field(..., description="Judges Assemblies")
+    agents: list[Grader] = Field(..., description="Judges Assemblies")
     topic_name: str = Field(..., description="Topic to Answer")
 
 
@@ -114,7 +190,7 @@ class AssemblyDefinition(BaseModel):
 
     id: str = Field(..., description="Assembly ID")
     topic_name: str = Field(..., description="Topic to Answer")
-    agents: List[GraderDefinition] = Field(..., description="Grader agent definitions")
+    agents: list[GraderDefinition] = Field(..., description="Grader agent definitions")
 
 
 RESPONSES = {

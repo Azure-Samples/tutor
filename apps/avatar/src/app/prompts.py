@@ -1,6 +1,5 @@
 from string import Template
 
-
 SIMULATION_PROMPT = Template(
    """
 You are acting as an avatar for a student evaluation scenario.

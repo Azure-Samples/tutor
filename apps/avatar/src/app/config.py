@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable
 
 from dotenv import load_dotenv
-
 from pydantic import Field
 from pydantic_settings import BaseSettings
-from tutor_lib.config import TutorSettings, get_settings as get_shared_settings
-
+from tutor_lib.config import TutorSettings
+from tutor_lib.config import get_settings as get_shared_settings
 
 load_dotenv()
 

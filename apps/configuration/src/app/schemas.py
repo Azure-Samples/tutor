@@ -1,10 +1,9 @@
 """Pydantic schemas and response envelopes for the configuration service."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -25,18 +24,18 @@ class BodyMessage(BaseModel):
     """
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    type: str | None
+    title: str | None
+    detail: dict[str, str | list] | list[dict[str, str | list]] | None
 
 
 @dataclass
 class SuccessMessage:
     """Standard success payload envelope."""
 
-    title: Optional[str]
-    message: Optional[str]
-    content: Optional[Any]
+    title: str | None
+    message: str | None
+    content: Any | None
 
 
 @dataclass
@@ -44,9 +43,9 @@ class ErrorMessage:
     """Standard error payload envelope."""
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    type: str | None
+    title: str | None
+    detail: dict[str, str | list] | list[dict[str, str | list]] | None
 
 class ChatResponse(BaseModel):
     """
@@ -60,10 +59,10 @@ class ChatResponse(BaseModel):
 class Case(BaseModel):
     name: str
     role: str
-    id: Optional[str] = None
-    steps: Optional[List] = None
-    profile: Optional[Dict] = None
-    history: Optional[List] = None
+    id: str | None = None
+    steps: list | None = None
+    profile: dict | None = None
+    history: list | None = None
 
 
 class Student(BaseModel):
@@ -76,48 +75,48 @@ class Professor(BaseModel):
     id: str
     name: str
     email: str
-    courses: List[str] = Field(default_factory=list)
+    courses: list[str] = Field(default_factory=list)
 
 class Course(BaseModel):
     id: str
     name: str
     professor_id: str
-    class_ids: List[str] = Field(default_factory=list)
+    class_ids: list[str] = Field(default_factory=list)
 
 class Class(BaseModel):
     id: str
     name: str
     course_id: str
-    student_ids: List[str] = Field(default_factory=list)
+    student_ids: list[str] = Field(default_factory=list)
 
 class Group(BaseModel):
     id: str
     name: str
     class_id: str
-    student_ids: List[str] = Field(default_factory=list)
-    assigned_case_ids: List[str] = Field(default_factory=list)
+    student_ids: list[str] = Field(default_factory=list)
+    assigned_case_ids: list[str] = Field(default_factory=list)
 
 
 class GroupCaseAssignment(BaseModel):
-    case_ids: List[str] = Field(default_factory=list)
+    case_ids: list[str] = Field(default_factory=list)
 
 
 class ThemeInput(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     name: str
     objective: str
     description: str
-    criteria: List[str] = Field(default_factory=list)
+    criteria: list[str] = Field(default_factory=list)
 
 
 class AccessScope(BaseModel):
-    institution_ids: List[str] = Field(default_factory=list)
-    school_ids: List[str] = Field(default_factory=list)
-    program_ids: List[str] = Field(default_factory=list)
-    course_ids: List[str] = Field(default_factory=list)
-    class_ids: List[str] = Field(default_factory=list)
-    learner_ids: List[str] = Field(default_factory=list)
-    staff_ids: List[str] = Field(default_factory=list)
+    institution_ids: list[str] = Field(default_factory=list)
+    school_ids: list[str] = Field(default_factory=list)
+    program_ids: list[str] = Field(default_factory=list)
+    course_ids: list[str] = Field(default_factory=list)
+    class_ids: list[str] = Field(default_factory=list)
+    learner_ids: list[str] = Field(default_factory=list)
+    staff_ids: list[str] = Field(default_factory=list)
 
 
 class AccessGrantItem(BaseModel):
@@ -138,34 +137,34 @@ class AccessContextItem(BaseModel):
 
 class AccessRoleContext(BaseModel):
     role: str
-    grants: List[AccessGrantItem] = Field(default_factory=list)
-    contexts: List[AccessContextItem] = Field(default_factory=list)
-    default_context_id: Optional[str] = None
+    grants: list[AccessGrantItem] = Field(default_factory=list)
+    contexts: list[AccessContextItem] = Field(default_factory=list)
+    default_context_id: str | None = None
 
 
 class AccessActor(BaseModel):
     subject: str
     tenant_id: str
     object_id: str
-    display_name: Optional[str] = None
-    email: Optional[str] = None
+    display_name: str | None = None
+    email: str | None = None
 
 
 class AccessContextPayload(BaseModel):
     actor: AccessActor
-    available_roles: List[str] = Field(default_factory=list)
-    default_role: Optional[str] = None
-    default_context: Optional[AccessContextItem] = None
-    roles: List[AccessRoleContext] = Field(default_factory=list)
-    feature_flags: List[str] = Field(default_factory=list)
+    available_roles: list[str] = Field(default_factory=list)
+    default_role: str | None = None
+    default_context: AccessContextItem | None = None
+    roles: list[AccessRoleContext] = Field(default_factory=list)
+    feature_flags: list[str] = Field(default_factory=list)
 
 
 class BulkRosterSyncRequest(BaseModel):
-    students: List[Student] = Field(default_factory=list)
-    professors: List[Professor] = Field(default_factory=list)
-    courses: List[Course] = Field(default_factory=list)
-    classes: List[Class] = Field(default_factory=list)
-    groups: List[Group] = Field(default_factory=list)
+    students: list[Student] = Field(default_factory=list)
+    professors: list[Professor] = Field(default_factory=list)
+    courses: list[Course] = Field(default_factory=list)
+    classes: list[Class] = Field(default_factory=list)
+    groups: list[Group] = Field(default_factory=list)
 
 
 RESPONSES = {

@@ -958,3 +958,6 @@ override.tf.json
 
 # Local SWA generated artifacts
 frontend/public/.swa/
+
+# Local agent scratch artifacts
+.tmp/

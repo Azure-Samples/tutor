@@ -38,8 +38,8 @@ data "azurerm_static_web_app" "frontend" {
 }
 
 locals {
-  service_name             = "essays"
-  swa_default_origin       = "https://${data.azurerm_static_web_app.frontend.default_host_name}"
+  service_name       = "essays"
+  swa_default_origin = "https://${data.azurerm_static_web_app.frontend.default_host_name}"
   effective_allowed_origins = distinct(compact(concat(
     [local.swa_default_origin],
     var.allowed_origins,

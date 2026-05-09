@@ -1,9 +1,9 @@
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 
-class QuestionEvaluationStatus(str, Enum):
+class QuestionEvaluationStatus(StrEnum):
     PENDING = "pending"
     EVALUATING = "evaluating"
     COMPLETED = "completed"

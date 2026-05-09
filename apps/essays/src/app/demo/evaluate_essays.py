@@ -3,21 +3,24 @@ Script to read essays_source.xlsx from .data folder, process each essay image UR
 Requires: pandas, openpyxl, python-dotenv
 """
 
-import io
-import sys
-import json
 import asyncio
+import io
+import json
+import sys
 from pathlib import Path
 
+import pandas as pd
 from dotenv import load_dotenv
-from semantic_kernel.agents import GroupChatManager, BooleanResult, MessageResult, StringResult  # pylint: disable=no-name-in-module
-from semantic_kernel.contents import ChatMessageContent, ChatHistory, AuthorRole
+from semantic_kernel.agents import (  # pylint: disable=no-name-in-module
+    BooleanResult,
+    GroupChatManager,
+    MessageResult,
+    StringResult,
+)
+from semantic_kernel.contents import AuthorRole, ChatHistory, ChatMessageContent
 
 from app.essays import EssayOrchestrator  # pylint: disable=import-error
-from app.schemas import Essay, Resource, Evaluator, Assembly  # pylint: disable=import-error
-
-import pandas as pd
-
+from app.schemas import Assembly, Essay, Evaluator, Resource  # pylint: disable=import-error
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', line_buffering=True)
 

@@ -563,7 +563,7 @@ graph TB
             AI_SEARCH["Azure AI Search"]
         end
         
-        FOUNDRY["AI Foundry Project\n(westus3, public endpoint,\nTerraform-managed — ADR-011)"]
+        FOUNDRY["Microsoft Foundry Project\n(project endpoint,\nworkflow-managed — ADR-015)"]
         SWA["Static Web App (Frontend)"]
         ENTRA["Microsoft Entra ID"]
     end
@@ -601,7 +601,7 @@ graph TB
     subgraph lib["lib/ (tutor-lib)"]
         CONFIG["config/\nAppFactory, Settings"]
         COSMOS_MOD["cosmos/\nCosmosCRUD, repositories"]
-        AGENTS["agents/\nChatAgent wrappers, AzureAIAgentClient\nOrchestration: Sequential · Concurrent · Handoff"]
+        AGENTS["agents/\nFoundry Agent Service facade\nAgentReference · InvocationRequest · InvocationResult"]
         SCHEMAS["schemas/\nShared Pydantic models (Assembly, AgentRef)"]
         MIDDLEWARE["middleware/\nAuth, logging, error handling"]
         EVAL["evaluation/\nFoundryEvaluator client"]
@@ -816,7 +816,7 @@ graph TB
 
 This section documents the **as-implemented** internal architecture of each microservice, showing how design patterns, agent orchestration, and Azure service integrations are wired in code.
 
-> **Foundry-First Architecture (ADR-011):** All agent definitions live in Azure AI Foundry as persistent agents with stable `agent_id` values. Services load agents from Foundry via `AzureAIAgentClient` and orchestrate them with Agent Framework rc3 patterns (`SequentialBuilder`, `ConcurrentBuilder`, `HandoffBuilder`). Cosmos DB stores **assemblies** — lightweight references that map Foundry agents to business entities (essays, questions, avatars). No backward compatibility shims exist; all services target Agent Framework `>=1.0.0rc3` with `azure-ai-projects>=2.0.0`.
+> **Foundry Agent Service Native Architecture (ADR-015):** Agent definitions, versions, conversations, responses, tool calls, traces, and evaluations are managed through Microsoft Foundry Agent Service. Application services call the `tutor_lib.agents` facade with `AgentReference`, `AgentInvocationRequest`, and `AgentInvocationResult` contracts; new writes use `agent_name` and `agent_version`. Microsoft Agent Framework, `AzureAIAgentClient`, direct thread/run polling, and `agent_id` as the primary app-facing contract are superseded. Cosmos DB still stores owned domain data and migration-era lightweight references, while learner-record and role-workspace projections carry governed provenance.
 
 ### 8.1 Essays Service — Strategy + Orchestrator Pattern
 
@@ -837,8 +837,8 @@ flowchart TD
 
     COMPOSE["PromptComposer.render()\nJinja2 template"]
     ATTACHMENTS["_build_image_attachments()\nBase64 → binary for vision"]
-    FOUNDRY["FoundryAgentService.run_agent()\nAzure AI Foundry"]
-    THREAD["Create thread → upload files\n→ send message → poll run"]
+    FOUNDRY["FoundryAgentFacade.invoke()\nMicrosoft Foundry Agent Service"]
+    THREAD["Conversation/response adapter\nstore policy + tool calls + trace id"]
     PARSE["_parse_response()\n→ verdict, strengths, improvements"]
     RESULT["EssayEvaluationResult\n{strategy, verdict, strengths, improvements}"]
 

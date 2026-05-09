@@ -20,6 +20,7 @@ This directory contains the Architecture Decision Records (ADRs) for **The Tutor
 | [012](./012-cosmos-foundry-agent-migration.md) | Cosmos-to-Foundry Agent Migration Implementation | Accepted | 2026-03-16 |
 | [013](./013-learner-record-standalone-platform.md) | Learner-Record-Centered Standalone Lifelong-Learning Platform | Accepted | 2026-04-08 |
 | [014](./014-hybrid-learner-record-service-bus-distribution.md) | Hybrid Learner-Record Service Bus Distribution | Accepted | 2026-04-08 |
+| [015](./015-foundry-agent-service-native-architecture.md) | Foundry Agent Service Native Architecture | Accepted | 2026-05-09 |
 
 ## ADR Format
 

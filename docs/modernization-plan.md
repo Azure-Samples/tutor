@@ -32,12 +32,22 @@ The phase plan below remains the implementation scaffold for infrastructure, ser
 | **2** | Standalone Learning Core | Own role workspaces, interventions, advising, and deterministic read models. | LL-05, LL-08, LL-09, LL-10, LL-11, LL-13, LL-17 | Student, professor, leader, and admin workspaces; design system; advising core; institutional projections and intervention flows | Extends Phases 4, 6, 9, 10 and adds new bounded contexts without assuming new Azure topology |
 | **3** | Lifelong Network Platform | Expand Tutor into a durable record, credential, alumni, and community network. | LL-07, LL-12, LL-14, LL-15, LL-16 | Skills graph, credentialing, portfolio, alumni re-entry, community, and continuing-education catalog pilot | Extends later platform work on top of the same APIM, ACA, Cosmos DB, Blob Storage, and Azure AI deployment model |
 
+### Foundry-Native Reset Overlay
+
+The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in [Foundry Native Implementation Epics](./foundry-native-implementation-epics.md) and governed by [ADR-015](./adr/015-foundry-agent-service-native-architecture.md).
+
+| Reset wave | Goal | Primary work | Exit criteria |
+| ---------- | ---- | ------------ | ------------- |
+| **Wave 0: Architecture Reset** | Align decisions before runtime migration. | ADR-015, ADR-011/012 partial supersession, documentation alignment, migration inventory, governance guardrails. | Docs state no Agent Framework in `apps/` or `lib`, Foundry Agent Service native runtime, model-catalog neutrality, strict retention defaults, and workflow-only production deployment. |
+| **Wave 1: Foundry and Record Foundation** | Remove runtime blocker and centralize governed agent facts. | `tutor_lib.agents` facade, dependency cleanup, questions/essays/avatar/chat/upskilling migration, evaluation release gates, learner-record provenance. | `rg "agent_framework|agent-framework|agent_framework_azure_ai|AzureAIAgentClient" apps lib` returns no matches; backend import/tests recover with fake Foundry facade; high-impact outputs carry provenance and review state. |
+
 ### Execution Rules
 
 - Use **Strangler Fig** migration. Existing services remain the implementation substrate while bounded contexts are formalized around the learner record.
 - Keep **anti-corruption layers** for LMS, SIS, CRM, analytics, and credential ecosystems. Wave delivery must not depend on direct coupling to external schemas.
 - Treat **provenance, evaluation, and human review** as wave-exit criteria for high-impact capabilities rather than post-launch hardening.
 - Allow new bounded contexts to start inside existing services or shared libraries when necessary, then split only when operational or ownership pressure justifies it.
+- Treat Microsoft Agent Framework removal as a Wave 1 entry gate. New code must call Microsoft Foundry Agent Service through `tutor_lib.agents` contracts rather than local orchestration wrappers.
 
 ---
 

@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-
 ROOT = Path(__file__).resolve().parents[2]
 CHAT_SRC = ROOT / "apps" / "chat" / "src"
 LIB_SRC = ROOT / "lib" / "src"

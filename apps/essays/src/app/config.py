@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Iterable
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
-
 from tutor_lib.config import get_settings as get_shared_settings
 
 

@@ -1,9 +1,9 @@
 import importlib
+import os
 import sys
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 
 ROOT = Path(__file__).resolve().parents[2]
 LMS_SRC = ROOT / "apps" / "lms-gateway" / "src"
@@ -11,8 +11,6 @@ LIB_SRC = ROOT / "lib" / "src"
 
 
 def _set_required_env() -> None:
-    import os
-
     os.environ["COSMOS_ENDPOINT"] = "https://localhost:8081/"
     os.environ["COSMOS_DATABASE"] = "unit-test-db"
     os.environ["PROJECT_ENDPOINT"] = "https://fake-endpoint.azure.com/"

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 import httpx
+
 from app.adapters import BaseLMSAdapter, SyncResult
 
 if TYPE_CHECKING:

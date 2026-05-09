@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-
 ROOT = Path(__file__).resolve().parents[2]
 AVATAR_SRC = ROOT / "apps" / "avatar" / "src"
 LIB_SRC = ROOT / "lib" / "src"
@@ -16,28 +15,27 @@ LIB_SRC = ROOT / "lib" / "src"
 def _install_tutor_lib_agents_stub() -> None:
     agents_module = types.ModuleType("tutor_lib.agents")
 
-    class _AgentSpec:
+    class _AgentReference:
         def __init__(self, *args, **kwargs) -> None:
             self.args = args
             self.kwargs = kwargs
 
-    class _AgentRegistry:
+    class _AgentInvocationRequest:
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+    class _FoundryAgentFacade:
         def __init__(self, *_args, **_kwargs) -> None:
-            pass
+            self.requests = []
 
-        def create(self, _spec):
-            return object()
+        async def invoke(self, request):
+            self.requests.append(request)
+            return SimpleNamespace(output_text="stub-avatar-response")
 
-    class _AgentRunContext:
-        def __init__(self, _agent) -> None:
-            pass
-
-        async def run(self, _prompt: str):
-            return SimpleNamespace(text="stub-avatar-response")
-
-    agents_module.AgentSpec = _AgentSpec
-    agents_module.AgentRegistry = _AgentRegistry
-    agents_module.AgentRunContext = _AgentRunContext
+    agents_module.AgentReference = _AgentReference
+    agents_module.AgentInvocationRequest = _AgentInvocationRequest
+    agents_module.FoundryAgentFacade = _FoundryAgentFacade
     sys.modules["tutor_lib.agents"] = agents_module
 
 

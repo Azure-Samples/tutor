@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable, List
 
 import jinja2
-
-from tutor_lib.agents import AgentRegistry, AgentRunContext, AgentSpec
+from tutor_lib.agents import AgentInvocationRequest, AgentReference, FoundryAgentFacade
 from tutor_lib.config import get_settings
 
 from .schemas import AgentFeedback, ParagraphEvaluation, PlanParagraph, PlanRequest
@@ -22,7 +21,7 @@ class PlanContext:
     timeframe: str
     topic: str
     class_id: str
-    performance_history: List[dict]
+    performance_history: list[dict]
 
 
 @dataclass(slots=True)
@@ -33,7 +32,7 @@ class PlanParagraphElement:
     paragraph: PlanParagraph
     context: PlanContext
 
-    async def accept(self, visitor: "PlanAgentVisitor") -> AgentFeedback:
+    async def accept(self, visitor: PlanAgentVisitor) -> AgentFeedback:
         return await visitor.visit(self)
 
 
@@ -45,8 +44,8 @@ class PlanAgentVisitor:
 
     def __init__(
         self,
-        composer: "PromptComposer",
-        registry: AgentRegistry,
+        composer: PromptComposer,
+        agent_facade: FoundryAgentFacade,
         instructions: str,
         deployment: str,
         *,
@@ -54,16 +53,15 @@ class PlanAgentVisitor:
         max_tokens: int | None = None,
     ) -> None:
         self._composer = composer
-        agent = registry.create(
-            AgentSpec(
-                name=self.agent_name,
-                instructions=instructions,
-                deployment=deployment,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+        self._agent_facade = agent_facade
+        self._agent_reference = AgentReference(
+            agent_name=self.agent_name,
+            agent_version="current",
+            model_name=deployment,
         )
-        self._runner = AgentRunContext(agent)
+        self._instructions = instructions
+        self._temperature = temperature
+        self._max_tokens = max_tokens
 
     async def visit(self, element: PlanParagraphElement) -> AgentFeedback:
         prompt = self._composer.render(
@@ -76,8 +74,22 @@ class PlanAgentVisitor:
             },
             performance_history=element.context.performance_history,
         )
-        response = await self._runner.run(prompt)
-        text = _extract_text(response)
+        request = AgentInvocationRequest(
+            agent=self._agent_reference,
+            input=prompt,
+            context={
+                "timeframe": element.context.timeframe,
+                "topic": element.context.topic,
+                "class_id": element.context.class_id,
+                "paragraph_index": element.index,
+            },
+            instructions=self._instructions,
+            temperature=self._temperature,
+            max_output_tokens=self._max_tokens,
+            store=False,
+        )
+        response = await self._agent_facade.invoke(request)
+        text = response.output_text
         verdict, strengths, improvements = _parse_feedback(text)
         return AgentFeedback(
             agent=self.agent_name,
@@ -122,7 +134,7 @@ class PlanEvaluationIterator:
         self._context = context
         self._index = 0
 
-    def __aiter__(self) -> "PlanEvaluationIterator":
+    def __aiter__(self) -> PlanEvaluationIterator:
         return self
 
     async def __anext__(self) -> ParagraphEvaluation:
@@ -131,7 +143,7 @@ class PlanEvaluationIterator:
 
         paragraph = self._plan.paragraphs[self._index]
         element = PlanParagraphElement(self._index, paragraph, self._context)
-        feedback: List[AgentFeedback] = []
+        feedback: list[AgentFeedback] = []
         for visitor in self._visitors:
             feedback.append(await element.accept(visitor))
 
@@ -162,7 +174,7 @@ class PlanEvaluationOrchestrator:
     def __init__(self, *, visitors: Iterable[PlanAgentVisitor]) -> None:
         self._visitors = list(visitors)
 
-    async def evaluate(self, request: PlanRequest) -> List[ParagraphEvaluation]:
+    async def evaluate(self, request: PlanRequest) -> list[ParagraphEvaluation]:
         context = PlanContext(
             timeframe=request.timeframe,
             topic=request.topic,
@@ -170,16 +182,16 @@ class PlanEvaluationOrchestrator:
             performance_history=[snapshot.model_dump() for snapshot in request.performance_history],
         )
         iterable = PlanEvaluationIterable(request, self._visitors, context)
-        evaluations: List[ParagraphEvaluation] = []
+        evaluations: list[ParagraphEvaluation] = []
         async for evaluation in iterable:
             evaluations.append(evaluation)
         return evaluations
 
 
-def _parse_feedback(text: str) -> tuple[str, List[str], List[str]]:
+def _parse_feedback(text: str) -> tuple[str, list[str], list[str]]:
     verdict = text.strip()
-    strengths: List[str] = []
-    improvements: List[str] = []
+    strengths: list[str] = []
+    improvements: list[str] = []
 
     sections = [section.strip() for section in text.split("\n\n") if section.strip()]
     for section in sections:
@@ -198,24 +210,10 @@ def _parse_feedback(text: str) -> tuple[str, List[str], List[str]]:
     return verdict, strengths, improvements
 
 
-def _extract_text(response: object) -> str:
-    maybe_text = getattr(response, "text", None)
-    if isinstance(maybe_text, str) and maybe_text.strip():
-        return maybe_text
-    content = getattr(response, "content", None)
-    if isinstance(content, list):
-        parts: List[str] = []
-        for item in content:
-            if isinstance(item, dict) and isinstance(item.get("text"), str):
-                parts.append(item["text"])
-        return "\n".join(parts) if parts else "No response returned."
-    return "No response returned."
-
-
 @lru_cache(maxsize=1)
 def build_orchestrator() -> PlanEvaluationOrchestrator:
     settings = get_settings()
-    registry = AgentRegistry(settings.azure_ai.project_endpoint)
+    agent_facade = FoundryAgentFacade(settings.azure_ai.project_endpoint)
     template_dir = Path(__file__).parent / "prompts"
     composer = PromptComposer(template_dir)
 
@@ -235,8 +233,29 @@ def build_orchestrator() -> PlanEvaluationOrchestrator:
     deployment_reasoning = settings.azure_ai.reasoning_deployment
 
     visitors = [
-        PerformanceInsightVisitor(composer, registry, performance_instructions, deployment_reasoning, temperature=0.2, max_tokens=800),
-        ContentComplexityVisitor(composer, registry, content_instructions, deployment_default, temperature=0.3, max_tokens=700),
-        GuidanceCoachVisitor(composer, registry, guidance_instructions, deployment_default, temperature=0.4, max_tokens=700),
+        PerformanceInsightVisitor(
+            composer,
+            agent_facade,
+            performance_instructions,
+            deployment_reasoning,
+            temperature=0.2,
+            max_tokens=800,
+        ),
+        ContentComplexityVisitor(
+            composer,
+            agent_facade,
+            content_instructions,
+            deployment_default,
+            temperature=0.3,
+            max_tokens=700,
+        ),
+        GuidanceCoachVisitor(
+            composer,
+            agent_facade,
+            guidance_instructions,
+            deployment_default,
+            temperature=0.4,
+            max_tokens=700,
+        ),
     ]
     return PlanEvaluationOrchestrator(visitors=visitors)

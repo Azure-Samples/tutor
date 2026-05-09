@@ -1,104 +1,181 @@
-import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import { getRouteMetadata } from "@/utils/routeMetadata";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
-import React from "react";
+import {
+  FiBookOpen,
+  FiCheckSquare,
+  FiCpu,
+  FiDatabase,
+  FiLayers,
+  FiMessageSquare,
+  FiSliders,
+  FiUsers,
+} from "react-icons/fi";
+import type { IconType } from "react-icons";
 
 export const metadata: Metadata = {
   title: "Tutor | Configuration",
-  description: "This is the Transcription configuration page for Tutor.",
+  description: "Administrative configuration hub for Tutor content, policy, and integrations.",
 };
 
-const configOptions = [
+interface ConfigurationRouteConfig {
+  href: string;
+  title: string;
+  section: string;
+  icon: IconType;
+}
+
+const CONFIGURATION_ROUTE_CONFIGS = [
   {
-    title: "Cases",
-    description:
-      "Manage and configure real-world cases for students to practice and be evaluated on. Perfect for scenario-based learning and oral exams.",
     href: "/configuration/cases",
-    icon: "/images/logo/logo.webp",
+    icon: FiUsers,
+    section: "Content setup",
+    title: "Cases",
   },
   {
-    title: "Themes",
-    description:
-      "Create, edit, and organize themes for essay and argumentation practice. Guide students to develop critical thinking and structured responses.",
     href: "/configuration/themes",
-    icon: "/images/logo/logo.webp",
+    icon: FiLayers,
+    section: "Content setup",
+    title: "Themes",
   },
   {
-    title: "Questions",
-    description:
-      "Design and manage objective questions for quizzes and assessments. Track student progress and ensure comprehensive evaluation.",
     href: "/configuration/questions",
-    icon: "/images/logo/logo.webp",
+    icon: FiCheckSquare,
+    section: "Assessment policy",
+    title: "Questions",
   },
   {
-    title: "Agents",
-    description:
-      "Create and manage AI agent assemblies that power essay and question evaluation workflows. Configure deployments, temperature, and instructions.",
     href: "/configuration/agents",
-    icon: "/images/logo/logo.webp",
+    icon: FiCpu,
+    section: "AI operations",
+    title: "Agents",
   },
   {
-    title: "Upskilling",
-    description:
-      "Evaluate teaching plans with agentic coaching feedback. Analyze paragraph structure and pedagogical effectiveness.",
     href: "/configuration/upskilling",
-    icon: "/images/logo/logo.webp",
+    icon: FiBookOpen,
+    section: "Faculty workflows",
+    title: "Upskilling",
   },
   {
-    title: "Evaluation",
-    description:
-      "Run agent quality checks by creating datasets and executing evaluation runs against deployed agents.",
     href: "/configuration/evaluation",
-    icon: "/images/logo/logo.webp",
+    icon: FiSliders,
+    section: "AI operations",
+    title: "Evaluation adapter",
   },
   {
-    title: "Supervisor",
-    description:
-      "Prepare pre-visit school briefings, review report sections, and monitor generated insights by school.",
     href: "/configuration/supervisor",
-    icon: "/images/logo/logo.webp",
+    icon: FiMessageSquare,
+    section: "Leadership utilities",
+    title: "Supervisor",
   },
   {
-    title: "LMS Gateway",
-    description:
-      "Trigger and inspect LMS synchronization jobs. Connect to Moodle or Canvas and schedule recurring syncs.",
     href: "/configuration/lms-gateway",
-    icon: "/images/logo/logo.webp",
+    icon: FiDatabase,
+    section: "Integrations",
+    title: "LMS Gateway",
   },
-];
+] as const satisfies readonly ConfigurationRouteConfig[];
+
+const getConfigurationRouteCards = () =>
+  CONFIGURATION_ROUTE_CONFIGS.map((routeConfig) => {
+    const route = getRouteMetadata(routeConfig.href);
+
+    return {
+      ...routeConfig,
+      audience: route?.audience ?? "Admins and faculty operators",
+      capability: route?.capability ?? "Administrative utility for Tutor operators.",
+      label: route?.label ?? routeConfig.title,
+      status: route?.status === "adapter" ? "Adapter" : "Active",
+    };
+  });
+
+const configurationRouteCards = getConfigurationRouteCards();
 
 const ConfigurationPage = () => {
   return (
     <DefaultLayout metadata={metadata}>
-      <Breadcrumb
-        pageName="Configuration & Management"
-        subtitle="Organize, evaluate, and empower student learning. Choose a tool below to get started!"
-      />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {configOptions.map((opt) => (
-          <Link
-            key={opt.title}
-            href={opt.href}
-            aria-label={`Open ${opt.title} configuration`}
-            className="flex min-h-56 flex-col items-center p-8 bg-gradient-to-br from-blue-50 to-green-50 hover:from-cyan-100 hover:to-yellow-100 shadow-xl rounded-2xl transition-transform duration-200 cursor-pointer text-center border-2 border-cyan-200 hover:border-green-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:bg-gradient-to-br dark:from-blue-900 dark:to-green-900 dark:hover:from-cyan-800 dark:hover:to-green-800 hover:scale-105 group"
-          >
-            <Image
-              width={100}
-              height={100}
-              src={opt.icon}
-              alt={`${opt.title} configuration`}
-              className="mb-4 rounded-full border-2 border-cyan-300 shadow bg-white group-hover:scale-110 group-hover:rotate-6 transition-transform duration-300"
-            />
-            <h3 className="text-lg font-bold text-blue-700 dark:text-cyan-200 mb-2 group-hover:text-green-700 transition-colors duration-300">
-              {opt.title}
-            </h3>
-            <p className="mt-2 text-green-700 dark:text-green-100 text-base font-medium group-hover:text-yellow-700 transition-colors duration-300">
-              {opt.description}
-            </p>
-          </Link>
-        ))}
+      <div className="space-y-8">
+        <header className="border-b border-stone-200 pb-6 dark:border-slate-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-700 dark:text-teal-300">
+            Admin configuration
+          </p>
+          <h1 className="mt-3 max-w-4xl text-3xl font-semibold leading-tight text-slate-900 md:text-4xl dark:text-slate-50">
+            Configuration operations hub
+          </h1>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300">
+            A compact entry point for content setup, assessment policy, AI operations, leadership
+            utilities, and LMS integration work. These links preserve the current configuration
+            routes while presenting them in the shared Tutor workspace style.
+          </p>
+          <dl className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
+            <div className="flex items-center gap-2">
+              <dt className="font-medium text-slate-900 dark:text-slate-50">Surfaces</dt>
+              <dd>{configurationRouteCards.length}</dd>
+            </div>
+            <div className="flex items-center gap-2">
+              <dt className="font-medium text-slate-900 dark:text-slate-50">Primary audience</dt>
+              <dd>Admins and faculty operators</dd>
+            </div>
+            <div className="flex items-center gap-2">
+              <dt className="font-medium text-slate-900 dark:text-slate-50">Coverage</dt>
+              <dd>Content, policy, AI, leadership, integrations</dd>
+            </div>
+          </dl>
+        </header>
+
+        <section aria-labelledby="configuration-routes-heading">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2
+                id="configuration-routes-heading"
+                className="text-xl font-semibold text-slate-900 dark:text-slate-50"
+              >
+                Administrative surfaces
+              </h2>
+              <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
+                Route details are sourced from the frontend route registry so capability language
+                stays aligned with the rest of the platform.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {configurationRouteCards.map((route) => {
+              const Icon = route.icon;
+
+              return (
+                <Link
+                  key={route.href}
+                  href={route.href}
+                  className="group flex min-h-52 flex-col rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition-colors hover:border-teal-700 hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-teal-500 dark:hover:bg-slate-800"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-teal-700 dark:text-teal-300">
+                      <Icon aria-hidden="true" className="h-4 w-4" />
+                      <span>{route.section}</span>
+                    </div>
+                    <span className="rounded-md border border-stone-200 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      {route.status}
+                    </span>
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-slate-50">
+                    {route.title}
+                  </h3>
+                  <p className="mt-2 text-xs font-medium uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    {route.label}
+                  </p>
+                  <p className="mt-3 flex-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {route.capability}
+                  </p>
+                  <p className="mt-4 text-sm font-semibold text-teal-700 group-hover:text-teal-800 dark:text-teal-300 dark:group-hover:text-teal-200">
+                    Open {route.title}
+                  </p>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
       </div>
     </DefaultLayout>
   );

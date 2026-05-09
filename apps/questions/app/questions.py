@@ -3,33 +3,53 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable, Protocol
+from typing import Protocol
 
 import jinja2
-
+from azure.core.exceptions import AzureError
 from azure.cosmos import exceptions
-
-from tutor_lib.agents import FoundryAgentService
+from pydantic import ValidationError
+from tutor_lib.agents import (
+    AgentInvocationRequest,
+    AgentInvocationResult,
+    AgentReference,
+    FoundryAgentFacade,
+)
 from tutor_lib.config import get_settings
 from tutor_lib.cosmos import AssemblyRepository
 
 from app.interfaces import DimensionEvaluation, QuestionEvaluationResult, QuestionEvaluationStatus
-from app.schemas import Answer, Assembly, Grader, Question
+from app.schemas import Answer, Grader, Question
+
+
+def _is_legacy_only_agent_reference(agent_name: str | None, legacy_agent_id: str | None) -> bool:
+    return bool(legacy_agent_id) and (not agent_name or agent_name == legacy_agent_id)
+
+
+def _grader_from_agent_reference(reference: AgentReference, fallback: Grader) -> Grader:
+    return Grader(
+        agent_name=reference.agent_name,
+        agent_version=reference.agent_version,
+        legacy_agent_id=fallback.legacy_agent_id or reference.legacy_agent_id,
+        dimension=fallback.dimension,
+        deployment=fallback.deployment or reference.model_name or "",
+    )
 
 
 class QuestionState(Protocol):
-    async def evaluate(self, context: "QuestionStateMachine") -> QuestionEvaluationResult: ...
+    async def evaluate(self, context: QuestionStateMachine) -> QuestionEvaluationResult: ...
 
 
 class PendingState:
-    async def evaluate(self, context: "QuestionStateMachine") -> QuestionEvaluationResult:
+    async def evaluate(self, context: QuestionStateMachine) -> QuestionEvaluationResult:
         context.transition(EvaluatingState())
         return await context.evaluate()
 
 
 class EvaluatingState:
-    async def evaluate(self, context: "QuestionStateMachine") -> QuestionEvaluationResult:
+    async def evaluate(self, context: QuestionStateMachine) -> QuestionEvaluationResult:
         await context.ensure_assembly()
         tasks = [self._run_dimension(context, grader) for grader in context.graders]
         dimension_results = await asyncio.gather(*tasks)
@@ -43,14 +63,26 @@ class EvaluatingState:
         context.transition(CompletedState(result))
         return result
 
-    async def _run_dimension(self, context: "QuestionStateMachine", grader: Grader) -> DimensionEvaluation:
+    async def _run_dimension(self, context: QuestionStateMachine, grader: Grader) -> DimensionEvaluation:
         prompt = context.prompt_composer.render(
             "correct.jinja",
             question=context.question,
             answer=context.answer,
             dimension=grader.dimension,
         )
-        raw_text = await context.agent_service.run_agent(grader.agent_id, prompt)
+        request = AgentInvocationRequest(
+            agent=grader.to_agent_reference(),
+            input=prompt,
+            context={
+                "assembly_id": context.assembly_id,
+                "question_id": context.question.id,
+                "answer_id": context.answer.id,
+                "dimension": grader.dimension,
+            },
+            store=False,
+        )
+        result: AgentInvocationResult = await context.agent_facade.invoke(request)
+        raw_text = result.output_text
         notes = [line.strip() for line in raw_text.split("\n") if line.strip()]
         verdict = notes[0] if notes else "No verdict returned"
         confidence = self._infer_confidence(notes)
@@ -74,7 +106,7 @@ class CompletedState:
     def __init__(self, result: QuestionEvaluationResult) -> None:
         self._result = result
 
-    async def evaluate(self, _: "QuestionStateMachine") -> QuestionEvaluationResult:
+    async def evaluate(self, _: QuestionStateMachine) -> QuestionEvaluationResult:
         return self._result
 
 
@@ -99,7 +131,7 @@ class QuestionStateMachine:
         self._assembly_id = assembly_id
         self.question = question
         self.answer = answer
-        self.agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
+        self.agent_facade = FoundryAgentFacade(settings.azure_ai.project_endpoint)
         self._assembly_repository = AssemblyRepository(settings.cosmos)
         self.prompt_composer = PromptComposer(Path(__file__).parent / "prompts")
         self.graders: list[Grader] = []
@@ -107,6 +139,10 @@ class QuestionStateMachine:
 
     def transition(self, state: QuestionState) -> None:
         self._state = state
+
+    @property
+    def assembly_id(self) -> str:
+        return self._assembly_id
 
     async def evaluate(self) -> QuestionEvaluationResult:
         self._result = await self._state.evaluate(self)
@@ -121,20 +157,36 @@ class QuestionStateMachine:
             raise ValueError(f"Assembly not found: {self._assembly_id}") from exc
 
         raw_agents = item.get("agents") or item.get("avatars", [])
+        if isinstance(raw_agents, (dict, str)):
+            raw_agents = [raw_agents]
         graders: list[Grader] = []
         for entry in raw_agents:
-            if isinstance(entry, dict):
-                if "agent_id" in entry:
-                    graders.append(Grader.model_validate(entry))
-                elif "id" in entry:
-                    graders.append(Grader(
-                        agent_id=str(entry["id"]),
-                        dimension=entry.get("dimension", ""),
-                        deployment=entry.get("deployment", ""),
-                    ))
+            try:
+                grader = Grader.model_validate(entry)
+            except ValidationError:
+                continue
+            graders.append(await self._resolve_legacy_grader(grader))
         if not graders:
             raise ValueError(f"Assembly '{self._assembly_id}' has no graders")
         self.graders = graders
+
+    async def _resolve_legacy_grader(self, grader: Grader) -> Grader:
+        legacy_agent_id = grader.legacy_agent_id
+        if not legacy_agent_id or not _is_legacy_only_agent_reference(
+            grader.agent_name,
+            legacy_agent_id,
+        ):
+            return grader
+
+        get_remote_agent = getattr(self.agent_facade, "get_agent", None)
+        if not callable(get_remote_agent):
+            return grader
+
+        try:
+            reference = await get_remote_agent(legacy_agent_id)
+        except (AttributeError, AzureError, RuntimeError, TypeError, ValueError):
+            return grader
+        return _grader_from_agent_reference(reference, grader)
 
 
 async def evaluate_question(assembly_id: str, question: Question, answer: Answer) -> QuestionEvaluationResult:

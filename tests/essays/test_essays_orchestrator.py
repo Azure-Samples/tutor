@@ -6,7 +6,9 @@ import importlib
 import json
 import sys
 import types
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,28 +18,105 @@ def _install_tutor_lib_agents_stub() -> None:
 
     agents_module = types.ModuleType("tutor_lib.agents")
 
-    class _ImportSafeFoundryAgentService:
-        def __init__(self, *_args, **_kwargs) -> None:
-            self.calls: list[tuple[str, str]] = []
+    @dataclass(frozen=True)
+    class _ImportSafeAgentReference:
+        agent_name: str
+        agent_version: str | None = None
+        role: str | None = None
+        dimension: str | None = None
+        model_provider: str | None = None
+        model_name: str | None = None
+        prompt_version: str | None = None
+        governance_state: str | None = None
+        legacy_agent_id: str | None = None
+        metadata: dict[str, Any] = field(default_factory=dict)
 
-        async def run_agent(self, agent_id: str, prompt: str, **_kwargs) -> str:
-            self.calls.append((agent_id, prompt))
-            return "stub response"
+        @property
+        def id(self) -> str:
+            return self.legacy_agent_id or self.agent_name
+
+        @property
+        def model(self) -> str | None:
+            return self.model_name
+
+        @property
+        def model_id(self) -> str | None:
+            return self.model_name
+
+        @property
+        def deployment_name(self) -> str | None:
+            return self.model_name
+
+    @dataclass(frozen=True)
+    class _ImportSafeAgentAttachment:
+        file_name: str
+        content_type: str
+        payload: bytes
+        purpose: str = "assistants"
+        tool_type: str = "vision"
+
+    @dataclass(frozen=True)
+    class _ImportSafeAgentInvocationRequest:
+        agent: _ImportSafeAgentReference
+        input: str
+        context: dict[str, Any] = field(default_factory=dict)
+        conversation_id: str | None = None
+        previous_invocation_id: str | None = None
+        attachments: tuple[_ImportSafeAgentAttachment, ...] = field(default_factory=tuple)
+        store: bool = False
+        stream: bool = False
+        background: bool = False
+        evidence_refs: tuple[str, ...] = field(default_factory=tuple)
+        metadata: dict[str, Any] = field(default_factory=dict)
+
+    @dataclass(frozen=True)
+    class _ImportSafeAgentInvocationResult:
+        output_text: str
+        agent: _ImportSafeAgentReference
+        store: bool = False
+
+    class _ImportSafeFoundryAgentFacade:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.requests: list[_ImportSafeAgentInvocationRequest] = []
+
+        async def invoke(self, request: _ImportSafeAgentInvocationRequest) -> _ImportSafeAgentInvocationResult:
+            self.requests.append(request)
+            return _ImportSafeAgentInvocationResult(
+                output_text="stub response",
+                agent=request.agent,
+                store=request.store,
+            )
 
         async def create_agent(self, **_kwargs):
-            return types.SimpleNamespace(id="agent-stub")
+            return _ImportSafeAgentReference(
+                agent_name="agent-stub",
+                legacy_agent_id="agent-stub-id",
+                model_name=_kwargs.get("deployment"),
+            )
 
         async def get_agent(self, agent_id: str):
-            return types.SimpleNamespace(id=agent_id, model="gpt-5-nano")
+            return _ImportSafeAgentReference(
+                agent_name=agent_id,
+                legacy_agent_id=agent_id,
+                model_name="gpt-5-nano",
+            )
 
-    class _ImportSafeAgentAttachment:
-        def __init__(self, file_name: str, content_type: str, payload: bytes) -> None:
-            self.file_name = file_name
-            self.content_type = content_type
-            self.payload = payload
+        async def list_agents(self, *, limit: int | None = None):
+            agents = [
+                _ImportSafeAgentReference(
+                    agent_name="agent-stub",
+                    legacy_agent_id="agent-stub-id",
+                    model_name="gpt-5-nano",
+                )
+            ]
+            return agents[:limit] if limit else agents
 
-    agents_module.FoundryAgentService = _ImportSafeFoundryAgentService
+    agents_module.AgentReference = _ImportSafeAgentReference
     agents_module.AgentAttachment = _ImportSafeAgentAttachment
+    agents_module.AgentInvocationRequest = _ImportSafeAgentInvocationRequest
+    agents_module.AgentInvocationResult = _ImportSafeAgentInvocationResult
+    agents_module.FoundryAgentFacade = _ImportSafeFoundryAgentFacade
+    agents_module.FoundryAgentService = _ImportSafeFoundryAgentFacade
     sys.modules["tutor_lib.agents"] = agents_module
 
 
@@ -144,15 +223,15 @@ def essays_main_module_fixture(monkeypatch):
 DEFAULT_RESPONSE = "Overall verdict\n\nStrengths: Solid thesis\n\nImprovements: Tighten conclusion"
 
 
-class _StubFoundryAgentService:
+class _StubFoundryAgentFacade:
     response_text = DEFAULT_RESPONSE
 
     def __init__(self, *_args, **_kwargs):
-        self.calls: list[tuple[str, str]] = []
+        self.requests = []
 
-    async def run_agent(self, agent_id: str, prompt: str, **kwargs) -> str:
-        self.calls.append((agent_id, prompt))
-        return self.response_text
+    async def invoke(self, request):
+        self.requests.append(request)
+        return types.SimpleNamespace(output_text=self.response_text, agent=request.agent, store=request.store)
 
 
 class _FakeCredential:  # noqa: D401 - simple stub credential
@@ -184,11 +263,13 @@ class _StubAssemblyRepository:
 @pytest.mark.asyncio
 async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
-    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
-    _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
+    monkeypatch.setattr(module, "FoundryAgentFacade", _StubFoundryAgentFacade)
+    _StubFoundryAgentFacade.response_text = DEFAULT_RESPONSE
 
     provisioned = module.AgentRef(
-        agent_id="agent-default",
+        agent_name="agent-default",
+        agent_version="2026-05-01",
+        legacy_agent_id="agent-default-id",
         role="default",
         deployment="gpt-5-nano",
     )
@@ -211,18 +292,18 @@ async def test_orchestrator_uses_default_strategy(monkeypatch, essays_app_module
 @pytest.mark.asyncio
 async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
-    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
-    _StubFoundryAgentService.response_text = (
+    monkeypatch.setattr(module, "FoundryAgentFacade", _StubFoundryAgentFacade)
+    _StubFoundryAgentFacade.response_text = (
         "Narrative verdict\n\nStrengths: Vivid imagery\n\nImprovements: Clarify ending"
     )
 
     narrative_agent = module.AgentRef(
-        agent_id="agent-narrative",
+        agent_name="agent-narrative",
         role="narrative",
         deployment="gpt-5-nano",
     )
     default_agent = module.AgentRef(
-        agent_id="agent-default",
+        agent_name="agent-default",
         role="default",
         deployment="gpt-5-nano",
     )
@@ -251,13 +332,13 @@ async def test_orchestrator_uses_narrative_strategy(monkeypatch, essays_app_modu
 @pytest.mark.asyncio
 async def test_orchestrator_uses_analytical_strategy_for_theme(monkeypatch, essays_app_module_fixture):
     module = essays_app_module_fixture
-    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
-    _StubFoundryAgentService.response_text = (
+    monkeypatch.setattr(module, "FoundryAgentFacade", _StubFoundryAgentFacade)
+    _StubFoundryAgentFacade.response_text = (
         "Analytical verdict\n\nStrengths: Rigorous evidence\n\nImprovements: Expand counterpoints"
     )
 
     analytical_agent = module.AgentRef(
-        agent_id="agent-analytical",
+        agent_name="agent-analytical",
         role="analytical",
         deployment="gpt-5",
     )
@@ -282,26 +363,26 @@ async def test_orchestrator_uses_enem_strategy_and_routes_to_enem_role(
 ):
     module = essays_app_module_fixture
 
-    created: list[_StubFoundryAgentService] = []
+    created: list[_StubFoundryAgentFacade] = []
 
-    class _RecordingService(_StubFoundryAgentService):
+    class _RecordingFacade(_StubFoundryAgentFacade):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             created.append(self)
 
-    monkeypatch.setattr(module, "FoundryAgentService", _RecordingService)
-    _StubFoundryAgentService.response_text = (
+    monkeypatch.setattr(module, "FoundryAgentFacade", _RecordingFacade)
+    _StubFoundryAgentFacade.response_text = (
         "ENEM verdict\n\nStrengths: Competency coverage\n\n"
         "Improvements: Strengthen intervention proposal"
     )
 
     enem_agent = module.AgentRef(
-        agent_id="agent-enem",
+        agent_name="agent-enem",
         role="enem",
         deployment="gpt-5",
     )
     default_agent = module.AgentRef(
-        agent_id="agent-default",
+        agent_name="agent-default",
         role="default",
         deployment="gpt-5-nano",
     )
@@ -327,7 +408,13 @@ async def test_orchestrator_uses_enem_strategy_and_routes_to_enem_role(
     result = await orchestrator.invoke("assembly-enem", essay, [])
 
     assert result.strategy is module.EssayStrategyType.ENEM
-    assert created[0].calls[0][0] == "agent-enem"
+    request = created[0].requests[0]
+    assert isinstance(request, module.AgentInvocationRequest)
+    assert request.agent.agent_name == "agent-enem"
+    assert request.context["essay_id"] == "essay-enem-theme"
+    assert request.context["role"] == "enem"
+    assert request.context["strategy"] == "enem"
+    assert request.store is False
 
 
 @pytest.mark.asyncio
@@ -335,14 +422,22 @@ async def test_orchestrator_uses_enem_strategy_for_competency_objectives(
     monkeypatch, essays_app_module_fixture
 ):
     module = essays_app_module_fixture
-    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
-    _StubFoundryAgentService.response_text = (
+
+    created: list[_StubFoundryAgentFacade] = []
+
+    class _RecordingFacade(_StubFoundryAgentFacade):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            created.append(self)
+
+    monkeypatch.setattr(module, "FoundryAgentFacade", _RecordingFacade)
+    _StubFoundryAgentFacade.response_text = (
         "ENEM objective verdict\n\nStrengths: Clear argumentation\n\n"
         "Improvements: Improve cohesion"
     )
 
     enem_agent = module.AgentRef(
-        agent_id="agent-enem",
+        agent_name="agent-enem",
         role="enem",
         deployment="gpt-5",
     )
@@ -370,6 +465,69 @@ async def test_orchestrator_uses_enem_strategy_for_competency_objectives(
     result = await orchestrator.invoke("assembly-enem-objective", essay, resources)
 
     assert result.strategy is module.EssayStrategyType.ENEM
+    request = created[0].requests[0]
+    assert request.context["resource_ids"] == ["res-enem"]
+    assert request.evidence_refs == ("res-enem",)
+
+
+@pytest.mark.asyncio
+async def test_hydrate_agents_accepts_legacy_shapes(essays_app_module_fixture):
+    module = essays_app_module_fixture
+    orchestrator = module.EssayOrchestrator()
+
+    agents = await orchestrator._hydrate_agents(
+        [
+            {"agent_id": "legacy-agent", "role": "default", "deployment": "gpt-5-nano"},
+            {"id": "legacy-id", "role": "narrative", "deployment": "gpt-5"},
+            "legacy-string",
+        ]
+    )
+
+    assert [agent.agent_name for agent in agents] == [
+        "legacy-agent",
+        "legacy-id",
+        "legacy-string",
+    ]
+    assert [agent.legacy_agent_id for agent in agents] == [
+        "legacy-agent",
+        "legacy-id",
+        "legacy-string",
+    ]
+    assert agents[2].role == "default"
+
+
+@pytest.mark.asyncio
+async def test_hydrate_agents_resolves_legacy_foundry_ids(monkeypatch, essays_app_module_fixture):
+    module = essays_app_module_fixture
+
+    class _ResolvingFacade(_StubFoundryAgentFacade):
+        async def get_agent(self, agent_id: str):
+            assert agent_id == "legacy-agent-id"
+            return module.AgentReference(
+                agent_name="narrative-grader",
+                agent_version="2026-05-09",
+                legacy_agent_id=agent_id,
+                model_name="gpt-5",
+            )
+
+    monkeypatch.setattr(module, "FoundryAgentFacade", _ResolvingFacade)
+    orchestrator = module.EssayOrchestrator()
+
+    agents = await orchestrator._hydrate_agents(
+        [
+            {
+                "agent_id": "legacy-agent-id",
+                "role": "narrative",
+                "deployment": "gpt-5",
+            }
+        ]
+    )
+
+    assert len(agents) == 1
+    assert agents[0].agent_name == "narrative-grader"
+    assert agents[0].agent_version == "2026-05-09"
+    assert agents[0].legacy_agent_id == "legacy-agent-id"
+    assert agents[0].role == "narrative"
 
 
 class _StubContainer:
@@ -425,7 +583,7 @@ async def test_load_assembly_raises_for_missing_assembly(monkeypatch, essays_app
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
-    monkeypatch.setattr(module, "FoundryAgentService", _StubFoundryAgentService)
+    monkeypatch.setattr(module, "FoundryAgentFacade", _StubFoundryAgentFacade)
     monkeypatch.setattr(module.exceptions, "CosmosResourceNotFoundError", not_found)
     monkeypatch.setattr(
         module,
@@ -445,15 +603,15 @@ async def test_load_assembly_returns_agents(monkeypatch, essays_app_module_fixtu
     module = essays_app_module_fixture
     not_found = type("NotFound", (Exception,), {})
 
-    created: list[_StubFoundryAgentService] = []
+    created: list[_StubFoundryAgentFacade] = []
 
-    class _RecordingService(_StubFoundryAgentService):
+    class _RecordingFacade(_StubFoundryAgentFacade):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             created.append(self)
 
-    monkeypatch.setattr(module, "FoundryAgentService", _RecordingService)
-    _StubFoundryAgentService.response_text = DEFAULT_RESPONSE
+    monkeypatch.setattr(module, "FoundryAgentFacade", _RecordingFacade)
+    _StubFoundryAgentFacade.response_text = DEFAULT_RESPONSE
     monkeypatch.setattr(module.exceptions, "CosmosResourceNotFoundError", not_found)
     monkeypatch.setattr(
         module,
@@ -468,7 +626,8 @@ async def test_load_assembly_returns_agents(monkeypatch, essays_app_module_fixtu
     essay = module.Essay(id="essay-present", topic="History", content="Text")
 
     await orchestrator.invoke("assembly-present", essay, [])
-    assert created[0].calls[0][0] == "agent-1"
+    assert created[0].requests[0].agent.agent_name == "agent-1"
+    assert created[0].requests[0].agent.legacy_agent_id == "agent-1"
 
 
 def test_prepare_resources_prefers_doc_intelligence(monkeypatch, essays_app_module_fixture):

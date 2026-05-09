@@ -4,23 +4,27 @@ from __future__ import annotations
 
 import base64
 import json
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from io import BytesIO
-from typing import Any, Iterable
+from typing import Any
 from uuid import uuid4
 
 from azure.core import exceptions as azure_exceptions
+from azure.core.exceptions import AzureError
 from azure.cosmos import exceptions as cosmos_exceptions
-from pydantic import ValidationError
-
-from fastapi import File, FastAPI, Form, HTTPException, Request, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
+from tutor_lib.agents import AgentReference, FoundryAgentFacade
+from tutor_lib.middleware import configure_entra_auth
 
-from tutor_lib.agents import FoundryAgentService
+from app.config import get_settings
 from app.cosmos import CosmosCRUD
+from app.essays import EssayOrchestrator
 from app.file_processing import (
     ProcessedUpload,
     encode_base64,
@@ -28,24 +32,20 @@ from app.file_processing import (
     process_upload,
     read_upload_bytes,
 )
-from app.essays import EssayOrchestrator
 from app.schemas import (
     RESPONSES,
-    BodyMessage,
     AgentDefinition,
-    ChatResponse,
-    Essay,
-    EssayPatch,
-    ErrorMessage,
     AgentRef,
-    Resource,
-    SuccessMessage,
     Assembly,
     AssemblyDefinition,
+    BodyMessage,
+    ChatResponse,
+    ErrorMessage,
+    Essay,
+    EssayPatch,
+    Resource,
+    SuccessMessage,
 )
-from app.config import get_settings
-from tutor_lib.middleware import configure_entra_auth
-
 
 ESSAY_FIELDS: tuple[str, ...] = (
     "id",
@@ -75,6 +75,12 @@ settings = get_settings()
 MAX_RESOURCE_DOCUMENT_BYTES = 1_900_000  # Cosmos DB enforces a 2 MB per-item limit
 
 _RESOURCE_CONTENT_CACHE: dict[str, BytesIO] = {}
+
+ESSAY_ID_FORM = Form(...)
+RESOURCE_OBJECTIVE_FORM = Form(...)
+RESOURCE_FILE = File(None)
+RESOURCE_DESCRIPTION_FORM = Form(None)
+RESOURCE_SUBMISSION_TEXT_FORM = Form(None)
 
 
 app = FastAPI(
@@ -135,7 +141,7 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 orchestrator = EssayOrchestrator()
-agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
+agent_facade = FoundryAgentFacade(settings.azure_ai.project_endpoint)
 
 
 def _crud(container: str) -> CosmosCRUD:
@@ -228,15 +234,43 @@ async def _resources_for_essay(essay_id: str) -> list[Resource]:
     return resources
 
 
-def _materialize_agent(agent: Any, definition: AgentDefinition | None = None) -> AgentRef:
+def _is_legacy_only_agent_reference(agent_name: str | None, legacy_agent_id: str | None) -> bool:
+    return bool(legacy_agent_id) and (not agent_name or agent_name == legacy_agent_id)
+
+
+def _materialize_agent(
+    agent: Any,
+    definition: AgentDefinition | None = None,
+    *,
+    legacy_agent_id: str | None = None,
+) -> AgentRef:
     """Build a lightweight AgentRef from a Foundry agent response."""
 
-    agent_id = getattr(agent, "id", None)
-    if not agent_id:
-        raise ValueError("Azure AI agent response did not include an id")
+    if isinstance(agent, AgentReference):
+        return AgentRef(
+            agent_name=agent.agent_name,
+            agent_version=agent.agent_version,
+            legacy_agent_id=legacy_agent_id or agent.legacy_agent_id,
+            role=definition.role if definition else agent.role or "default",
+            deployment=agent.model_name or (definition.deployment if definition else ""),
+        )
+
+    agent_name = getattr(agent, "agent_name", None) or getattr(agent, "name", None)
+    legacy_agent_id = legacy_agent_id or getattr(agent, "legacy_agent_id", None) or getattr(agent, "id", None)
+    if not agent_name:
+        agent_name = legacy_agent_id
+    if not agent_name:
+        raise ValueError("Azure AI agent response did not include a name or id")
+
+    agent_version = (
+        getattr(agent, "agent_version", None)
+        or getattr(agent, "version", None)
+        or getattr(agent, "published_version", None)
+    )
 
     deployment = (
-        getattr(agent, "model", None)
+        getattr(agent, "model_name", None)
+        or getattr(agent, "model", None)
         or getattr(agent, "model_id", None)
         or getattr(agent, "deployment_name", None)
         or (definition.deployment if definition else "")
@@ -244,35 +278,73 @@ def _materialize_agent(agent: Any, definition: AgentDefinition | None = None) ->
     role = definition.role if definition else "default"
 
     return AgentRef(
-        agent_id=agent_id,
+        agent_name=str(agent_name),
+        agent_version=str(agent_version) if agent_version else None,
+        legacy_agent_id=str(legacy_agent_id) if legacy_agent_id else None,
         role=role,
         deployment=deployment,
     )
 
 
+async def _resolve_legacy_agent_ref(agent_ref: AgentRef) -> AgentRef:
+    legacy_agent_id = agent_ref.legacy_agent_id
+    if not legacy_agent_id or not _is_legacy_only_agent_reference(
+        agent_ref.agent_name,
+        legacy_agent_id,
+    ):
+        return agent_ref
+
+    get_remote_agent = getattr(agent_facade, "get_agent", None)
+    if not callable(get_remote_agent):
+        return agent_ref
+
+    try:
+        remote = await get_remote_agent(legacy_agent_id)
+    except (AttributeError, AzureError, RuntimeError, TypeError, ValueError):
+        return agent_ref
+    return _materialize_agent(remote, legacy_agent_id=legacy_agent_id)
+
+
+async def _resolve_agent_definition(definition: AgentDefinition) -> AgentRef:
+    legacy_agent_id = definition.legacy_agent_id
+    if legacy_agent_id and _is_legacy_only_agent_reference(definition.agent_name, legacy_agent_id):
+        get_remote_agent = getattr(agent_facade, "get_agent", None)
+        if callable(get_remote_agent):
+            try:
+                remote = await get_remote_agent(legacy_agent_id)
+            except (AttributeError, AzureError, RuntimeError, TypeError, ValueError):
+                return definition.to_agent_ref()
+            return _materialize_agent(
+                remote,
+                definition=definition,
+                legacy_agent_id=legacy_agent_id,
+            )
+
+    if definition.agent_name:
+        return definition.to_agent_ref()
+
+    created = await agent_facade.create_agent(
+        name=definition.name,
+        instructions=definition.instructions,
+        deployment=definition.deployment,
+        temperature=definition.temperature,
+    )
+    return _materialize_agent(created, definition=definition, legacy_agent_id=legacy_agent_id)
+
+
 async def _ensure_provisioned_agents(definitions: list[AgentDefinition]) -> list[AgentRef]:
     provisioned: list[AgentRef] = []
     for definition in definitions:
-        if definition.agent_id:
-            remote = await agent_service.get_agent(definition.agent_id)
-            provisioned.append(_materialize_agent(remote, definition=definition))
-            continue
-
-        created = await agent_service.create_agent(
-            name=definition.name,
-            instructions=definition.instructions,
-            deployment=definition.deployment,
-            temperature=definition.temperature,
-        )
-        remote = await agent_service.get_agent(created.id)
-        provisioned.append(_materialize_agent(remote, definition=definition))
+        provisioned.append(await _resolve_agent_definition(definition))
     return provisioned
 
 
 def _assembly_definition_from_assembly(assembly: Assembly) -> AssemblyDefinition:
     agents = [
         AgentDefinition(
-            agent_id=agent.agent_id,
+            agent_name=agent.agent_name,
+            agent_version=agent.agent_version,
+            legacy_agent_id=agent.legacy_agent_id,
             name=agent.role,
             instructions="",
             deployment=agent.deployment,
@@ -287,22 +359,11 @@ async def _hydrate_assembly_record(raw: dict[str, Any]) -> AssemblyDefinition:
     raw_agents = raw.get("agents", []) or []
     provisioned: list[AgentRef] = []
     for entry in raw_agents:
-        if isinstance(entry, dict):
-            # Support both new lightweight format (agent_id) and legacy (id)
-            if "agent_id" in entry:
-                provisioned.append(AgentRef.model_validate(entry))
-            elif "id" in entry:
-                provisioned.append(AgentRef(
-                    agent_id=str(entry["id"]),
-                    role=entry.get("role", "default"),
-                    deployment=entry.get("deployment", ""),
-                ))
-        elif isinstance(entry, str):
-            provisioned.append(AgentRef(
-                agent_id=entry,
-                role="default",
-                deployment="",
-            ))
+        try:
+            agent_ref = AgentRef.model_validate(entry)
+        except ValidationError:
+            continue
+        provisioned.append(await _resolve_legacy_agent_ref(agent_ref))
 
     assembly = Assembly(
         id=str(raw.get("id") or ""),
@@ -549,11 +610,11 @@ async def create_resource(resource: Resource) -> JSONResponse:
 
 @app.post("/resources/upload", tags=["Resources"])
 async def upload_resource(
-    essay_id: str = Form(...),
-    objective: str = Form(...),
-    file: UploadFile | None = File(None),
-    description: str | None = Form(None),
-    submission_text: str | None = Form(None),
+    essay_id: str = ESSAY_ID_FORM,
+    objective: str = RESOURCE_OBJECTIVE_FORM,
+    file: UploadFile | None = RESOURCE_FILE,
+    description: str | None = RESOURCE_DESCRIPTION_FORM,
+    submission_text: str | None = RESOURCE_SUBMISSION_TEXT_FORM,
 ) -> JSONResponse:
     await _require_essay_document(essay_id)
 
@@ -604,7 +665,7 @@ async def upload_resource(
     if description and not payload_content:
         payload_content = description
 
-    metadata.setdefault("uploaded_at", datetime.now(timezone.utc).isoformat())
+    metadata.setdefault("uploaded_at", datetime.now(UTC).isoformat())
 
     resource_id = str(uuid4())
     resource_payload: dict[str, Any] = {
@@ -699,7 +760,7 @@ async def create_agent(definition: AgentDefinition) -> JSONResponse:
 @app.get("/agents", tags=["Assemblies"])
 async def list_agents(limit: int | None = None) -> JSONResponse:
     try:
-        agents = await agent_service.list_agents(limit=limit)
+        agents = await agent_facade.list_agents(limit=limit)
     except Exception:
         return _create_success_response("Agents Retrieved", "Agents fetched", [])
     hydrated = [_materialize_agent(agent).model_dump() for agent in agents]
@@ -709,7 +770,7 @@ async def list_agents(limit: int | None = None) -> JSONResponse:
 @app.get("/agents/{agent_id}", tags=["Assemblies"])
 async def get_agent(agent_id: str) -> JSONResponse:
     try:
-        remote = await agent_service.get_agent(agent_id)
+        remote = await agent_facade.get_agent(agent_id)
     except (azure_exceptions.ResourceNotFoundError, cosmos_exceptions.CosmosResourceNotFoundError) as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found") from exc
 
@@ -752,7 +813,7 @@ async def create_assembly(assembly: AssemblyDefinition) -> JSONResponse:
         essay_id=assembly.essay_id,
         agents=provisioned,
     )
-    await _crud(settings.cosmos.assembly_container).create_item(stored.model_dump())
+    await _crud(settings.cosmos.assembly_container).create_item(stored.model_dump(exclude_none=True))
     await _link_essay_to_assembly(essay_document, stored.id)
     response = _assembly_definition_from_assembly(stored)
     return _create_success_response("Assembly Created", "Assembly stored", response.model_dump())
@@ -784,7 +845,7 @@ async def update_assembly(assembly_id: str, assembly: AssemblyDefinition) -> JSO
         essay_id=essay_document["id"],
         agents=provisioned,
     )
-    await crud.update_item(assembly_id, stored.model_dump())
+    await crud.update_item(assembly_id, stored.model_dump(exclude_none=True))
     await _link_essay_to_assembly(essay_document, stored.id)
     response = _assembly_definition_from_assembly(stored)
     return _create_success_response("Assembly Updated", "Assembly modified", response.model_dump())

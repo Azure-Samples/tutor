@@ -93,6 +93,8 @@ The target platform uses DDD bounded contexts. Several of these contexts can beg
 | **Institutional Analytics and Read Models** | Projection context | Learner, cohort, school, and program projections for workspaces and interventions. | `insights-svc` plus future read-model projections. |
 | **Agent Evaluation and Governance** | Governance context | Evaluation datasets, policy gates, provenance contracts, degraded-mode policy, and release approval for high-impact AI features. | `evaluation-svc` and [agent-evaluation.md](./agent-evaluation.md). |
 
+Foundry-native agent execution is an implementation concern of the agentic services, not a system of record. The only app-facing agent runtime boundary is `tutor_lib.agents`; provider SDK objects, direct thread/run polling, and Agent Framework orchestration do not cross into bounded contexts.
+
 ---
 
 ## 3. System-of-Record Boundaries
@@ -125,6 +127,7 @@ All external data enters Tutor through the **Integration Hub**. After normalizat
 | **Read models follow CQRS thinking** | CQRS / projection pattern | Role workspaces read optimized projections such as timelines, work queues, and briefings instead of querying write models directly. |
 | **Workspace routing is strategy-driven** | Strategy and data-driven routing | Role, relationship, lifecycle state, and feature flags determine which modules, queues, and actions a user sees. |
 | **Agentic services operate inside a governance envelope** | NIST AI RMF-aligned control boundary | No autonomous high-impact educational action is allowed; degraded mode is explicit and auditable. |
+| **Foundry execution uses a facade** | Facade / Adapter / Command | Services invoke named and versioned Foundry Agent Service agents through `tutor_lib.agents`; SDK response primitives stay behind the anti-corruption boundary. |
 | **No cross-context database reads** | DDD ownership rule | Services and contexts integrate through APIs, events, and normalized contracts rather than shared container access. |
 
 ---

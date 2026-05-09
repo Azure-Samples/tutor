@@ -17,7 +17,7 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_418_IM_A_TEAPOT,
-    HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_422_UNPROCESSABLE_CONTENT,
 )
 
 
@@ -200,10 +200,86 @@ class LearnerRecordTimelinePayload(BaseModel):
     context_id: str
     context_label: str
     summary: str
-    freshness: FreshnessMetadata
     page: CursorPage
     entries: list[LearnerRecordEntry] = Field(default_factory=list)
-    deep_links: list[DeepLink] = Field(default_factory=list)
+
+
+# ===== P1: Learner Progress And Strategy Read Models =====
+
+
+class CourseProgressItem(BaseModel):
+    """Course progress snapshot for a learner."""
+
+    course_id: str
+    course_title: str
+    completion_rate: float = Field(..., ge=0, le=1)
+    assignments_completed: int
+    assignments_total: int
+    avg_score: float | None = None
+    last_activity_at: str | None = None
+    status: Literal["active", "completed", "at_risk", "inactive"]
+
+
+class MasteryItem(BaseModel):
+    """Competency or topic mastery signal."""
+
+    competency_id: str
+    competency_label: str
+    mastery_level: Literal["emerging", "developing", "proficient", "advanced"]
+    evidence_count: int
+    last_assessed_at: str | None = None
+    confidence: float = Field(..., ge=0, le=1)
+
+
+class RiskIndicator(BaseModel):
+    """Student risk signal with advisory context."""
+
+    risk_id: str
+    risk_type: Literal["attendance", "performance", "engagement", "completion"]
+    severity: Literal["low", "medium", "high"]
+    title: str
+    summary: str
+    evidence_refs: list[str] = Field(default_factory=list)
+    recommended_action: str | None = None
+
+
+class LearnerProgressPayload(BaseModel):
+    """Learner progress and strategy read model (P1)."""
+
+    learner_id: str
+    institution_id: str | None = None
+    overall_status: Literal["on_track", "needs_support", "at_risk", "excelling"]
+    courses: list[CourseProgressItem] = Field(default_factory=list)
+    mastery: list[MasteryItem] = Field(default_factory=list)
+    risks: list[RiskIndicator] = Field(default_factory=list)
+    freshness: FreshnessMetadata
+    trust: TrustMetadata
+
+
+# ===== P1: Connector Health Read Model =====
+
+
+class ConnectorHealthItem(BaseModel):
+    """Connector health snapshot for monitoring."""
+
+    connector_id: str
+    provider: str
+    status: Literal["active", "paused", "error", "initializing"]
+    last_sync_at: str | None = None
+    error_count: int = 0
+    last_error: str | None = None
+    events_synced_24h: int = 0
+    avg_sync_duration_seconds: float | None = None
+
+
+class ConnectorHealthPayload(BaseModel):
+    """Connector health dashboard for a tenant (P1)."""
+
+    tenant_id: str
+    connectors: list[ConnectorHealthItem] = Field(default_factory=list)
+    total_events_24h: int = 0
+    total_errors_24h: int = 0
+    freshness: FreshnessMetadata
 
 
 RESPONSES: dict[int, dict[str, Any]] = {
@@ -217,5 +293,5 @@ RESPONSES: dict[int, dict[str, Any]] = {
     HTTP_401_UNAUTHORIZED: {"model": BodyMessage},
     HTTP_403_FORBIDDEN: {"model": BodyMessage},
     HTTP_418_IM_A_TEAPOT: {"model": BodyMessage},
-    HTTP_422_UNPROCESSABLE_ENTITY: {"model": BodyMessage},
+    HTTP_422_UNPROCESSABLE_CONTENT: {"model": BodyMessage},
 }

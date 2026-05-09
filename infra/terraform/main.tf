@@ -50,7 +50,7 @@ locals {
   agent_role_scopes = {
     "Storage Blob Data Contributor" = azurerm_storage_account.uploads.id
     "AcrPull"                       = azurerm_container_registry.main.id
-    "Cognitive Services User"       = module.ai_foundry.ai_foundry_id
+    "Azure AI User"                 = module.ai_foundry.ai_foundry_id
   }
 
   agent_role_assignments = {
@@ -355,21 +355,21 @@ resource "azurerm_cosmosdb_sql_container" "containers" {
 # ── Service Bus: learner-record distribution seam ───────────────────────────
 
 resource "azurerm_servicebus_namespace" "main" {
-  name                         = local.service_bus_namespace_name
-  location                     = azurerm_resource_group.main.location
-  resource_group_name          = azurerm_resource_group.main.name
-  sku                          = "Standard"
-  local_auth_enabled           = false
-  minimum_tls_version          = "1.2"
+  name                          = local.service_bus_namespace_name
+  location                      = azurerm_resource_group.main.location
+  resource_group_name           = azurerm_resource_group.main.name
+  sku                           = "Standard"
+  local_auth_enabled            = false
+  minimum_tls_version           = "1.2"
   public_network_access_enabled = true
 }
 
 resource "azurerm_servicebus_topic" "learner_record" {
-  name                                 = var.service_bus_learner_record_topic_name
-  namespace_id                         = azurerm_servicebus_namespace.main.id
-  requires_duplicate_detection         = true
+  name                                    = var.service_bus_learner_record_topic_name
+  namespace_id                            = azurerm_servicebus_namespace.main.id
+  requires_duplicate_detection            = true
   duplicate_detection_history_time_window = "PT10M"
-  support_ordering                     = true
+  support_ordering                        = true
 }
 
 resource "azurerm_servicebus_subscription" "learner_record_integration_backlog" {
@@ -379,7 +379,7 @@ resource "azurerm_servicebus_subscription" "learner_record_integration_backlog" 
   dead_lettering_on_message_expiration = true
 }
 
-# ── Azure AI Foundry (ADR-011 → ADR-012: AVM module, public endpoint) ──────
+# ── Azure AI Foundry (AVM module, Agent Service enabled) ────────────────────
 
 module "ai_foundry" {
   source  = "Azure/avm-ptn-aiml-ai-foundry/azurerm"
@@ -391,7 +391,7 @@ module "ai_foundry" {
 
   ai_foundry = {
     name                    = "${local.normalized_prefix}${random_string.suffix.result}ai"
-    create_ai_agent_service = false
+    create_ai_agent_service = true
     disable_local_auth      = false
   }
 
@@ -520,13 +520,19 @@ resource "azurerm_api_management_api_policy" "backend_services_hardening" {
   XML
 }
 
-# ── RBAC: Cognitive Services for backend container apps ──────────────────────
+# ── RBAC: Azure AI access ────────────────────────────────────────────────────
 
 resource "azurerm_role_assignment" "container_app_cognitive_services" {
   for_each             = toset(local.backend_service_names)
   scope                = module.ai_foundry.ai_foundry_id
-  role_definition_name = "Cognitive Services User"
+  role_definition_name = "Azure AI User"
   principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "foundry_project_ai_user" {
+  scope                = module.ai_foundry.ai_foundry_id
+  role_definition_name = "Azure AI User"
+  principal_id         = module.ai_foundry.ai_foundry_project_system_identity_principal_id["tutor"]
 }
 
 resource "azurerm_role_assignment" "learner_record_service_bus_sender" {

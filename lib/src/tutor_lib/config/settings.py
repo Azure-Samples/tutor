@@ -28,6 +28,18 @@ class CosmosConfig(BaseSettings):
     upskilling_container: str = Field(alias="COSMOS_UPSKILLING_TABLE", default="upskilling_plans")
     insights_report_container: str = Field(alias="COSMOS_INSIGHTS_REPORT_TABLE", default="insights_reports")
     insights_feedback_container: str = Field(alias="COSMOS_INSIGHTS_FEEDBACK_TABLE", default="insights_feedback")
+    integration_idempotency_container: str = Field(
+        alias="COSMOS_INTEGRATION_IDEMPOTENCY_TABLE",
+        default="integration_idempotency",
+    )
+    integration_connectors_container: str = Field(
+        alias="COSMOS_INTEGRATION_CONNECTORS_TABLE",
+        default="integration_connectors",
+    )
+    integration_dead_letters_container: str = Field(
+        alias="COSMOS_INTEGRATION_DEAD_LETTERS_TABLE",
+        default="integration_dead_letters",
+    )
     learner_record_events_container: str = Field(
         alias="COSMOS_LEARNER_RECORD_EVENTS_TABLE",
         default="learner_record_events",

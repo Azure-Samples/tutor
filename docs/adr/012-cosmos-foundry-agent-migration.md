@@ -2,11 +2,13 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Accepted |
+| **Status** | Partially superseded by [ADR-015](./015-foundry-agent-service-native-architecture.md) |
 | **Date** | 2026-03-16 |
 | **Deciders** | Platform team |
 | **Implements** | ADR-011 (Foundry-First Agent Architecture) |
 | **Tracking** | [Issue #49](https://github.com/Azure-Samples/tutor/issues/49) |
+
+> ADR-015 supersedes this ADR where it keeps `AgentRegistry`, `AgentRunContext`, `AgentSpec`, Agent Framework orchestration, or `agent_id` as a primary app-facing contract. The shared-library promotion, lightweight-reference migration intent, and Cosmos domain-data boundary remain useful historical context.
 
 ---
 

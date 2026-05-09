@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import Annotated, Any
 from uuid import uuid4
 
 from azure.cosmos import exceptions as cosmos_exceptions
@@ -12,18 +12,26 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from tutor_lib.config import get_settings
+from tutor_lib.middleware import configure_entra_auth, get_authenticated_user, require_roles
+from tutor_lib.middleware.auth import (
+    AccessContext,
+    AccessGrant,
+    AuthenticatedUser,
+    RelationshipScope,
+)
 
 from app.cosmos import CosmosCRUD
 from app.schemas import (
+    RESPONSES,
     AccessActor,
     AccessContextItem,
     AccessContextPayload,
     AccessGrantItem,
     AccessRoleContext,
     AccessScope,
-    BulkRosterSyncRequest,
-    RESPONSES,
     BodyMessage,
+    BulkRosterSyncRequest,
     Class,
     Course,
     ErrorMessage,
@@ -34,10 +42,6 @@ from app.schemas import (
     SuccessMessage,
     ThemeInput,
 )
-from tutor_lib.config import get_settings
-from tutor_lib.middleware import configure_entra_auth, get_authenticated_user, require_roles
-from tutor_lib.middleware.auth import AccessContext, AccessGrant, AuthenticatedUser, RelationshipScope
-
 
 settings = get_settings()
 
@@ -112,6 +116,8 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 require_professor = require_roles("professor", "admin")
+AuthenticatedAccessUser = Annotated[AuthenticatedUser, Depends(get_authenticated_user)]
+ProfessorDependency = Annotated[str, Depends(require_professor)]
 THEME_KIND = "theme"
 _BASE_FEATURE_FLAGS: tuple[str, ...] = (
     "workspace-shell",
@@ -227,80 +233,80 @@ def _access_context_payload(user: AuthenticatedUser) -> AccessContextPayload:
 
 
 @app.get("/access-context", tags=["Access"])
-async def get_access_context(user: AuthenticatedUser = Depends(get_authenticated_user)) -> JSONResponse:
+async def get_access_context(user: AuthenticatedAccessUser) -> JSONResponse:
     payload = _access_context_payload(user)
     return _success("Access Context Retrieved", "Access context resolved", payload.model_dump())
 
 
 @app.post("/students", tags=["Students"])
-async def create_student(student: Student, _: str = Depends(require_professor)) -> JSONResponse:
+async def create_student(student: Student, _: ProfessorDependency) -> JSONResponse:
     await _crud(settings.cosmos.student_container).create_item(student.model_dump())
     return _success("Student Created", "Student stored", student.model_dump())
 
 
 @app.get("/students", tags=["Students"])
-async def list_students(_: str = Depends(require_professor)) -> JSONResponse:
+async def list_students(_: ProfessorDependency) -> JSONResponse:
     items = await _crud(settings.cosmos.student_container).list_items()
     return _success("Students Retrieved", "Students fetched", items)
 
 
 @app.post("/professors", tags=["Professors"])
-async def create_professor(professor: Professor, _: str = Depends(require_professor)) -> JSONResponse:
+async def create_professor(professor: Professor, _: ProfessorDependency) -> JSONResponse:
     await _crud(settings.cosmos.professor_container).create_item(professor.model_dump())
     return _success("Professor Created", "Professor stored", professor.model_dump())
 
 
 @app.get("/professors", tags=["Professors"])
-async def list_professors(_: str = Depends(require_professor)) -> JSONResponse:
+async def list_professors(_: ProfessorDependency) -> JSONResponse:
     items = await _crud(settings.cosmos.professor_container).list_items()
     return _success("Professors Retrieved", "Professors fetched", items)
 
 
 @app.post("/courses", tags=["Courses"])
-async def create_course(course: Course, _: str = Depends(require_professor)) -> JSONResponse:
+async def create_course(course: Course, _: ProfessorDependency) -> JSONResponse:
     await _crud(settings.cosmos.course_container).create_item(course.model_dump())
     return _success("Course Created", "Course stored", course.model_dump())
 
 
 @app.get("/courses", tags=["Courses"])
-async def list_courses(_: str = Depends(require_professor)) -> JSONResponse:
+async def list_courses(_: ProfessorDependency) -> JSONResponse:
     items = await _crud(settings.cosmos.course_container).list_items()
     return _success("Courses Retrieved", "Courses fetched", items)
 
 
 @app.post("/classes", tags=["Classes"])
-async def create_class(class_: Class, _: str = Depends(require_professor)) -> JSONResponse:
+async def create_class(class_: Class, _: ProfessorDependency) -> JSONResponse:
     await _crud(settings.cosmos.class_container).create_item(class_.model_dump())
     return _success("Class Created", "Class stored", class_.model_dump())
 
 
 @app.get("/classes", tags=["Classes"])
-async def list_classes(_: str = Depends(require_professor)) -> JSONResponse:
+async def list_classes(_: ProfessorDependency) -> JSONResponse:
     items = await _crud(settings.cosmos.class_container).list_items()
     return _success("Classes Retrieved", "Classes fetched", items)
 
 
 @app.post("/groups", tags=["Groups"])
-async def create_group(group: Group, _: str = Depends(require_professor)) -> JSONResponse:
+async def create_group(group: Group, _: ProfessorDependency) -> JSONResponse:
     await _crud(settings.cosmos.group_container).create_item(group.model_dump())
     return _success("Group Created", "Group stored", group.model_dump())
 
 
 @app.get("/groups", tags=["Groups"])
-async def list_groups(_: str = Depends(require_professor)) -> JSONResponse:
+async def list_groups(_: ProfessorDependency) -> JSONResponse:
     items = await _crud(settings.cosmos.group_container).list_items()
     return _success("Groups Retrieved", "Groups fetched", items)
 
 
 @app.get("/themes", tags=["Themes"])
-async def list_themes(_: str = Depends(require_professor)) -> JSONResponse:
+async def list_themes(_: ProfessorDependency) -> JSONResponse:
     items = await _crud(settings.cosmos.configuration_container).list_items()
     themes = [item for item in items if item.get("kind") == THEME_KIND]
     return _success("Themes Retrieved", "Themes fetched", themes)
 
 
 @app.post("/themes", tags=["Themes"])
-async def create_theme(theme: ThemeInput, _: str = Depends(require_professor)) -> JSONResponse:
+async def create_theme(theme: ThemeInput, _: ProfessorDependency) -> JSONResponse:
     theme_id = theme.id or str(uuid4())
     payload = _theme_document(theme, theme_id)
     await _crud(settings.cosmos.configuration_container).create_item(payload)
@@ -308,7 +314,7 @@ async def create_theme(theme: ThemeInput, _: str = Depends(require_professor)) -
 
 
 @app.get("/themes/{theme_id}", tags=["Themes"])
-async def get_theme(theme_id: str, _: str = Depends(require_professor)) -> JSONResponse:
+async def get_theme(theme_id: str, _: ProfessorDependency) -> JSONResponse:
     try:
         item = await _crud(settings.cosmos.configuration_container).read_item(theme_id)
     except cosmos_exceptions.CosmosResourceNotFoundError as exc:
@@ -321,7 +327,7 @@ async def get_theme(theme_id: str, _: str = Depends(require_professor)) -> JSONR
 
 
 @app.put("/themes/{theme_id}", tags=["Themes"])
-async def update_theme(theme_id: str, theme: ThemeInput, _: str = Depends(require_professor)) -> JSONResponse:
+async def update_theme(theme_id: str, theme: ThemeInput, _: ProfessorDependency) -> JSONResponse:
     crud = _crud(settings.cosmos.configuration_container)
     try:
         existing = await crud.read_item(theme_id)
@@ -337,7 +343,7 @@ async def update_theme(theme_id: str, theme: ThemeInput, _: str = Depends(requir
 
 
 @app.delete("/themes/{theme_id}", tags=["Themes"])
-async def delete_theme(theme_id: str, _: str = Depends(require_professor)) -> JSONResponse:
+async def delete_theme(theme_id: str, _: ProfessorDependency) -> JSONResponse:
     crud = _crud(settings.cosmos.configuration_container)
     try:
         existing = await crud.read_item(theme_id)
@@ -355,7 +361,7 @@ async def delete_theme(theme_id: str, _: str = Depends(require_professor)) -> JS
 async def assign_cases_to_group(
     group_id: str,
     assignment: GroupCaseAssignment,
-    _: str = Depends(require_professor),
+    _: ProfessorDependency,
 ) -> JSONResponse:
     crud = _crud(settings.cosmos.group_container)
     try:
@@ -371,7 +377,7 @@ async def assign_cases_to_group(
 @app.post("/lms/bulk-sync", tags=["Groups", "Students", "Professors", "Courses", "Classes"])
 async def bulk_sync_roster(
     payload: BulkRosterSyncRequest,
-    _: str = Depends(require_professor),
+    _: ProfessorDependency,
 ) -> JSONResponse:
     students = [item.model_dump() for item in payload.students]
     professors = [item.model_dump() for item in payload.professors]

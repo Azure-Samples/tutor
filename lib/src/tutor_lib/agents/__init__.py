@@ -1,3 +1,19 @@
-from .clients import AgentAttachment, AgentRegistry, AgentRunContext, AgentSpec, FoundryAgentService
+from .clients import (
+	AgentAttachment,
+	AgentEvaluationReference,
+	AgentInvocationRequest,
+	AgentInvocationResult,
+	AgentReference,
+	FoundryAgentFacade,
+	FoundryAgentService,
+)
 
-__all__ = ["AgentAttachment", "AgentRegistry", "AgentRunContext", "AgentSpec", "FoundryAgentService"]
+__all__ = [
+	"AgentAttachment",
+	"AgentEvaluationReference",
+	"AgentInvocationRequest",
+	"AgentInvocationResult",
+	"AgentReference",
+	"FoundryAgentFacade",
+	"FoundryAgentService",
+]

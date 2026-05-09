@@ -16,6 +16,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from tutor_lib.config import create_app, get_settings
+from tutor_lib.integration_hub import (
+    CosmosConnectorStateRepository,
+    InMemoryConnectorStateRepository,
+)
 from tutor_lib.learner_record import (
     AzureServiceBusLearnerRecordEventPublisher,
     CosmosLearnerRecordEventRepository,
@@ -42,12 +46,18 @@ from app.projections import WorkspaceProjectionBuilder
 from app.schemas import (
     BodyMessage,
     BriefingRequest,
+    ConnectorHealthItem,
+    ConnectorHealthPayload,
+    CourseProgressItem,
     DeepLink,
     ErrorMessage,
     FeedbackRequest,
     FreshnessMetadata,
+    LearnerProgressPayload,
+    MasteryItem,
     ProvenanceMetadata,
     ReviewMetadata,
+    RiskIndicator,
     SuccessMessage,
     TrustMetadata,
 )
@@ -115,6 +125,14 @@ def _learner_record_event_publisher() -> LearnerRecordEventPublisher:
     return NoOpLearnerRecordEventPublisher()
 
 
+@lru_cache(maxsize=1)
+def _connector_state_repository() -> InMemoryConnectorStateRepository | CosmosConnectorStateRepository:
+    if _use_in_memory_store():
+        return InMemoryConnectorStateRepository()
+    settings = get_settings()
+    return CosmosConnectorStateRepository(settings.cosmos)
+
+
 def _use_in_memory_store() -> bool:
     if getenv("INSIGHTS_REPOSITORY", "cosmos").lower() == "memory":
         return True
@@ -139,6 +157,7 @@ def reset_repository() -> None:
     _repository.cache_clear()
     _learner_record_repository.cache_clear()
     _learner_record_event_publisher.cache_clear()
+    _connector_state_repository.cache_clear()
     _fabric_adapter.cache_clear()
     _indicator_strategies.cache_clear()
     _projection_builder.cache_clear()
@@ -195,7 +214,7 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError) 
         title="Invalid request payload",
         detail={"invalid-params": list(exc.errors())},
     )
-    return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, content=jsonable_encoder(body))
+    return JSONResponse(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, content=jsonable_encoder(body))
 
 
 @app.exception_handler(Exception)
@@ -432,6 +451,14 @@ def _enforce_workspace_pilot_scope(*, role: str, context: AccessContext, user: A
             _enforce_pilot_school_scope(school_id)
 
 
+def _enforce_tenant_scope(user: AuthenticatedUser, tenant_id: str) -> None:
+    if tenant_id not in user.scope.institution_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requested tenant is outside the caller scope",
+        )
+
+
 @app.get("/workspace-snapshots/{role}")
 async def get_workspace_snapshot(
     role: str,
@@ -617,3 +644,167 @@ async def get_pilot_metrics(
 
     metrics = await _repository().get_pilot_metrics(allowed_school_ids)
     return _success("Pilot Metrics Retrieved", "Pilot metrics fetched.", pilot_metrics_to_dict(metrics))
+
+
+# ===== P1: Learner Progress, Mastery, Risk Projections =====
+
+
+@app.get("/learner-progress/{learner_id}")
+async def get_learner_progress(
+    learner_id: str,
+    user: AuthenticatedUserDependency,
+    context_id: str = Query(..., min_length=1),
+    institution_id: str | None = Query(default=None),
+) -> JSONResponse:
+    """
+    Get learner progress read model with course progress, mastery, and risk.
+
+    P1 implementation uses learner-record events to project progress.
+    """
+    role = _role_from_context_id(context_id)
+    context = _resolve_workspace_context(user, role=role, context_id=context_id)
+    _enforce_workspace_pilot_scope(role=role, context=context, user=user)
+    _enforce_learner_record_scope(learner_id=learner_id, role=role, context=context, user=user)
+
+    # For P1, build deterministic projection from learner-record events
+    from tutor_lib.learner_record import build_learner_key
+
+    learner_key = build_learner_key(learner_id=learner_id, institution_id=institution_id)
+    events = await _learner_record_repository().list_events(learner_key=learner_key)
+
+    # Aggregate events into course progress
+    courses_map: dict[str, CourseProgressItem] = {}
+    mastery_map: dict[str, MasteryItem] = {}
+    risks: list[RiskIndicator] = []
+
+    for event in events:
+        # Extract course context if available
+        context_id = event.source.entity_id or "unknown"
+
+        if event.event_type == "performance":
+            # Add to course progress
+            if context_id not in courses_map:
+                courses_map[context_id] = CourseProgressItem(
+                    course_id=context_id,
+                    course_title=f"Course {context_id}",
+                    completion_rate=0.0,
+                    assignments_completed=0,
+                    assignments_total=1,
+                    avg_score=None,
+                    last_activity_at=event.occurred_at,
+                    status="active",
+                )
+            course = courses_map[context_id]
+            # Update course metrics
+            courses_map[context_id] = CourseProgressItem(
+                course_id=course.course_id,
+                course_title=course.course_title,
+                completion_rate=min(course.completion_rate + 0.1, 1.0),
+                assignments_completed=course.assignments_completed + 1,
+                assignments_total=course.assignments_total + 1,
+                avg_score=course.avg_score,
+                last_activity_at=event.occurred_at,
+                status=course.status,
+            )
+
+        elif event.event_type == "engagement":
+            # Check for risk signals (low engagement)
+            if "page_view" in event.title.lower() or "attendance" in event.title.lower():
+                # Placeholder: would analyze engagement patterns
+                pass
+
+    # Determine overall status
+    overall_status = "on_track"
+    if len(courses_map) == 0:
+        overall_status = "needs_support"
+
+    # Build trust and freshness metadata
+    trust = TrustMetadata(
+        provenance=ProvenanceMetadata(
+            source_type="learner_record_events",
+            source_ids=[learner_key],
+            generator="insights.learner_progress",
+            workflow_version="learner-progress-v1",
+            model=None,
+        ),
+        evaluation_state="not_required",
+        human_review=ReviewMetadata(
+            status="not_required",
+            summary="Deterministic projection from learner-record events",
+        ),
+        degraded=False,
+        advisory_only=False,
+        note="P1 progress projection from learner-record events",
+    )
+
+    freshness = FreshnessMetadata(
+        generated_at=datetime.now(UTC).isoformat(),
+        source_updated_at=events[0].recorded_at if events else None,
+        status="fresh" if events else "derived",
+        note="Progress computed from learner-record events",
+    )
+
+    payload = LearnerProgressPayload(
+        learner_id=learner_id,
+        institution_id=institution_id,
+        overall_status=overall_status,
+        courses=list(courses_map.values()),
+        mastery=list(mastery_map.values()),
+        risks=risks,
+        freshness=freshness,
+        trust=trust,
+    )
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(payload))
+
+
+# ===== P1: Connector Health Projection =====
+
+
+@app.get("/connector-health")
+async def get_connector_health(
+    tenant_id: str = Query(..., min_length=1),
+    user: AuthenticatedUser = Depends(get_authenticated_user),  # noqa: B008
+) -> JSONResponse:
+    """
+    Get connector health dashboard for a tenant.
+
+    P1 implementation projects connector state; ingestion volume metrics can be
+    added once event telemetry is persisted.
+    """
+    _enforce_tenant_scope(user, tenant_id)
+    states = await _connector_state_repository().list_connectors(tenant_id)
+    connectors = [
+        ConnectorHealthItem(
+            connector_id=connector.connector_id,
+            provider=connector.provider,
+            status=connector.status,
+            last_sync_at=connector.last_sync_at,
+            error_count=1 if connector.error_message else 0,
+            last_error=connector.error_message,
+            events_synced_24h=0,
+            avg_sync_duration_seconds=None,
+        )
+        for connector in states
+    ]
+    source_updated_at = max(
+        (connector.last_sync_at for connector in states if connector.last_sync_at),
+        default=None,
+    )
+
+    freshness = FreshnessMetadata(
+        generated_at=datetime.now(UTC).isoformat(),
+        source_updated_at=source_updated_at,
+        status="fresh" if source_updated_at else "derived",
+        note="Connector health computed from state",
+    )
+
+    payload = ConnectorHealthPayload(
+        tenant_id=tenant_id,
+        connectors=connectors,
+        total_events_24h=0,
+        total_errors_24h=sum(connector.error_count for connector in connectors),
+        freshness=freshness,
+    )
+
+    return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(payload))

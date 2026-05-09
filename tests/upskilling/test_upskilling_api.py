@@ -2,28 +2,47 @@ import importlib
 import sys
 import types
 from pathlib import Path
-from unittest.mock import MagicMock
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 ROOT = Path(__file__).resolve().parents[2]
 UPSKILLING_APP = ROOT / "apps" / "upskilling"
 LIB_SRC = ROOT / "lib" / "src"
 
 
-def _stub_agent_framework_azure():
-    for mod_name in (
-        "agent_framework_azure_ai",
-        "agent_framework_azure_ai._agent_provider",
-        "agent_framework_azure_ai._chat_client",
-        "agent_framework_azure_ai._shared",
-    ):
-        if mod_name not in sys.modules:
-            sys.modules[mod_name] = types.ModuleType(mod_name)
-    af_azure_ai = sys.modules["agent_framework_azure_ai"]
-    af_azure_ai.AzureAIAgentClient = MagicMock  # type: ignore[attr-defined]
+def _install_tutor_lib_agents_stub() -> None:
+    agents_module = types.ModuleType("tutor_lib.agents")
+
+    class _AgentReference:
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+    class _AgentInvocationRequest:
+        def __init__(self, *args, **kwargs) -> None:
+            self.args = args
+            self.kwargs = kwargs
+
+    class _FoundryAgentFacade:
+        def __init__(self, *_args, **_kwargs) -> None:
+            self.requests = []
+
+        async def invoke(self, request):
+            self.requests.append(request)
+            return SimpleNamespace(
+                output_text=(
+                    "Well-structured teaching move.\n\n"
+                    "Strengths: Clear topic framing.\n\n"
+                    "Improvements: Add a formative check."
+                )
+            )
+
+    agents_module.AgentReference = _AgentReference
+    agents_module.AgentInvocationRequest = _AgentInvocationRequest
+    agents_module.FoundryAgentFacade = _FoundryAgentFacade
+    sys.modules["tutor_lib.agents"] = agents_module
 
 
 _PLAN_PAYLOAD = {
@@ -56,7 +75,7 @@ def fixture_api_client(monkeypatch):
         if module_name.startswith("tutor_lib.agents"):
             sys.modules.pop(module_name, None)
 
-    _stub_agent_framework_azure()
+    _install_tutor_lib_agents_stub()
     main_module = importlib.import_module("app.main")
     importlib.reload(main_module)
 

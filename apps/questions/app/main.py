@@ -7,16 +7,20 @@ from dataclasses import asdict
 from functools import lru_cache
 from typing import Any
 
+from azure.core.exceptions import AzureError
 from azure.cosmos import exceptions as cosmos_exceptions
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from tutor_lib.agents import AgentReference, FoundryAgentFacade
+from tutor_lib.config import get_settings
+from tutor_lib.middleware import configure_entra_auth
 
 from app.cosmos_crud import CosmosCRUD
-from app.questions import evaluate_question
 from app.interfaces import DimensionEvaluation, QuestionEvaluationResult, QuestionEvaluationStatus
+from app.questions import evaluate_question
 from app.schemas import (
     RESPONSES,
     Answer,
@@ -26,13 +30,10 @@ from app.schemas import (
     ChatResponse,
     ErrorMessage,
     Grader,
+    GraderDefinition,
     Question,
     SuccessMessage,
 )
-from tutor_lib.agents import FoundryAgentService
-from tutor_lib.config import get_settings
-from tutor_lib.middleware import configure_entra_auth
-
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -62,7 +63,59 @@ app.add_middleware(
 )
 configure_entra_auth(app)
 
-agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)
+agent_facade = FoundryAgentFacade(settings.azure_ai.project_endpoint)
+
+
+def _grader_from_reference(
+    reference: AgentReference,
+    *,
+    dimension: str,
+    deployment: str,
+    legacy_agent_id: str | None = None,
+) -> Grader:
+    return Grader(
+        agent_name=reference.agent_name,
+        agent_version=reference.agent_version,
+        legacy_agent_id=legacy_agent_id or reference.legacy_agent_id,
+        dimension=dimension,
+        deployment=deployment or reference.model_name or "",
+    )
+
+
+def _is_legacy_only_agent_reference(agent_name: str | None, legacy_agent_id: str | None) -> bool:
+    return bool(legacy_agent_id) and (not agent_name or agent_name == legacy_agent_id)
+
+
+async def _resolve_grader_definition(grader_def: GraderDefinition) -> Grader:
+    legacy_agent_id = grader_def.legacy_agent_id
+    if legacy_agent_id and _is_legacy_only_agent_reference(grader_def.agent_name, legacy_agent_id):
+        get_remote_agent = getattr(agent_facade, "get_agent", None)
+        if callable(get_remote_agent):
+            try:
+                reference = await get_remote_agent(legacy_agent_id)
+            except (AttributeError, AzureError, RuntimeError, TypeError, ValueError):
+                return grader_def.to_grader()
+            return _grader_from_reference(
+                reference,
+                dimension=grader_def.dimension,
+                deployment=grader_def.deployment,
+                legacy_agent_id=legacy_agent_id,
+            )
+
+    if grader_def.agent_name:
+        return grader_def.to_grader()
+
+    remote = await agent_facade.create_agent(
+        name=grader_def.name,
+        instructions=grader_def.instructions,
+        deployment=grader_def.deployment,
+    )
+    return _grader_from_reference(
+        remote,
+        dimension=grader_def.dimension,
+        deployment=grader_def.deployment,
+        legacy_agent_id=legacy_agent_id,
+    )
 
 
 @app.get("/health", tags=["Evaluation"])
@@ -286,25 +339,9 @@ async def list_assemblies() -> JSONResponse:
 async def create_assembly(definition: AssemblyDefinition) -> JSONResponse:
     graders: list[Grader] = []
     for grader_def in definition.agents:
-        if grader_def.agent_id:
-            graders.append(Grader(
-                agent_id=grader_def.agent_id,
-                dimension=grader_def.dimension,
-                deployment=grader_def.deployment,
-            ))
-        else:
-            remote = await agent_service.create_agent(
-                name=grader_def.name,
-                instructions=grader_def.instructions,
-                deployment=grader_def.deployment,
-            )
-            graders.append(Grader(
-                agent_id=remote.id,
-                dimension=grader_def.dimension,
-                deployment=grader_def.deployment,
-            ))
+        graders.append(await _resolve_grader_definition(grader_def))
     assembly = Assembly(id=definition.id, agents=graders, topic_name=definition.topic_name)
-    created = await _crud(settings.cosmos.assembly_container).create_item(assembly.model_dump())
+    created = await _crud(settings.cosmos.assembly_container).create_item(assembly.model_dump(exclude_none=True))
     return _success("Assembly Created", "Assembly stored", created)
 
 
@@ -318,25 +355,9 @@ async def update_assembly(assembly_id: str, definition: AssemblyDefinition) -> J
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assembly not found") from exc
     graders: list[Grader] = []
     for grader_def in definition.agents:
-        if grader_def.agent_id:
-            graders.append(Grader(
-                agent_id=grader_def.agent_id,
-                dimension=grader_def.dimension,
-                deployment=grader_def.deployment,
-            ))
-        else:
-            remote = await agent_service.create_agent(
-                name=grader_def.name,
-                instructions=grader_def.instructions,
-                deployment=grader_def.deployment,
-            )
-            graders.append(Grader(
-                agent_id=remote.id,
-                dimension=grader_def.dimension,
-                deployment=grader_def.deployment,
-            ))
+        graders.append(await _resolve_grader_definition(grader_def))
     assembly = Assembly(id=assembly_id, agents=graders, topic_name=definition.topic_name)
-    merged = {**existing, **assembly.model_dump()}
+    merged = {**existing, **assembly.model_dump(exclude_none=True)}
     await crud.update_item(assembly_id, merged)
     return _success("Assembly Updated", "Assembly modified", merged)
 

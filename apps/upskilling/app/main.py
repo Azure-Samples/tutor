@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from functools import lru_cache
 from os import getenv
-from typing import Any
+from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -26,7 +26,6 @@ from .schemas import (
     ErrorMessage,
     ParagraphEvaluation,
     PerformanceSnapshot,
-    PlanEvaluationResponse,
     PlanParagraph,
     PlanRequest,
     SuccessMessage,
@@ -69,15 +68,16 @@ def _repository() -> UpskillingRepository:
     if getenv("UPSKILLING_REPOSITORY", "cosmos").lower() == "memory":
         return InMemoryUpskillingRepository()
     try:
-        settings = get_settings()
+        current_settings = get_settings()
         return CosmosUpskillingRepository(
-            settings.cosmos.upskilling_container, settings.cosmos
+            current_settings.cosmos.upskilling_container, current_settings.cosmos
         )
-    except Exception:
+    except Exception:  # noqa: BLE001
         return InMemoryUpskillingRepository()
 
 
 require_professor = require_roles("professor", "admin")
+ProfessorUser = Annotated[AuthenticatedUser, Depends(require_professor)]
 
 
 @app.get("/health", tags=["Planning"])
@@ -128,7 +128,7 @@ async def global_exception_handler(_: Request, exc: Exception) -> JSONResponse:
 @app.post("/plans", tags=["Planning"])
 async def create_plan(
     payload: CreatePlanRequest,
-    user: AuthenticatedUser = Depends(require_professor),
+    user: ProfessorUser,
 ) -> JSONResponse:
     now = datetime.now(UTC).isoformat()
     record = PlanRecord(
@@ -150,7 +150,7 @@ async def create_plan(
 
 @app.get("/plans", tags=["Planning"])
 async def list_plans(
-    user: AuthenticatedUser = Depends(require_professor),
+    user: ProfessorUser,
 ) -> JSONResponse:
     plans = await _repository().list_plans(professor_id=user.subject)
     return _success("Plans", "Plans retrieved.", [plan_to_dict(p) for p in plans])
@@ -159,7 +159,7 @@ async def list_plans(
 @app.get("/plans/{plan_id}", tags=["Planning"])
 async def get_plan(
     plan_id: str,
-    user: AuthenticatedUser = Depends(require_professor),
+    _user: ProfessorUser,
 ) -> JSONResponse:
     plan = await _repository().get_plan(plan_id)
     if plan is None:
@@ -171,7 +171,7 @@ async def get_plan(
 async def update_plan(
     plan_id: str,
     payload: UpdatePlanRequest,
-    user: AuthenticatedUser = Depends(require_professor),
+    _user: ProfessorUser,
 ) -> JSONResponse:
     plan = await _repository().get_plan(plan_id)
     if plan is None:
@@ -202,7 +202,7 @@ async def update_plan(
 @app.delete("/plans/{plan_id}", tags=["Planning"])
 async def delete_plan(
     plan_id: str,
-    user: AuthenticatedUser = Depends(require_professor),
+    _user: ProfessorUser,
 ) -> JSONResponse:
     plan = await _repository().get_plan(plan_id)
     if plan is None:
@@ -217,7 +217,7 @@ async def delete_plan(
 @app.post("/plans/{plan_id}/evaluate", tags=["Planning"])
 async def evaluate_persisted_plan(
     plan_id: str,
-    user: AuthenticatedUser = Depends(require_professor),
+    _user: ProfessorUser,
 ) -> JSONResponse:
     plan = await _repository().get_plan(plan_id)
     if plan is None:
@@ -234,7 +234,7 @@ async def evaluate_persisted_plan(
     try:
         orchestrator = build_orchestrator()
         evaluations = await orchestrator.evaluate(request)
-    except Exception:
+    except Exception:  # noqa: BLE001
         evaluations = [
             ParagraphEvaluation(
                 paragraph_index=index,

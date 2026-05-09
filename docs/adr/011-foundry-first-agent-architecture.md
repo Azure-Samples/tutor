@@ -2,10 +2,12 @@
 
 | Field | Value |
 |-------|-------|
-| **Status** | Accepted |
+| **Status** | Partially superseded by [ADR-015](./015-foundry-agent-service-native-architecture.md) |
 | **Date** | 2026-03-09 |
 | **Deciders** | Platform team |
 | **Supersedes** | Partial updates to ADR-005 (Foundry Evaluation) |
+
+> ADR-015 supersedes the Agent Framework orchestration, `AzureAIAgentClient`, thread/run polling, and `agent_id` primary-contract portions of this ADR. The decisions that remain valid are: agents are Foundry-managed assets, Cosmos DB keeps domain data and lightweight references, and production deployment remains workflow governed.
 
 ---
 

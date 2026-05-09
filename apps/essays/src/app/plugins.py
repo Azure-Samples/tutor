@@ -7,32 +7,46 @@ import base64
 import logging
 import os
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any, Optional, Union
+from typing import Any
 
 import requests
-import agent_framework as _af
-from PIL import Image
-from agent_framework_azure_ai import AgentToolkit
 from azure.ai.vision.imageanalysis import ImageAnalysisClient, VisualFeatures
 from azure.core.credentials import AzureKeyCredential
 from azure.cosmos.aio import CosmosClient
-
+from PIL import Image
 
 logger = logging.getLogger(__name__)
-ai_function = getattr(_af, "tool", getattr(_af, "ai_function", None))
 
-if ai_function is None:
-    raise RuntimeError(
-        "The installed agent-framework package does not export tool/ai_function. "
-        "Install a compatible agent-framework version."
-    )
 
 __all__ = ["VisionSettings", "VisionToolkit", "build_vision_toolkit"]
 
 
-def _get_env(name: str, *, required: bool = False) -> Optional[str]:
+@dataclass(slots=True)
+class AgentToolkit:
+    """Local metadata container for plugin tools."""
+
+    tools: Iterable[Callable[..., Any]]
+
+
+def ai_function(
+    *,
+    name: str,
+    description: str,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Preserve tool metadata without requiring Microsoft Agent Framework."""
+
+    def decorator(function: Callable[..., Any]) -> Callable[..., Any]:
+        function.__ai_function_name__ = name
+        function.__ai_function_description__ = description
+        return function
+
+    return decorator
+
+
+def _get_env(name: str, *, required: bool = False) -> str | None:
     value = os.getenv(name)
     if required and not value:
         raise AttributeError(f"Missing required environment variable: {name}")
@@ -45,13 +59,13 @@ class VisionSettings:
 
     vision_endpoint: str
     vision_key: str
-    cosmos_endpoint: Optional[str] = None
-    cosmos_key: Optional[str] = None
-    cosmos_database: Optional[str] = None
-    cosmos_container: Optional[str] = None
+    cosmos_endpoint: str | None = None
+    cosmos_key: str | None = None
+    cosmos_database: str | None = None
+    cosmos_container: str | None = None
 
     @classmethod
-    def from_env(cls) -> "VisionSettings":
+    def from_env(cls) -> VisionSettings:
         return cls(
             vision_endpoint=_get_env("AZURE_VISION_ENDPOINT", required=True) or "",
             vision_key=_get_env("AZURE_VISION_KEY", required=True) or "",
@@ -110,8 +124,8 @@ class VisionToolkit:
         name="load_images",
         description="Load images from URLs or byte arrays and return a list of byte buffers.",
     )
-    async def load_images(self, image_sources: list[Union[str, bytes]]) -> list[Optional[bytes]]:
-        images: list[Optional[bytes]] = []
+    async def load_images(self, image_sources: list[str | bytes]) -> list[bytes | None]:
+        images: list[bytes | None] = []
         for source in image_sources:
             if isinstance(source, str):
                 try:  # pragma: no cover - network failures not deterministic
@@ -127,7 +141,7 @@ class VisionToolkit:
     @ai_function(name="save_image_set", description="Persist images and metadata into Cosmos DB.")
     async def save_image_set(
         self,
-        images: list[Optional[bytes]],
+        images: list[bytes | None],
         metadata: list[dict[str, Any]],
     ) -> list[dict[str, Any]]:
         self._ensure_cosmos()
@@ -159,7 +173,7 @@ class VisionToolkit:
         return results
 
     @ai_function(name="add_captions", description="Generate captions for supplied images.")
-    async def add_captions(self, images: list[Optional[bytes]]) -> list[dict[str, Any]]:
+    async def add_captions(self, images: list[bytes | None]) -> list[dict[str, Any]]:
         captions: list[dict[str, Any]] = []
         async with self._vision_client() as client:
             for image in images:
@@ -184,7 +198,7 @@ class VisionToolkit:
         return captions
 
     @ai_function(name="extract_tags", description="Extract vision tags and confidences for images.")
-    async def extract_tags(self, images: list[Optional[bytes]]) -> list[dict[str, Any]]:
+    async def extract_tags(self, images: list[bytes | None]) -> list[dict[str, Any]]:
         tag_sets: list[dict[str, Any]] = []
         async with self._vision_client() as client:
             for image in images:
@@ -207,8 +221,8 @@ class VisionToolkit:
         return tag_sets
 
     @ai_function(name="crop_images", description="Crop images around the largest detected object.")
-    async def crop_images(self, images: list[Optional[bytes]]) -> list[Optional[bytes]]:
-        cropped: list[Optional[bytes]] = []
+    async def crop_images(self, images: list[bytes | None]) -> list[bytes | None]:
+        cropped: list[bytes | None] = []
         async with self._vision_client() as client:
             for image in images:
                 if not image:
@@ -246,7 +260,7 @@ class VisionToolkit:
         return cropped
 
     @ai_function(name="extract_text", description="Run OCR over an image (bytes or URL).")
-    async def extract_text(self, image: Union[str, bytes]) -> dict[str, Any]:
+    async def extract_text(self, image: str | bytes) -> dict[str, Any]:
         async with self._vision_client() as client:
             try:
                 if isinstance(image, str):

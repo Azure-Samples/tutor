@@ -111,6 +111,15 @@ variable "cosmos_containers" {
     resources = {
       partition_key_path = "/id"
     }
+    integration_idempotency = {
+      partition_key_path = "/tenant_id"
+    }
+    integration_connectors = {
+      partition_key_path = "/tenant_id"
+    }
+    integration_dead_letters = {
+      partition_key_path = "/tenant_id"
+    }
     graders = {
       partition_key_path = "/id"
     }

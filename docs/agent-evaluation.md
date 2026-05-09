@@ -301,6 +301,10 @@ class GuardrailComplianceEvaluator:
 
 ## 6. Evaluation API
 
+ADR-015 changes the release-gate identity model from opaque `agentId` values to Foundry Agent Service `agent_name` and `agent_version` references. Existing `agent_id` fields may remain as read-only migration compatibility, but new evaluation runs should persist an `AgentEvaluationReference` containing dataset lineage, thresholds, evaluation run id, trace or report URI, status, and approval state.
+
+High-impact agent versions must pass the ten-evaluator panel and the three adversarial reviews documented in [Foundry Native Implementation Epics](./foundry-native-implementation-epics.md). Safety, groundedness, relevance, rubric alignment, discursive accuracy, privacy, and degraded-state behavior can block release.
+
 ### Endpoints
 
 ```

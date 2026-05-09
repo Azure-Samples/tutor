@@ -1,10 +1,9 @@
 """Pydantic schemas and response envelopes for the avatar service."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 from starlette.status import (
     HTTP_200_OK,
     HTTP_201_CREATED,
@@ -16,7 +15,7 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_418_IM_A_TEAPOT,
-    HTTP_422_UNPROCESSABLE_ENTITY
+    HTTP_422_UNPROCESSABLE_ENTITY,
 )
 
 
@@ -24,18 +23,18 @@ class BodyMessage(BaseModel):
     """Baseline message payload for error responses."""
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    type: str | None
+    title: str | None
+    detail: dict[str, str | list] | list[dict[str, str | list]] | None
 
 
 @dataclass
 class SuccessMessage:
     """Standard envelope for successful responses."""
 
-    title: Optional[str]
-    message: Optional[str]
-    content: Optional[Any]
+    title: str | None
+    message: str | None
+    content: Any | None
 
 
 @dataclass
@@ -43,9 +42,9 @@ class ErrorMessage:
     """Standard envelope for error responses."""
 
     success: bool
-    type: Optional[str]
-    title: Optional[str]
-    detail: Optional[Union[Dict[str, Union[str, List]], List[Dict[str, Union[str, List]]]]]
+    type: str | None
+    title: str | None
+    detail: dict[str, str | list] | list[dict[str, str | list]] | None
 
 
 class ChatResponse(BaseModel):
@@ -53,16 +52,16 @@ class ChatResponse(BaseModel):
 
     case_id: str
     prompt: str
-    chat_history: Optional[Union[str, List[Dict[str, str]]]] = None
+    chat_history: str | list[dict[str, str]] | None = None
 
 
 class Case(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     name: str
     role: str
-    steps: List[Any] = Field(default_factory=list)
-    profile: Dict[str, Any] = Field(default_factory=dict)
-    history: List[Any] = Field(default_factory=list)
+    steps: list[Any] = Field(default_factory=list)
+    profile: dict[str, Any] = Field(default_factory=dict)
+    history: list[Any] = Field(default_factory=list)
 
 
 RESPONSES = {

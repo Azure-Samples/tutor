@@ -104,6 +104,21 @@ output "COSMOS_RESOURCE_TABLE" {
   value       = "resources"
 }
 
+output "COSMOS_INTEGRATION_IDEMPOTENCY_TABLE" {
+  description = "Cosmos DB container name for Integration Hub idempotency records."
+  value       = "integration_idempotency"
+}
+
+output "COSMOS_INTEGRATION_CONNECTORS_TABLE" {
+  description = "Cosmos DB container name for Integration Hub connector state."
+  value       = "integration_connectors"
+}
+
+output "COSMOS_INTEGRATION_DEAD_LETTERS_TABLE" {
+  description = "Cosmos DB container name for Integration Hub dead-letter records."
+  value       = "integration_dead_letters"
+}
+
 output "COSMOS_GRADER_TABLE" {
   description = "Cosmos DB container name for graders."
   value       = "graders"
@@ -369,5 +384,5 @@ output "WEB_APP_BASE_URL" {
 
 output "TRANSCRIPTION_APP_BASE_URL" {
   description = "Public base URL for transcription backend service."
-  value       = ""  
+  value       = ""
 }

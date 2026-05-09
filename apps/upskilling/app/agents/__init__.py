@@ -1,11 +1,18 @@
-"""Agent orchestration helpers built on Microsoft Agent Framework."""
+"""Agent facade compatibility exports for the upskilling service."""
 
-from .clients import AgentRegistry, AgentSpec
-from .run import AgentRunContext, AgentToolkit
+from .clients import (
+    AgentInvocationRequest,
+    AgentInvocationResult,
+    AgentReference,
+    FoundryAgentFacade,
+)
+from .run import AgentInvocationRunner, AgentToolkit
 
 __all__ = [
-    "AgentRegistry",
-    "AgentSpec",
-    "AgentRunContext",
+    "AgentInvocationRequest",
+    "AgentInvocationResult",
+    "AgentInvocationRunner",
+    "AgentReference",
     "AgentToolkit",
+    "FoundryAgentFacade",
 ]

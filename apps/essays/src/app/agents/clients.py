@@ -1,17 +1,17 @@
-"""Compatibility wrapper that delegates to shared tutor_lib agent clients."""
+"""Compatibility wrapper that delegates to shared tutor_lib agent contracts."""
 
-from tutor_lib.agents.clients import (
+from tutor_lib.agents import (
     AgentAttachment,
-    AgentRegistry,
-    AgentRunContext,
-    AgentSpec,
-    FoundryAgentService,
+    AgentInvocationRequest,
+    AgentInvocationResult,
+    AgentReference,
+    FoundryAgentFacade,
 )
 
 __all__ = [
     "AgentAttachment",
-    "AgentRegistry",
-    "AgentRunContext",
-    "AgentSpec",
-    "FoundryAgentService",
+    "AgentInvocationRequest",
+    "AgentInvocationResult",
+    "AgentReference",
+    "FoundryAgentFacade",
 ]

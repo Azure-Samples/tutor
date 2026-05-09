@@ -1,25 +1,17 @@
-"""Execution helpers for running agents."""
+"""Execution helpers for invoking Foundry-native agent commands."""
 
 from __future__ import annotations
 
-import asyncio
-import agent_framework as _af
-from typing import Any
-
-_Agent = getattr(_af, "Agent", getattr(_af, "ChatAgent", None))
-
-AgentType = Any
+from tutor_lib.agents import AgentInvocationRequest, AgentInvocationResult, FoundryAgentFacade
 
 
-class AgentRunContext:
-    """Wrapper around a ChatAgent to provide convenience methods."""
+class AgentInvocationRunner:
+    """Small adapter around the shared Foundry facade."""
 
-    def __init__(self, agent: AgentType) -> None:
-        self._agent = agent
+    def __init__(self, facade: FoundryAgentFacade) -> None:
+        self._facade = facade
 
-    async def run(self, message: str, **kwargs: Any) -> Any:
-        """Execute the agent with a single message and return the response."""
-        result = self._agent.run(message, **kwargs)
-        if asyncio.iscoroutine(result):
-            return await result
-        return result
+    async def invoke(self, request: AgentInvocationRequest) -> AgentInvocationResult:
+        """Invoke the shared facade with a Tutor command object."""
+
+        return await self._facade.invoke(request)

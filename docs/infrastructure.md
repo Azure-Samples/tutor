@@ -365,9 +365,9 @@ module "cosmos_db" {
 }
 ```
 
-### 4.4 AI Module — Foundry (ADR-011)
+### 4.4 AI Module — Foundry (ADR-015)
 
-Azure AI Foundry is deployed **outside the VNet** in **westus3** with a public endpoint (see [ADR-011](adr/011-foundry-first-agent-architecture.md)). The AI Hub + AI Project pattern uses the `avm/res/machine-learning-services/workspace` AVM module.
+Microsoft Foundry is deployed with a project endpoint consumed by agentic services through `tutor_lib.agents` (see [ADR-015](adr/015-foundry-agent-service-native-architecture.md)). The AI Hub + AI Project pattern uses the `avm/res/machine-learning-services/workspace` AVM module. Application configuration must expose the project endpoint URL in the form `https://<resource-name>.services.ai.azure.com/api/projects/<project-name>`.
 
 ```hcl
 # infra/terraform/modules/ai/foundry.tf
@@ -433,19 +433,21 @@ module "ai_project" {
   }
 }
 
-# RBAC: Cognitive Services User for all container app managed identities
+# RBAC: least-privilege runtime identity for all invoking container apps
 resource "azurerm_role_assignment" "foundry_agent_user" {
   for_each             = var.managed_identity_ids
   scope                = module.ai_services.resource_id
-  role_definition_name = "Cognitive Services User"
+  role_definition_name = "Azure AI User"
   principal_id         = each.value
 }
 ```
 
 **Key design decisions:**
-- **westus3, public endpoint** — avoids VNet complexity; agents are accessed via managed identity + RBAC
+- **Project endpoint URL** — app code uses the Foundry project endpoint, not a resource id or legacy connection string
+- **Least privilege** — runtime identities invoke agents with Azure AI User; publishing/versioning identities are separate
 - **AVM pattern** — consistent with all other infrastructure modules (ADR-004)
-- **Outputs**: `ai_project.resource_id` → `PROJECT_ENDPOINT` environment variable for all agentic services
+- **Outputs**: Foundry project endpoint URL → `AZURE_AI_PROJECT_ENDPOINT` or `PROJECT_ENDPOINT` for agentic services
+- **Deployment policy**: production changes are applied only by repository GitHub workflows
 
 ---
 

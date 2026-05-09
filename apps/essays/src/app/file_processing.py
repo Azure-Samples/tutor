@@ -4,17 +4,15 @@ from __future__ import annotations
 
 import base64
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Iterable
 
-from fastapi import HTTPException, status
-
-from pypdf import PdfReader
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
+from fastapi import HTTPException, status
 from PIL import Image
-
+from pypdf import PdfReader
 
 ALLOWED_IMAGE_TYPES: set[str] = {
     "image/jpeg",

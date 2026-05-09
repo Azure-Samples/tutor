@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import random
 import uuid
+from collections.abc import Iterable
 from functools import lru_cache
-from typing import Any, Iterable, cast
+from typing import Any, cast
 
 from azure.cosmos import exceptions
 from fastapi import Body, FastAPI, HTTPException, Request, status
@@ -13,14 +14,13 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from tutor_lib.middleware import configure_entra_auth
 
 from app.avatar import AvatarChat, build_avatar_chat
 from app.config import get_settings
 from app.cosmos import CosmosCRUD
+from app.schemas import RESPONSES, BodyMessage, Case, ChatResponse, ErrorMessage, SuccessMessage
 from app.speech import SpeechTokenBroker
-from app.schemas import BodyMessage, Case, ChatResponse, ErrorMessage, RESPONSES, SuccessMessage
-from tutor_lib.middleware import configure_entra_auth
-
 
 settings = cast(Any, get_settings())
 

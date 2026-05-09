@@ -1,11 +1,11 @@
 import pytest
-
 from questions.app.questions import (
     QuestionEvaluationStatus,
     QuestionStateMachine,
     evaluate_question,
 )
 from questions.app.schemas import Answer, Grader, Question
+from tutor_lib.agents import AgentInvocationRequest, AgentInvocationResult, AgentReference
 
 
 @pytest.fixture(autouse=True)
@@ -19,26 +19,35 @@ def _configure_environment(monkeypatch):
     monkeypatch.setenv("COSMOS_ASSEMBLY_TABLE", "assemblies")
 
 
-class _StubFoundryAgentService:
+class _StubFoundryAgentFacade:
     """Stub that returns a fixed text response for any agent invocation."""
     response_text = "Strong verdict with high confidence\nHigh confidence justification"
+    instances = []
 
     def __init__(self, *_args, **_kwargs):
-        self.calls: list[tuple[str, str]] = []
+        self.requests: list[AgentInvocationRequest] = []
+        _StubFoundryAgentFacade.instances.append(self)
 
-    async def run_agent(self, agent_id: str, prompt: str, **kwargs) -> str:
-        self.calls.append((agent_id, prompt))
-        return self.response_text
+    async def invoke(self, request: AgentInvocationRequest) -> AgentInvocationResult:
+        self.requests.append(request)
+        return AgentInvocationResult(
+            output_text=self.response_text,
+            agent=request.agent,
+            store=request.store,
+        )
 
 
 @pytest.mark.asyncio
 async def test_evaluate_question_returns_completed(monkeypatch):
-    monkeypatch.setattr("questions.app.questions.FoundryAgentService", _StubFoundryAgentService)
+    _StubFoundryAgentFacade.instances.clear()
+    monkeypatch.setattr("questions.app.questions.FoundryAgentFacade", _StubFoundryAgentFacade)
 
     async def _fake_ensure(self):
         self.graders = [
             Grader(
-                agent_id="grader-1",
+                agent_name="accuracy-grader",
+                agent_version="2026-05-01",
+                legacy_agent_id="grader-1",
                 deployment="fake-deployment",
                 dimension="accuracy",
             )
@@ -59,15 +68,24 @@ async def test_evaluate_question_returns_completed(monkeypatch):
     assert dim.dimension == "accuracy"
     assert dim.confidence == pytest.approx(0.9)
     assert dim.notes[0] == "Strong verdict with high confidence"
+    request = _StubFoundryAgentFacade.instances[0].requests[0]
+    assert request.agent.agent_name == "accuracy-grader"
+    assert request.agent.agent_version == "2026-05-01"
+    assert request.agent.legacy_agent_id == "grader-1"
+    assert request.agent.dimension == "accuracy"
+    assert request.context["assembly_id"] == "assembly-123"
+    assert request.context["question_id"] == "q1"
+    assert request.context["answer_id"] == "a1"
+    assert request.store is False
 
 
-class _LowConfidenceFoundryAgentService(_StubFoundryAgentService):
+class _LowConfidenceFoundryAgentFacade(_StubFoundryAgentFacade):
     response_text = "Needs work\nLow confidence in assessment"
 
 
 @pytest.mark.asyncio
 async def test_confidence_inference_handles_low_confidence(monkeypatch):
-    monkeypatch.setattr("questions.app.questions.FoundryAgentService", _LowConfidenceFoundryAgentService)
+    monkeypatch.setattr("questions.app.questions.FoundryAgentFacade", _LowConfidenceFoundryAgentFacade)
 
     async def _fake_ensure(self):
         self.graders = [
@@ -89,3 +107,81 @@ async def test_confidence_inference_handles_low_confidence(monkeypatch):
     dim = result.dimensions[0]
     assert dim.confidence == pytest.approx(0.4)
     assert "Low confidence" in " ".join(dim.notes)
+
+
+@pytest.mark.asyncio
+async def test_legacy_assembly_references_hydrate(monkeypatch):
+    class _Repository:
+        async def get_by_id(self, _assembly_id):
+            return {
+                "id": "assembly-legacy",
+                "agents": [
+                    {"agent_id": "legacy-agent", "dimension": "accuracy", "deployment": "gpt-5-nano"},
+                    {"id": "legacy-id", "dimension": "clarity", "deployment": "gpt-5"},
+                    "legacy-string",
+                ],
+            }
+
+    machine = QuestionStateMachine(
+        assembly_id="assembly-legacy",
+        question=Question(id="q-legacy", topic="Math", question="2+2", explanation=None),
+        answer=Answer(id="a-legacy", text="4", question_id="q-legacy", respondent="Student"),
+    )
+    monkeypatch.setattr(machine, "_assembly_repository", _Repository())
+    machine.agent_facade = object()
+
+    await machine.ensure_assembly()
+
+    assert [grader.agent_name for grader in machine.graders] == [
+        "legacy-agent",
+        "legacy-id",
+        "legacy-string",
+    ]
+    assert [grader.legacy_agent_id for grader in machine.graders] == [
+        "legacy-agent",
+        "legacy-id",
+        "legacy-string",
+    ]
+    assert machine.graders[2].dimension == "default"
+
+
+@pytest.mark.asyncio
+async def test_legacy_assembly_references_resolve_foundry_agent_names(monkeypatch):
+    class _Repository:
+        async def get_by_id(self, _assembly_id):
+            return {
+                "id": "assembly-legacy",
+                "agents": [
+                    {
+                        "agent_id": "legacy-agent-id",
+                        "dimension": "accuracy",
+                        "deployment": "gpt-5-nano",
+                    }
+                ],
+            }
+
+    class _ResolvingFacade:
+        async def get_agent(self, agent_id: str) -> AgentReference:
+            assert agent_id == "legacy-agent-id"
+            return AgentReference(
+                agent_name="accuracy-grader",
+                agent_version="2026-05-09",
+                legacy_agent_id=agent_id,
+                model_name="gpt-5-nano",
+            )
+
+    machine = QuestionStateMachine(
+        assembly_id="assembly-legacy",
+        question=Question(id="q-legacy", topic="Math", question="2+2", explanation=None),
+        answer=Answer(id="a-legacy", text="4", question_id="q-legacy", respondent="Student"),
+    )
+    monkeypatch.setattr(machine, "_assembly_repository", _Repository())
+    machine.agent_facade = _ResolvingFacade()
+
+    await machine.ensure_assembly()
+
+    assert len(machine.graders) == 1
+    assert machine.graders[0].agent_name == "accuracy-grader"
+    assert machine.graders[0].agent_version == "2026-05-09"
+    assert machine.graders[0].legacy_agent_id == "legacy-agent-id"
+    assert machine.graders[0].dimension == "accuracy"

@@ -1,28 +1,53 @@
-"""Essay evaluation orchestrator built on Microsoft Agent Framework."""
+"""Essay evaluation orchestrator built on Foundry-native agents."""
 
 from __future__ import annotations
 
 import base64
 import binascii
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import jinja2
-
+from azure.core.exceptions import AzureError
 from azure.cosmos import exceptions
-
-from tutor_lib.agents import AgentAttachment, FoundryAgentService
-from app.config import get_settings
-from app.file_processing import ALLOWED_PDF_TYPES, extract_pdf_text, extract_text_with_doc_intelligence
-from app.schemas import Essay, AgentRef, Resource, Assembly
+from pydantic import ValidationError
+from pypdf.errors import PdfReadError
+from tutor_lib.agents import (
+    AgentAttachment,
+    AgentInvocationRequest,
+    AgentInvocationResult,
+    AgentReference,
+    FoundryAgentFacade,
+)
 from tutor_lib.cosmos import AssemblyRepository
 
-from pypdf.errors import PdfReadError
+from app.config import get_settings
+from app.file_processing import (
+    ALLOWED_PDF_TYPES,
+    extract_pdf_text,
+    extract_text_with_doc_intelligence,
+)
+from app.schemas import AgentRef, Assembly, Essay, Resource
 
 
-class EssayStrategyType(str, Enum):
+def _is_legacy_only_agent_reference(agent_name: str | None, legacy_agent_id: str | None) -> bool:
+    return bool(legacy_agent_id) and (not agent_name or agent_name == legacy_agent_id)
+
+
+def _agent_ref_from_reference(reference: AgentReference, fallback: AgentRef) -> AgentRef:
+    return AgentRef(
+        agent_name=reference.agent_name,
+        agent_version=reference.agent_version,
+        legacy_agent_id=fallback.legacy_agent_id or reference.legacy_agent_id,
+        role=fallback.role,
+        deployment=fallback.deployment or reference.model_name or "",
+    )
+
+
+class EssayStrategyType(StrEnum):
     """Enumeration describing available evaluation strategies."""
 
     ENEM = "enem"
@@ -58,8 +83,8 @@ class EssayEvaluationStrategy:
 
     template_name = "correct.jinja"
 
-    def __init__(self, agent_service: FoundryAgentService, composer: PromptComposer) -> None:
-        self._agent_service = agent_service
+    def __init__(self, agent_facade: FoundryAgentFacade, composer: PromptComposer) -> None:
+        self._agent_facade = agent_facade
         self._composer = composer
 
     async def evaluate(
@@ -68,9 +93,25 @@ class EssayEvaluationStrategy:
         essay: Essay,
         resources: Iterable[Resource],
     ) -> EssayEvaluationResult:
-        prompt = self._composer.render(self.template_name, essay, resources)
-        attachments = self._build_image_attachments(resources)
-        response_text = await self._agent_service.run_agent(agent.agent_id, prompt, attachments=attachments)
+        prepared_resources = list(resources)
+        prompt = self._composer.render(self.template_name, essay, prepared_resources)
+        attachments = self._build_image_attachments(prepared_resources)
+        resource_ids = tuple(resource.id for resource in prepared_resources if resource.id)
+        request = AgentInvocationRequest(
+            agent=agent.to_agent_reference(),
+            input=prompt,
+            context={
+                "essay_id": essay.id,
+                "role": agent.role,
+                "strategy": self.strategy_type().value,
+                "resource_ids": list(resource_ids),
+            },
+            attachments=tuple(attachments),
+            evidence_refs=resource_ids,
+            store=False,
+        )
+        result: AgentInvocationResult = await self._agent_facade.invoke(request)
+        response_text = result.output_text
         verdict, strengths, improvements = self._parse_response(response_text)
         return EssayEvaluationResult(
             strategy=self.strategy_type(),
@@ -191,20 +232,20 @@ class EssayOrchestrator:
         self._resolver = StrategyResolver()
         prompt_dir = Path(__file__).parent / "prompts"
         self._composer = PromptComposer(prompt_dir)
-        self._agent_service = FoundryAgentService(settings.azure_ai.project_endpoint)  # pylint: disable=no-member
+        self._agent_facade = FoundryAgentFacade(settings.azure_ai.project_endpoint)  # pylint: disable=no-member
         self._assembly_repository = AssemblyRepository(settings.cosmos)
         self._strategies: dict[EssayStrategyType, EssayEvaluationStrategy] = {
             EssayStrategyType.ENEM: EnemEssayStrategy(
-                self._agent_service, self._composer
+                self._agent_facade, self._composer
             ),
             EssayStrategyType.ANALYTICAL: AnalyticalEssayStrategy(
-                self._agent_service, self._composer
+                self._agent_facade, self._composer
             ),
             EssayStrategyType.NARRATIVE: NarrativeEssayStrategy(
-                self._agent_service, self._composer
+                self._agent_facade, self._composer
             ),
             EssayStrategyType.DEFAULT: DefaultEssayStrategy(
-                self._agent_service, self._composer
+                self._agent_facade, self._composer
             ),
         }
 
@@ -241,24 +282,35 @@ class EssayOrchestrator:
         provisioned: list[AgentRef] = []
         for entry in items:
             if isinstance(entry, dict):
-                # Support both new lightweight format (agent_id) and legacy (id)
-                if "agent_id" in entry:
-                    provisioned.append(AgentRef.model_validate(entry))
-                elif "id" in entry:
-                    provisioned.append(AgentRef(
-                        agent_id=str(entry["id"]),
-                        role=entry.get("role", "default"),
-                        deployment=entry.get("deployment", ""),
-                    ))
+                try:
+                    agent_ref = AgentRef.model_validate(entry)
+                except ValidationError:
+                    continue
+                provisioned.append(await self._resolve_legacy_agent_ref(agent_ref))
                 continue
             if isinstance(entry, str):
-                provisioned.append(AgentRef(
-                    agent_id=entry,
-                    role="default",
-                    deployment="",
-                ))
+                agent_ref = AgentRef.model_validate(entry)
+                provisioned.append(await self._resolve_legacy_agent_ref(agent_ref))
                 continue
         return provisioned
+
+    async def _resolve_legacy_agent_ref(self, agent_ref: AgentRef) -> AgentRef:
+        legacy_agent_id = agent_ref.legacy_agent_id
+        if not legacy_agent_id or not _is_legacy_only_agent_reference(
+            agent_ref.agent_name,
+            legacy_agent_id,
+        ):
+            return agent_ref
+
+        get_remote_agent = getattr(self._agent_facade, "get_agent", None)
+        if not callable(get_remote_agent):
+            return agent_ref
+
+        try:
+            reference = await get_remote_agent(legacy_agent_id)
+        except (AttributeError, AzureError, RuntimeError, TypeError, ValueError):
+            return agent_ref
+        return _agent_ref_from_reference(reference, agent_ref)
 
     def _select_agent(self, assembly: Assembly, strategy_type: EssayStrategyType) -> AgentRef:
         if not assembly.agents:
