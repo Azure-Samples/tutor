@@ -1497,15 +1497,17 @@ jobs:
           TFSTATE_CONTAINER: ${{ secrets.TERRAFORM_STATE_CONTAINER }}
           TFSTATE_KEY: ${{ secrets.TERRAFORM_STATE_KEY }}
         run: |
-          set -euo pipefail
-          cd infra/terraform
+          set -uo pipefail
+          cd infra/terraform || exit 1
 
-          : "${TFSTATE_RESOURCE_GROUP:?Missing secret TERRAFORM_STATE_RESOURCE_GROUP}"
-          : "${TFSTATE_STORAGE_ACCOUNT:?Missing secret TERRAFORM_STATE_STORAGE_ACCOUNT}"
-          : "${TFSTATE_CONTAINER:?Missing secret TERRAFORM_STATE_CONTAINER}"
+          if [ -z "${TFSTATE_RESOURCE_GROUP:-}" ] || [ -z "${TFSTATE_STORAGE_ACCOUNT:-}" ] || [ -z "${TFSTATE_CONTAINER:-}" ]; then
+            echo "::warning::Terraform backend configuration is incomplete; skipping environment refresh backend initialization."
+            exit 0
+          fi
+
           if [ "$AZURE_ENV_NAME" != "prod" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
-          elif [ -z "$TFSTATE_KEY" ]; then
+          elif [ -z "${TFSTATE_KEY:-}" ]; then
             TFSTATE_KEY="tutor-${AZURE_ENV_NAME}.tfstate"
           fi
 
@@ -1519,15 +1521,15 @@ jobs:
           } > backend.hcl
 
           if ! terraform init -reconfigure -backend-config=backend.hcl; then
-            echo "OIDC backend auth unavailable during environment refresh initialization; retrying with storage account key fallback."
+            echo "::warning::OIDC backend auth unavailable during environment refresh initialization; retrying with storage account key fallback."
             TFSTATE_ACCESS_KEY="$(az storage account keys list \
               --resource-group "$TFSTATE_RESOURCE_GROUP" \
               --account-name "$TFSTATE_STORAGE_ACCOUNT" \
-              --query '[0].value' -o tsv)"
+              --query '[0].value' -o tsv 2>/dev/null || true)"
 
             if [ -z "$TFSTATE_ACCESS_KEY" ]; then
-              echo "Failed to retrieve storage account access key for Terraform backend fallback."
-              exit 1
+              echo "::warning::Storage account key fallback is unavailable; continuing without Terraform state for environment refresh."
+              exit 0
             fi
 
             {
@@ -1539,8 +1541,8 @@ jobs:
             } > backend.hcl
 
             if ! terraform init -reconfigure -backend-config=backend.hcl; then
-              echo "::error::Terraform backend initialization failed with both OIDC auth and storage account key fallback."
-              exit 1
+              echo "::warning::Terraform backend initialization failed with both OIDC auth and storage account key fallback; continuing without Terraform state for environment refresh."
+              exit 0
             fi
           fi
 
@@ -1567,6 +1569,48 @@ jobs:
             [ -n "$value" ]
           }
 
+          hydrate_foundry_outputs_from_azure_resources() {
+            local rg_name="tutor-${AZURE_ENV_NAME}"
+            local project_name="tutor-${AZURE_ENV_NAME}-ai-project"
+            local ai_foundry_name=""
+
+            ai_foundry_name="$(az resource list \
+              --resource-group "$rg_name" \
+              --resource-type Microsoft.CognitiveServices/accounts \
+              --query "[?kind=='AIServices'].name | [0]" -o tsv 2>/dev/null || true)"
+
+            if [ -z "$ai_foundry_name" ]; then
+              ai_foundry_name="$(az resource list \
+                --resource-group "$rg_name" \
+                --resource-type Microsoft.CognitiveServices/accounts \
+                --query "sort_by(@, &name)[0].name" -o tsv 2>/dev/null || true)"
+            fi
+
+            if [ -z "$ai_foundry_name" ]; then
+              echo "::warning::Unable to discover an AI Services account in resource group '$rg_name' for Foundry endpoint fallback."
+              return 1
+            fi
+
+            if ! azd_env_has_nonempty_value PROJECT_ENDPOINT; then
+              if azd env set PROJECT_ENDPOINT "https://${ai_foundry_name}.services.ai.azure.com/api/projects/${project_name}" >/dev/null; then
+                echo "Hydrated PROJECT_ENDPOINT from Azure resource metadata."
+              else
+                echo "::warning::Failed to hydrate PROJECT_ENDPOINT from Azure resource metadata."
+                return 1
+              fi
+            fi
+
+            if ! azd_env_has_nonempty_value AI_SERVICES_ENDPOINT; then
+              if azd env set AI_SERVICES_ENDPOINT "https://${ai_foundry_name}.cognitiveservices.azure.com/" >/dev/null; then
+                echo "Hydrated AI_SERVICES_ENDPOINT from Azure resource metadata."
+              else
+                echo "::warning::Failed to hydrate AI_SERVICES_ENDPOINT from Azure resource metadata."
+              fi
+            fi
+
+            return 0
+          }
+
           hydrate_nonsecret_output() {
             local output_name="$1"
             local required="$2"
@@ -1584,17 +1628,23 @@ jobs:
             fi
 
             if [ -n "$output_value" ]; then
-              azd env set "$output_name" "$output_value"
+              azd env set "$output_name" "$output_value" >/dev/null
               echo "Hydrated $output_name from Terraform output."
               return 0
             fi
 
+            if [ "$output_name" = "PROJECT_ENDPOINT" ] || [ "$output_name" = "AI_SERVICES_ENDPOINT" ]; then
+              if hydrate_foundry_outputs_from_azure_resources && azd_env_has_nonempty_value "$output_name"; then
+                return 0
+              fi
+            fi
+
             if [ "$required" = "true" ]; then
-              echo "::error::Missing required non-secret output $output_name after azd env refresh and Terraform fallback."
+              echo "::error::Missing required non-secret output $output_name after azd env refresh, Terraform fallback, and Azure resource fallback."
               return 1
             fi
 
-            echo "::warning::Optional non-secret Terraform output $output_name is unavailable; continuing."
+            echo "::warning::Optional non-secret output $output_name is unavailable after Terraform and Azure resource fallback; continuing."
           }
 
           hydrate_nonsecret_output PROJECT_ENDPOINT true
@@ -1603,7 +1653,7 @@ jobs:
           hydrate_nonsecret_output MODEL_REASONING_DEPLOYMENT false
 
           if ! azd_env_has_nonempty_value PROJECT_ENDPOINT; then
-            echo "::error::PROJECT_ENDPOINT is still unavailable after azd env refresh and Terraform fallback."
+            echo "::error::PROJECT_ENDPOINT is still unavailable after azd env refresh, Terraform fallback, and Azure resource fallback."
             exit 1
           fi
 
