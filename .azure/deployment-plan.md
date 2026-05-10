@@ -11,7 +11,7 @@ Tutor now has an authoritative learner-record event backbone in Cosmos DB, but d
 | Option | Summary | Benefits | Trade-offs |
 | --- | --- | --- | --- |
 | A. Cosmos-only | Keep append-only learner-record storage and direct read-model replay without a broker. | Lowest cost and lowest implementation risk. | Leaves downstream consumers coupled to the authoritative store and does not establish a durable integration seam. |
-| B. Service Bus as source of truth | Replace the learner-record event store with brokered topics/queues. | Simplifies fan-out semantics. | Rejected. Violates ADR-013 by moving the authoritative learner record out of an append-oriented store, weakens replay/history, and turns transient messaging into the institutional record. |
+| B. Service Bus as source of truth | Replace the learner-record event store with brokered topics/queues. | Simplifies fan-out semantics. | Rejected. Violates ADR-007 by moving the authoritative learner record out of an append-oriented store, weakens replay/history, and turns transient messaging into the institutional record. |
 | C. Hybrid Cosmos plus Service Bus | Keep Cosmos as the authoritative append-only store and publish accepted learner-record integration events to Service Bus. | Preserves replayable history while adding decoupled workflow distribution, dead-lettering, and future subscriber fan-out. | Adds infra, RBAC, and message-publication complexity. |
 
 ### Recommendation
@@ -20,7 +20,7 @@ Adopt **Option C**.
 
 This aligns with:
 
-- **ADR-013**: the learner record remains the architectural center and stays append-oriented.
+- **ADR-007**: the learner record remains the architectural center and stays append-oriented.
 - **CQRS / Event Sourcing guidance** from Microsoft Learn: the event store remains authoritative while projections and downstream consumers subscribe through separate mechanisms.
 - **Service Bus guidance** from Microsoft Learn: topics/subscriptions are appropriate for workflow-grade business messaging with RBAC, dead-lettering, and controlled fan-out.
 
@@ -90,7 +90,7 @@ This aligns with:
 - `infra/terraform/outputs.tf`
 - `infra/terraform/main.tfvars.json`
 - `infra/terraform/terraform.tfvars.sample`
-- `docs/adr/014-hybrid-learner-record-service-bus-distribution.md` (new)
+- `docs/adr/007-learner-record-platform-distribution.md`
 
 ## Quality Attribute Impact
 

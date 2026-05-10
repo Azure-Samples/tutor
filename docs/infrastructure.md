@@ -1,22 +1,30 @@
 # Infrastructure
 
-> Azure Developer CLI (`azd`) integration with Terraform and Azure Verified Modules (AVM) for **The Tutor** platform.
+> Workflow-governed Azure deployment architecture for **The Tutor** platform using Azure Developer CLI (`azd`), Terraform, and Azure Verified Modules (AVM).
 
 ---
 
 ## 1. Infrastructure Overview
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph Developer
-        AZD["azd up"]
+      AZD["push to main / workflow_dispatch"]
         TF_PLAN["terraform plan"]
     end
 
-    subgraph "azd Workflow"
-        PROVISION["azd provision\n(terraform apply)"]
-        BUILD["azd package\n(docker build)"]
-        DEPLOY["azd deploy\n(ACA revision)"]
+    subgraph "GitHub Workflow"
+      PROVISION["azd provision\n(terraform apply)"]
+      BUILD["workflow build\n(container images)"]
+      DEPLOY["workflow deploy\n(ACA revisions)"]
     end
 
     subgraph Azure["Azure Subscription"]
@@ -29,7 +37,7 @@ graph TB
 
             subgraph Compute
                 ACA_ENV["ACA Environment"]
-                ACA_APPS["10 Container Apps"]
+                ACA_APPS["9 Backend Container Apps"]
                 ACR["Container Registry"]
                 SWA["Static Web App"]
             end
@@ -56,7 +64,7 @@ graph TB
 
             subgraph Security
                 KV["Key Vault"]
-                MI["Managed Identities\n(10)"]
+                MI["Managed Identities\n(9 backend apps)"]
             end
 
             subgraph Observability
@@ -100,7 +108,7 @@ infra/
 │       │   ├── variables.tf
 │       │   └── outputs.tf
 │       ├── compute/
-│       │   ├── main.tf                   # ACA Environment + 10 Container Apps
+│       │   ├── main.tf                   # ACA Environment + 9 backend Container Apps
 │       │   ├── variables.tf
 │       │   └── outputs.tf
 │       ├── ai/
@@ -124,17 +132,16 @@ infra/
 │           ├── variables.tf
 │           └── outputs.tf
 │
-├── bicep/                                # Legacy (preserved for reference)
-│   ├── main.bicep
-│   └── modules/
-│       ├── aca.bicep
-│       ├── acr.bicep
-│       ├── aoai.bicep
-│       ├── cosmos.bicep
-│       ├── loga.bicep
-│       ├── speech.bicep
-│       ├── staticwapp.bicep
-│       └── vnet.bicep
+├── main.bicep                            # Legacy Bicep entry point (preserved for reference)
+├── modules/                              # Legacy Bicep modules
+│   ├── aca.bicep
+│   ├── acr.bicep
+│   ├── aoai.bicep
+│   ├── cosmos.bicep
+│   ├── loga.bicep
+│   ├── speech.bicep
+│   ├── staticwapp.bicep
+│   └── vnet.bicep
 │
 └── environments/
     ├── dev.tfvars                         # Development environment
@@ -365,9 +372,9 @@ module "cosmos_db" {
 }
 ```
 
-### 4.4 AI Module — Foundry (ADR-015)
+### 4.4 AI Module - Foundry (ADR-008)
 
-Microsoft Foundry is deployed with a project endpoint consumed by agentic services through `tutor_lib.agents` (see [ADR-015](adr/015-foundry-agent-service-native-architecture.md)). The AI Hub + AI Project pattern uses the `avm/res/machine-learning-services/workspace` AVM module. Application configuration must expose the project endpoint URL in the form `https://<resource-name>.services.ai.azure.com/api/projects/<project-name>`.
+Microsoft Foundry is deployed with a project endpoint consumed by agentic services through `tutor_lib.agents` (see [ADR-008](adr/008-foundry-agent-runtime-evaluation.md)). The AI Hub + AI Project pattern uses the `avm/res/machine-learning-services/workspace` AVM module. Application configuration must expose the project endpoint URL in the form `https://<resource-name>.services.ai.azure.com/api/projects/<project-name>`.
 
 ```hcl
 # infra/terraform/modules/ai/foundry.tf
@@ -445,7 +452,7 @@ resource "azurerm_role_assignment" "foundry_agent_user" {
 **Key design decisions:**
 - **Project endpoint URL** — app code uses the Foundry project endpoint, not a resource id or legacy connection string
 - **Least privilege** — runtime identities invoke agents with Azure AI User; publishing/versioning identities are separate
-- **AVM pattern** — consistent with all other infrastructure modules (ADR-004)
+- **AVM pattern** — consistent with all other infrastructure modules (ADR-002)
 - **Outputs**: Foundry project endpoint URL → `AZURE_AI_PROJECT_ENDPOINT` or `PROJECT_ENDPOINT` for agentic services
 - **Deployment policy**: production changes are applied only by repository GitHub workflows
 
@@ -459,103 +466,59 @@ resource "azurerm_role_assignment" "foundry_agent_user" {
 # azure.yaml (root of repository)
 name: tutor
 metadata:
-  template: tutor@0.2.0
+  template: tutor-modernization@0.1.0
 
 infra:
   provider: terraform
   path: infra/terraform
 
 services:
-  # ── Platform Domain ──
-  config-svc:
-    project: apps/configuration/src
+  avatar:
+    project: apps/avatar
     language: python
     host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-    hooks:
-      prepackage:
-        run: uv pip install --system -e ../../lib
-
+    docker: { path: dockerfile, context: ../.. }
+  chat:
+    project: apps/chat
+    language: python
+    host: containerapp
+    docker: { path: dockerfile, context: ../.. }
+  configuration:
+    project: apps/configuration
+    language: python
+    host: containerapp
+    docker: { path: dockerfile, context: ../.. }
+  essays:
+    project: apps/essays
+    language: python
+    host: containerapp
+    docker: { path: dockerfile, context: ../.. }
+  evaluation:
+    project: apps/evaluation
+    language: python
+    host: containerapp
+    docker: { path: dockerfile, context: ../.. }
+  insights:
+    project: apps/insights
+    language: python
+    host: containerapp
+    docker: { path: dockerfile, context: ../.. }
   lms-gateway:
-    project: apps/lms-gateway/src
+    project: apps/lms-gateway
     language: python
     host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  content-svc:
-    project: apps/content/src
+    docker: { path: dockerfile, context: ../.. }
+  questions:
+    project: apps/questions
     language: python
     host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  # ── Assessment Domain ──
-  essays-svc:
-    project: apps/essays/src
+    docker: { path: dockerfile, context: ../.. }
+  upskilling:
+    project: apps/upskilling
     language: python
     host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  questions-svc:
-    project: apps/questions/src
-    language: python
-    host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  # ── Interaction Domain ──
-  avatar-svc:
-    project: apps/avatar/src
-    language: python
-    host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  chat-svc:
-    project: apps/chat/src
-    language: python
-    host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  # ── Analytics Domain ──
-  upskilling-svc:
-    project: apps/upskilling/src
-    language: python
-    host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  evaluation-svc:
-    project: apps/evaluation/src
-    language: python
-    host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  # ── Supervision Domain ──
-  insights-svc:
-    project: apps/insights/src
-    language: python
-    host: containerapp
-    docker:
-      path: ../../Dockerfile
-      context: ../..
-
-  # ── Frontend ──
-  ui:
+    docker: { path: dockerfile, context: ../.. }
+  frontend:
     project: frontend
     dist: .next
     language: js
@@ -567,19 +530,21 @@ services:
 
 ### 5.2 Deployment Commands
 
+Normal Azure deployments are performed through the approved GitHub workflows. The commands below are limited to first-time environment bootstrap, diagnostics, or documented break-glass work.
+
 ```bash
 # First-time setup
 azd init
 azd env set AZURE_ENV_NAME dev
 azd env set AZURE_LOCATION eastus2
 
-# Provision infrastructure + deploy all services
+# First-time bootstrap only: provision infrastructure + deploy all services
 azd up
 
-# Deploy a single service
-azd deploy config-svc
+# First-time bootstrap or break-glass only: deploy a single service
+azd deploy configuration
 
-# Deploy all services without provisioning
+# First-time bootstrap or break-glass only: deploy all services without provisioning
 azd deploy --all
 
 # Provision infrastructure only
@@ -592,8 +557,8 @@ azd down --purge
 ### 5.3 CI/CD with GitHub Actions
 
 ```yaml
-# .github/workflows/deploy.yml
-name: Deploy to Azure
+# .github/workflows/azd-deploy.yml
+name: azd deploy
 on:
   push:
     branches: [main]
@@ -619,7 +584,7 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Provision and deploy
+      - name: Provision and deploy through governed workflow
         run: azd up --no-prompt
         env:
           AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
@@ -675,6 +640,10 @@ variable "services" {
     "evaluation-svc" = {
       port = 8086, cpu = 0.5, memory = "1Gi"
       min_replicas = 0, max_replicas = 2, domain = "analytics"
+    }
+    "insights-svc" = {
+      port = 8090, cpu = 0.5, memory = "1Gi"
+      min_replicas = 0, max_replicas = 3, domain = "supervision"
     }
   }
 }
@@ -737,7 +706,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "<port>"]
 
 ### Step-by-Step
 
-1. **Preserve existing Bicep** → Move to `infra/bicep/` (done in Phase 3)
+1. **Preserve existing Bicep** → Keep `infra/main.bicep` and `infra/modules/` as legacy reference while Terraform remains primary
 2. **Bootstrap Terraform state** → Create state storage account
 3. **Write Terraform modules** → Using AVM, one module at a time
 4. **Import existing resources** → `terraform import` for each resource
@@ -802,10 +771,10 @@ az storage container create -n tfstate --account-name tutortfstate
 
 ### Developer Workflow
 
-1. **`azd up`** — Provisions the `dev` environment (shared Cosmos, OpenAI, AI Search, etc.)
-2. **`azd deploy <service>`** — Deploys a single service to the dev ACA environment
-3. **Remote debugging** — Attach to ACA via `az containerapp exec` for live troubleshooting
-4. **Feature branches** — Use `azd env new feature-xxx` to create isolated dev environments when needed
+1. **Push to `main` or run `workflow_dispatch`** — Uses the approved backend/frontend GitHub workflows.
+2. **First-time bootstrap only** — Run `azd provision` / `azd deploy` locally when a new environment has no workflow-ready infrastructure yet.
+3. **Remote debugging** — Attach to ACA via `az containerapp exec` for live troubleshooting.
+4. **Feature branches** — Use isolated Azure environments only when explicitly planned and keep deployment execution auditable.
 
 ### Environment Variables
 
@@ -853,8 +822,7 @@ repository_url      = "https://github.com/Azure-Samples/tutor"
 
 | Document | Link |
 |----------|------|
-| ADR-003: ACA Microservices | [003-aca-microservices.md](adr/003-aca-microservices.md) |
-| ADR-004: Terraform + AVM | [adr/004-terraform-avm.md](adr/004-terraform-avm.md) |
-| ADR-008: Security Layers | [adr/008-security-layers.md](adr/008-security-layers.md) |
+| ADR-002: Azure Runtime and Infrastructure | [adr/002-azure-runtime-infrastructure.md](adr/002-azure-runtime-infrastructure.md) |
+| ADR-004: Security Layers and Zero-Trust | [adr/004-security-zero-trust.md](adr/004-security-zero-trust.md) |
 | Modernization Plan (Phase 3) | [modernization-plan.md](modernization-plan.md) |
 | Security | [security.md](security.md) |

@@ -40,7 +40,7 @@ Notes:
 - Primary owner: SystemArchitect
 - Dependencies: None
 - Desired behavior: The repo should explicitly reposition Tutor from LMS enhancer to standalone lifelong learning and outcomes platform with optional LMS, SIS, CRM, and credential integrations behind anti-corruption layers.
-- Acceptance criteria: supersede or materially update [docs/adr/001-lms-enhancer-platform.md](./adr/001-lms-enhancer-platform.md); update [docs/architecture.md](./architecture.md) and [docs/service-domains.md](./service-domains.md) with new target-state domains; document 3 migration horizons and core system-of-record responsibilities.
+- Acceptance criteria: supersede or materially update [docs/adr/007-learner-record-platform-distribution.md](./adr/007-learner-record-platform-distribution.md); update [docs/architecture.md](./architecture.md) and [docs/service-domains.md](./service-domains.md) with new target-state domains; document 3 migration horizons and core system-of-record responsibilities.
 
 ## LL-02 - Build tenant and relationship-based access control plane
 

@@ -1,34 +1,40 @@
 # Architecture Decision Records
 
-This directory contains the Architecture Decision Records (ADRs) for **The Tutor** platform modernization.
+This directory contains the current Architecture Decision Records (ADRs) for **The Tutor** platform. Historical ADR versions are not kept as live archive files; use Git history when the older decision trail is needed.
 
 ## ADR Index
 
 | ADR | Title | Status | Date |
 | --- | ----- | ------ | ---- |
-| [001](./001-lms-enhancer-platform.md) | LMS-Enhancer Multi-Agent Platform | Superseded | 2026-02-24 |
-| [002](./002-shared-library.md) | Shared Library Extraction (`tutor-lib`) | Accepted | 2026-02-24 |
-| [003](./003-aca-microservices.md) | Azure Container Apps for Microservices | Accepted | 2026-02-24 |
-| [004](./004-terraform-avm.md) | Terraform with Azure Verified Modules | Accepted | 2026-02-24 |
-| [005](./005-foundry-evaluation.md) | Foundry Agent Evaluation | Accepted | 2026-02-24 |
-| [006](./006-domain-decoupling.md) | Domain-Driven Service Decoupling | Accepted | 2026-02-24 |
-| [007](./007-frontend-modernization.md) | Frontend Modernization (Next.js 15 + React 19) | Accepted | 2026-02-24 |
-| [008](./008-security-layers.md) | Security Layers and Zero-Trust | Accepted | 2026-02-24 |
-| [009](./009-supervisor-fabric-integration.md) | Supervisor Insights & Microsoft Fabric Integration | Proposed | 2025-01 |
-| [010](./010-pedagogical-content-ocr.md) | Pedagogical Content Ingestion, OCR & RAG | Accepted | 2026-03-02 |
-| [011](./011-foundry-first-agent-architecture.md) | Foundry-First Agent Architecture | Accepted | 2026-03-09 |
-| [012](./012-cosmos-foundry-agent-migration.md) | Cosmos-to-Foundry Agent Migration Implementation | Accepted | 2026-03-16 |
-| [013](./013-learner-record-standalone-platform.md) | Learner-Record-Centered Standalone Lifelong-Learning Platform | Accepted | 2026-04-08 |
-| [014](./014-hybrid-learner-record-service-bus-distribution.md) | Hybrid Learner-Record Service Bus Distribution | Accepted | 2026-04-08 |
-| [015](./015-foundry-agent-service-native-architecture.md) | Foundry Agent Service Native Architecture | Accepted | 2026-05-09 |
+| [001](./001-shared-library-contracts.md) | Shared Library and Cross-Service Contracts | Accepted | 2026-05-10 |
+| [002](./002-azure-runtime-infrastructure.md) | Azure Runtime and Infrastructure | Accepted | 2026-05-10 |
+| [003](./003-service-boundaries-institutional-insights.md) | Service Boundaries and Institutional Insights | Accepted | 2026-05-10 |
+| [004](./004-security-zero-trust.md) | Security Layers and Zero-Trust | Accepted | 2026-05-10 |
+| [005](./005-frontend-modernization-workspace-ux.md) | Frontend Modernization and Workspace UX | Accepted | 2026-05-10 |
+| [006](./006-pedagogical-content-ocr-rag.md) | Pedagogical Content, OCR, and RAG | Accepted | 2026-05-10 |
+| [007](./007-learner-record-platform-distribution.md) | Learner-Record Platform and Distribution | Accepted | 2026-05-10 |
+| [008](./008-foundry-agent-runtime-evaluation.md) | Foundry Agent Runtime and Evaluation Governance | Accepted | 2026-05-10 |
+
+## Current Authority Map
+
+| Topic | Authoritative ADR |
+| ----- | ----------------- |
+| Shared library and cross-service contracts | [ADR-001](./001-shared-library-contracts.md) |
+| Azure runtime, Terraform, ACA, APIM, workflow deployment | [ADR-002](./002-azure-runtime-infrastructure.md) |
+| Service boundaries, supervision domain, Fabric-backed institutional insights | [ADR-003](./003-service-boundaries-institutional-insights.md) |
+| Identity, RBAC, network, data, and audit security | [ADR-004](./004-security-zero-trust.md) |
+| Frontend baseline and role-aware workspace UX | [ADR-005](./005-frontend-modernization-workspace-ux.md) |
+| Pedagogical content, OCR, AI Search, RAG, ENEM direction | [ADR-006](./006-pedagogical-content-ocr-rag.md) |
+| Learner-record platform, anti-corruption layers, Service Bus distribution | [ADR-007](./007-learner-record-platform-distribution.md) |
+| Foundry Agent Service runtime, agent contracts, evaluation governance | [ADR-008](./008-foundry-agent-runtime-evaluation.md) |
 
 ## ADR Format
 
 Each ADR follows this structure:
 
-1. **Title** — Short descriptive name
-2. **Status** — Proposed / Accepted / Deprecated / Superseded
-3. **Context** — What problem are we solving?
-4. **Decision** — What did we decide?
-5. **Consequences** — What are the trade-offs?
-6. **References** — Links to related resources
+1. **Title** - Short descriptive name
+2. **Status** - Proposed / Accepted / Deprecated / Superseded
+3. **Context** - What problem are we solving?
+4. **Decision** - What did we decide?
+5. **Consequences** - What trade-offs are accepted?
+6. **References** - Links to related resources

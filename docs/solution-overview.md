@@ -32,38 +32,44 @@ The system is positioned as an **LMS enhancer**: it consumes LMS context (course
 
 ### 2.1 Backend Services (Python 3.13, FastAPI)
 
-| Service | Port | Pattern | Responsibility |
-|---------|------|---------|---------------|
-| **Configuration** | 8081 | CRUD + Repository | Students, professors, courses, classes, groups, pedagogical rules, feature flags |
-| **Questions** | 8082 | State Machine | Question evaluation pipeline: Pending → Evaluating → Completed (objective + discursive) |
-| **Essays** | 8083 | Strategy + Orchestrator | Essay submission with OCR (Azure AI Document Intelligence — Phase A in progress, issue #18), multi-strategy ENEM-aligned evaluation (Phase B), RAG grounding (Phase B), Foundry agent provisioning |
-| **Avatar** | 8084 | Agent + Speech | Real-time avatar interaction using Azure Speech SDK + AI Agents |
-| **Upskilling** | 8085 | Repository + Visitor | Stateful teaching plan management (CRUD), multi-agent evaluation (Performance, ContentComplexity, GuidanceCoach, ENEMAlignment), Cosmos DB persistence with `/professor_id` partition |
-| **Content** *(target)* | 8089 | Pipeline | Pedagogical material ingestion: upload → OCR → chunk → AI Search index |
-| **Insights** *(target)* | 8090 | Strategy + Synthesis | Supervisor insight reports: Fabric indicators → narrative briefing |
+The current deployed backend set is nine Azure Container Apps, matching `azure.yaml` and the backend deployment workflow.
 
-### 2.2 Frontend (Next.js 14, React 18, TypeScript)
+| Service | APIM path | Pattern | Responsibility |
+|---------|-----------|---------|---------------|
+| **Avatar** | `/api/avatar` | Agent + Speech | Conversational avatar tutoring using Azure Speech, Foundry-managed agents, and governed case context |
+| **Chat** | `/api/chat` | Guardrail + Repository | Guided tutor responses with answer-avoidance guardrails and conversation persistence |
+| **Configuration** | `/api/configuration` | CRUD + Repository | Students, professors, courses, classes, groups, pedagogical rules, themes, feature flags |
+| **Essays** | `/api/essays` | Strategy + Orchestrator | Essay submission, OCR-capable ingestion, multi-strategy evaluation, and Foundry agent invocation |
+| **Evaluation** | `/api/evaluation` | Dataset + Run Pipeline | Golden datasets, evaluation runs, and quality gates for high-impact agent behavior |
+| **Insights** | `/api/insights` | CQRS Projection + Governance | School-unit intelligence, causal-study drafts, conformal-risk reports, lifelong learner network payloads, and Fabric-backed supervisor briefings |
+| **LMS Gateway** | `/api/lms-gateway` | Adapter + Job Queue | LMS anti-corruption layer, sync idempotency, connector state, and dead-letter tracking |
+| **Questions** | `/api/questions` | State Machine | Question evaluation pipeline: Pending → Evaluating → Completed (objective + discursive) |
+| **Upskilling** | `/api/upskilling` | Repository + Visitor | Stateful teaching-plan management, multi-agent evaluation, and governed advisory training-plan drafts |
+
+`content-svc` remains a future service boundary for a dedicated content ingestion workflow. Current grounding and pedagogical-rule work is split between configuration, essays, chat, Blob Storage, AI Search, and shared contracts.
+
+### 2.2 Frontend (Next.js 15, React 18, TypeScript)
 
 - Single-page application hosted on **Azure Static Web Apps**
-- Five feature modules: Configuration, Questions, Essays, Avatar, Chat
+- Workspace and feature modules for Configuration, Questions, Essays, Avatar, Chat, Evaluation, LMS Gateway, Upskilling, governed intelligence, and lifelong learner network views
 - API clients per service (`axios` with `ApiEnvelope<T>` unwrapper)
 - Azure Speech SDK integration for avatar WebRTC
 - Tailwind CSS styling with Satoshi font family
 
-### 2.3 Infrastructure (Azure Bicep)
+### 2.3 Infrastructure (Terraform + azd + GitHub Actions)
 
 | Resource | Module | Purpose |
 |----------|--------|---------|
-| VNet (10.0.0.0/22) | `vnet.bicep` | Network isolation, service/private endpoints |
-| Log Analytics | `loga.bicep` | Centralized logging |
-| Azure Container Registry | `acr.bicep` | Container image hosting |
-| Azure Cosmos DB | `cosmos.bicep` | NoSQL data store (5 logical databases) |
-| Azure Container Apps | `aca.bicep` | Microservice compute (10 services) |
-| Azure OpenAI (gpt-4o) | `aoai.bicep` | LLM inference with private endpoints |
-| Azure Speech Services | `speech.bicep` | TTS/STT for avatar |
-| Azure Static Web App | `staticwapp.bicep` | Frontend hosting |
-| Azure AI Document Intelligence | `docintel.bicep` *(target — Phase B infra; SDK wired in essays-svc in Phase A)* | OCR for handwritten essays and pedagogical materials |
-| Azure AI Search | `search.bicep` *(target — Phase B)* | Vector + keyword index for RAG grounding |
+| VNet (10.0.0.0/22) | `infra/terraform` networking modules | Network isolation, service/private endpoints |
+| Log Analytics + Application Insights | `infra/terraform` observability resources | Centralized logging, diagnostics, and telemetry |
+| Azure Container Registry | `infra/terraform` registry resources | Container image hosting |
+| Azure Cosmos DB | `infra/terraform` data resources | NoSQL data store for service-owned containers and projections |
+| Azure Container Apps | `infra/terraform` service resources | Microservice compute for nine backend services |
+| Azure OpenAI / Foundry project | `infra/terraform` AI resources | LLM inference and Foundry Agent Service runtime |
+| Azure Speech Services | `infra/terraform` AI resources | TTS/STT for avatar |
+| Azure Static Web App | `infra/terraform` frontend resources + SWA workflow | Frontend hosting |
+| Azure AI Document Intelligence | `infra/terraform` AI resources | OCR for handwritten essays and pedagogical materials |
+| Azure AI Search | `infra/terraform` data/AI resources | Vector + keyword index for RAG grounding |
 | Microsoft Fabric | *(external)* | Read-only semantic model for standardized assessments, attendance, task completion indicators |
 
 ### 2.4 Data Store
@@ -74,7 +80,8 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 - `cases`, `steps`, `essays` — Assessment domain
 - `questions`, `evaluations` — Question evaluation domain
 - `upskilling_plans` — Upskilling domain (teaching plans, partition key: `/professor_id`)
-- `agents`, `swarms` — Agent provisioning domain
+- `learner_record_events`, `insights_reports`, `insights_feedback`, integration connector/idempotency/dead-letter containers — Insights and integration projections
+- Agent references and invocation metadata — Foundry Agent Service assets are invoked through `tutor_lib.agents`; Cosmos keeps only domain-owned data and lightweight references
 
 ---
 
@@ -99,9 +106,9 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Next.js | 14.2.5 | React framework |
+| Next.js | 15.5.10 | React framework |
 | React | 18.3.1 | UI library |
-| TypeScript | 5.6.3 | Type safety |
+| TypeScript | 5.7+ | Type safety |
 | Tailwind CSS | 3.4.14 | Utility-first CSS |
 | axios | ≥1.13.2 | HTTP client |
 | Azure Speech SDK | ≥1.47.0 | Speech integration |
@@ -111,8 +118,9 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Azure Bicep | latest | IaC language |
-| Azure CLI | latest | Deployment CLI |
+| Terraform | latest | Primary IaC implementation under `infra/terraform` |
+| Azure Developer CLI | latest | Environment orchestration used by approved workflows and bootstrap paths |
+| Azure CLI | latest | Diagnostics and operational support |
 
 ---
 
@@ -125,29 +133,30 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 | **Strategy** | Essays | `AnalyticalStrategy`, `NarrativeStrategy`, `ENEMStrategy`, `DefaultStrategy` for evaluation |
 | **Strategy** | Insights | `StandardizedTestStrategy`, `AttendanceStrategy`, `TaskCompletionStrategy` for indicator fetching |
 | **Orchestrator** | Essays | `EssayOrchestrator` composes OCR + strategy + RAG + agent execution |
-| **Pipeline** | Content | Upload → OCR → Chunk → AI Search index |
+| **Pipeline** | Content *(future service boundary)* | Upload → OCR → Chunk → AI Search index |
 | **Visitor** | Upskilling | `PerformanceVisitor`, `ContentComplexityVisitor`, `GuidanceCoachVisitor`, `ENEMAlignmentVisitor` |
 | **Builder** | Avatar | Agent configuration via `AvatarHandler` class |
 | **Singleton** | All | `CosmosClient` and `Settings` reuse |
 | **Guardrail** | Chat | Topic + language + answer-avoidance guardrails enforced by guided tutor |
+| **CQRS Projection** | Insights | Deterministic school-unit, conformal-risk, causal-study, and lifelong-network read models with governance metadata |
 
 ---
 
-## 5. Known Issues (Pre-Modernization)
+## 5. Current Modernization Status
 
-| Issue | Impact | Severity |
-|-------|--------|----------|
-| Missing `common` module | Configuration, Questions, Upskilling fail to import `from common.config` | **Critical** |
-| Empty Dockerfiles | No containerization possible | **High** |
-| Duplicated dependencies | All 5 `pyproject.toml` share ~90% of deps with no shared library | **Medium** |
-| Stale `tutor.egg-info` | Artifact from monolithic layout; confusing | **Low** |
-| Frontend `webApp` import | Configuration components reference non-existent API export | **Medium** |
-| No `azure.yaml` | Cannot use `azd` for deployment | **High** |
-| No Terraform | Infrastructure not portable; no AVM compliance | **Medium** |
-| No agent evaluation | No way to measure agent quality or regression | **High** |
-| No authentication | No auth layer on any API or frontend | **Critical** |
-| Tight coupling | All services share Cosmos logic but without a shared library | **Medium** |
-| Empty components | `Transcriptions/index.tsx`, `Configuration/Cases.tsx` are empty stubs | **Low** |
+The earlier pre-modernization blockers have been retired or moved into governed follow-up work: `tutor-lib` replaces the missing `common` module, service Dockerfiles and `azure.yaml` exist, Terraform is the active infrastructure path, APIM routes cover the deployed service set, and Foundry Agent Service is accessed through `tutor_lib.agents` per ADR-008.
+
+Current high-trust P2/P3 capabilities are implemented and live-validated in the `108dev` environment:
+
+| Capability | Current status |
+|------------|----------------|
+| School-unit intelligence | Implemented in `insights-svc`, exposed to principals, supervisors, and admins with role/scope controls |
+| Causal-study drafts | Implemented as governed supervisor/admin drafts; outputs are advisory and reviewable |
+| Conformal-risk reports | Implemented with explicit learner membership requirements and uncertainty metadata |
+| Lifelong learner network | Implemented for alumni record surfaces using shared lifelong-network contracts |
+| Advisory training plans | Implemented in `upskilling-svc` with governance, calibration, and review-state metadata |
+
+Remaining work is tracked as targeted hardening rather than foundational enablement: APIM policy hardening, broader integration tests, dedicated content-service extraction when justified, and continued production security/accessibility reviews.
 
 ---
 
@@ -157,38 +166,31 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 tutor/
 ├── apps/                          # Backend microservices
 │   ├── avatar/                    # Avatar + Speech agent service
-│   │   ├── src/app/               # FastAPI app, routes, agents, config
-│   │   ├── dockerfile             # (empty)
-│   │   └── pyproject.toml
-│   ├── configuration/             # CRUD for students, courses, etc.
-│   │   ├── src/app/               # FastAPI app, routes, repositories
-│   │   ├── dockerfile             # (empty)
-│   │   └── pyproject.toml
+│   ├── chat/                      # Guided tutoring service
+│   ├── configuration/             # CRUD for students, courses, rules, themes
 │   ├── essays/                    # Essay evaluation with strategies
-│   │   ├── src/app/               # FastAPI app, orchestrator, strategies
-│   │   ├── dockerfile             # (empty)
-│   │   └── pyproject.toml
+│   ├── evaluation/                # Agent quality datasets and runs
+│   ├── insights/                  # Governed intelligence and lifelong-network projections
+│   ├── lms-gateway/               # LMS adapter and sync gateway
 │   ├── questions/                 # Question evaluation state machine
-│   │   ├── app/                   # FastAPI app, state machine, grader
-│   │   ├── dockerfile             # (empty)
-│   │   └── pyproject.toml
-│   └── upskilling/                # Learning analytics visitors
-│       ├── app/                   # FastAPI app, visitors, analyzers
-│       ├── dockerfile             # (empty)
-│       └── pyproject.toml
-├── frontend/                      # Next.js 14 SPA
-│   ├── app/                       # Pages (avatar, chat, config, essays, questions)
+│   └── upskilling/                # Teaching-plan evaluation and advisory training plans
+├── frontend/                      # Next.js 15 SPA
+│   ├── app/                       # Pages and role-aware workspace routes
 │   ├── components/                # React components per domain
 │   ├── types/                     # TypeScript type definitions
 │   ├── utils/                     # API clients, context providers
 │   └── package.json
-├── infra/                         # Azure Bicep modules
-│   ├── main.bicep                 # Subscription-scope entry point
-│   └── modules/                   # VNet, ACR, ACA, Cosmos, OpenAI, Speech, SWA
+├── infra/                         # Terraform primary IaC; Bicep retained as legacy reference
+│   ├── terraform/                 # Root module, service stacks, outputs
+│   ├── main.bicep                 # Legacy subscription-scope entry point
+│   └── modules/                   # Legacy Bicep modules
 ├── tests/                         # pytest test suites
 │   ├── configuration/
 │   ├── essays/
-│   └── questions/
+│   ├── insights/
+│   ├── lms_gateway/
+│   ├── questions/
+│   └── upskilling/
 ├── docs/                          # Documentation (this folder)
 └── README.md
 ```

@@ -11,7 +11,7 @@ Primary source inputs:
 - [Standalone lifelong-learning risk assessment](./standalone-lifelong-learning-risk-assessment.md)
 - [Architecture](./architecture.md)
 - [Service domains](./service-domains.md)
-- [ADR-007 Frontend modernization](./adr/007-frontend-modernization.md)
+- [ADR-005 Frontend modernization](./adr/005-frontend-modernization-workspace-ux.md)
 
 ## Current-state grounding
 

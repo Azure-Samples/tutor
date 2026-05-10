@@ -8,7 +8,7 @@ This runbook describes how to provision and deploy Tutor with Azure Developer CL
 >
 > Authorized workflows:
 >
-- `.github/workflows/azd-deploy.yml` → Infrastructure + 8 backend services (Container Apps), triggered by push to `main` or `workflow_dispatch`.
+- `.github/workflows/azd-deploy.yml` → Infrastructure + 9 backend services (Container Apps), triggered by push to `main` or `workflow_dispatch`.
 - `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` → Frontend (Static Web App), triggered by push to `main`, PR events, or `workflow_dispatch`.
 >
 > **Why:** GitHub Workflows provide auditable, reproducible deployments with proper secret management via OIDC federation. Manual deployments bypass CI checks, status gates, and deployment traceability.
@@ -29,7 +29,8 @@ Set these in repository or environment secrets:
 - `AZURE_CLIENT_ID`
 - `AZURE_TENANT_ID`
 - `AZURE_SUBSCRIPTION_ID`
-- `NEXT_PUBLIC_APIM_BASE_URL` (used by Static Web Apps frontend build)
+
+The Static Web Apps workflow resolves `NEXT_PUBLIC_APIM_BASE_URL` from Azure during normal deployments. Keep a manually configured value only when an environment-specific override is intentionally required.
 
 ## Release Routing Policy
 
@@ -97,11 +98,12 @@ Invoke-RestMethod "$apim/api/questions/ready"
 Invoke-RestMethod "$apim/api/upskilling/health"
 Invoke-RestMethod "$apim/api/chat/ready"
 Invoke-RestMethod "$apim/api/evaluation/health"
+Invoke-RestMethod "$apim/api/insights/health"
 Invoke-RestMethod "$apim/api/lms-gateway/ready"
 ```
 
 1. Frontend redeploy only after APIM is functional:
-   - Set GitHub secret `NEXT_PUBLIC_APIM_BASE_URL` to the APIM gateway URL.
+   - Confirm the Static Web Apps workflow resolves the APIM gateway URL from Azure outputs, or set an explicit environment override when needed.
    - Run `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml` (`workflow_dispatch`) to redeploy only the frontend.
 
 ## Terraform Validation Before Deployment
@@ -188,7 +190,7 @@ When `.github/workflows/azd-deploy.yml` fails in the `provision` job (`Provision
 The artifact includes:
 
 - ACA environment provisioning state and recent failed activity events
-- Per-service Container App state for backend services (`avatar`, `chat`, `configuration`, `essays`, `evaluation`, `lms-gateway`, `questions`, `upskilling`)
+- Per-service Container App state for backend services (`avatar`, `chat`, `configuration`, `essays`, `evaluation`, `insights`, `lms-gateway`, `questions`, `upskilling`)
 - Latest revision status (when present) per service
 - Resource-group failed activity events with correlation IDs and status messages
 - Failed ARM deployment operations (if any)

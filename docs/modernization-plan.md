@@ -34,11 +34,11 @@ The phase plan below remains the implementation scaffold for infrastructure, ser
 
 ### Foundry-Native Reset Overlay
 
-The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in [Foundry Native Implementation Epics](./foundry-native-implementation-epics.md) and governed by [ADR-015](./adr/015-foundry-agent-service-native-architecture.md).
+The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in [Foundry Native Implementation Epics](./foundry-native-implementation-epics.md) and governed by [ADR-008](./adr/008-foundry-agent-runtime-evaluation.md).
 
 | Reset wave | Goal | Primary work | Exit criteria |
 | ---------- | ---- | ------------ | ------------- |
-| **Wave 0: Architecture Reset** | Align decisions before runtime migration. | ADR-015, ADR-011/012 partial supersession, documentation alignment, migration inventory, governance guardrails. | Docs state no Agent Framework in `apps/` or `lib`, Foundry Agent Service native runtime, model-catalog neutrality, strict retention defaults, and workflow-only production deployment. |
+| **Wave 0: Architecture Reset** | Align decisions before runtime migration. | Consolidated ADR-008, documentation alignment, migration inventory, governance guardrails. | Docs state no Agent Framework in `apps/` or `lib`, Foundry Agent Service native runtime, model-catalog neutrality, strict retention defaults, and workflow-only production deployment. |
 | **Wave 1: Foundry and Record Foundation** | Remove runtime blocker and centralize governed agent facts. | `tutor_lib.agents` facade, dependency cleanup, questions/essays/avatar/chat/upskilling migration, evaluation release gates, learner-record provenance. | `rg "agent_framework|agent-framework|agent_framework_azure_ai|AzureAIAgentClient" apps lib` returns no matches; backend import/tests recover with fake Foundry facade; high-impact outputs carry provenance and review state. |
 
 ### Execution Rules
@@ -48,6 +48,19 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
 - Treat **provenance, evaluation, and human review** as wave-exit criteria for high-impact capabilities rather than post-launch hardening.
 - Allow new bounded contexts to start inside existing services or shared libraries when necessary, then split only when operational or ownership pressure justifies it.
 - Treat Microsoft Agent Framework removal as a Wave 1 entry gate. New code must call Microsoft Foundry Agent Service through `tutor_lib.agents` contracts rather than local orchestration wrappers.
+
+### P2/P3 Landing Status
+
+The governed-intelligence P2/P3 delivery track is implemented, committed, deployed, and live-verified in `108dev`. The landing includes:
+
+| Track | Delivered capability | Current implementation anchor |
+| ----- | -------------------- | ----------------------------- |
+| **P2 governed intelligence** | School-unit intelligence, causal-study drafts, conformal-risk reports, and role/scope policy boundaries | `insights-svc`, `tutor_lib.intelligence`, workspace governed intelligence panels |
+| **P3 lifelong network** | Credential, portfolio, alumni re-entry, mentor/community, and research-governance payloads | `tutor_lib.lifelong_network`, `insights-svc`, alumni record workspace |
+| **Professor upskilling advisory flow** | Advisory training-plan drafts with governance, uncertainty, calibration, and review metadata | `upskilling-svc`, configuration upskilling UI |
+| **Quality gates** | Backend Ruff/tests, frontend lint/typecheck/build, Playwright route and policy tests, workflow deployment, live APIM/SWA verification | GitHub workflows and APIM/SWA live endpoints |
+
+The roadmap below remains the longer modernization scaffold. Its original phase labels should not be read as blocking the P2/P3 governed-intelligence surfaces already landed.
 
 ---
 
@@ -124,7 +137,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
 
 ---
 
-## Phase 1 — Shared Library Extraction
+## Phase 1 — Shared Library and Cross-Service Contracts
 
 > Extract common code into `lib/` to fix the broken `common` module and eliminate duplication.
 
@@ -137,11 +150,11 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - `cosmos/crud.py` — `CosmosCRUD` base class (extracted from existing services)
   - `schemas/envelope.py` — `ApiEnvelope[T]` response wrapper
 
-- [ ] **P1-02**: Extract agent infrastructure into `lib/`
-  - `agents/base.py` — `BaseTutorAgent` abstract class
-  - `agents/builder.py` — `AgentBuilder` fluent API
-  - `agents/registry.py` — `AgentRegistry` for discovery
-  - `agents/foundry_client.py` — Azure AI Foundry client wrapper
+- [x] **P1-02**: Establish Foundry Agent Service facade in `lib/`
+  - `tutor_lib.agents` — ADR-008 app-facing boundary for named/versioned Foundry agents
+  - `AgentReference` — stable agent name/version reference
+  - `AgentInvocationRequest` and `AgentInvocationResult` — request/result contracts with provenance support
+  - SDK adapters and fakes stay behind the shared facade; Agent Framework registry/orchestration types are not app-facing contracts
 
 - [x] **P1-03**: Add middleware to `lib/`
   - `middleware/auth.py` — Entra ID JWT validation (placeholder, activated in Phase 5)
@@ -158,7 +171,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Test `CosmosCRUD` with mock client
   - Test `AppFactory` middleware registration
   - Test `ApiEnvelope` serialization
-  - Test `AgentBuilder` fluent API
+  - Test `tutor_lib.agents` facade contracts and fake invocation paths
 
 ---
 
@@ -194,7 +207,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Sync scheduler (timer-triggered)
   - Port 8087
 
-> Note (2026-02-25): `chat`, `evaluation`, and `lms-gateway` service scaffolds were added; detailed adapters/evaluator logic and integration tests remain pending in Phase 2.
+> Note (current): `chat`, `evaluation`, `insights`, and `lms-gateway` are part of the deployed backend set. Additional adapters, evaluator depth, and end-to-end integration coverage continue as hardening work, not as prerequisites for the landed P2/P3 governed-intelligence surfaces.
 
 - [ ] **P2-05**: Standardize all service entry points
   - All services use `tutor_lib.config.create_app()` factory
@@ -231,7 +244,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Use AVM: `avm/res/document-db/database-account`, `avm/res/storage/storage-account`
 
 - [ ] **P3-04**: Create Terraform compute module
-  - ACA Environment + 10 Container Apps (one per service)
+  - ACA Environment + 9 backend Container Apps (one per current backend service)
   - Per-service scaling rules
   - ACR for container images
   - Use AVM: `avm/res/app/managed-environment`, `avm/res/app/container-app`
@@ -257,12 +270,12 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Diagnostic settings on all resources
   - Alert rules
 
-- [ ] **P3-08**: Create `azure.yaml` for azd
-  - Define all 10 services + frontend
+- [x] **P3-08**: Create `azure.yaml` for azd
+  - Define all 9 backend services + frontend
   - Map to Terraform provider
   - Add pre-deploy hooks for container builds
 
-- [ ] **P3-09**: Write Dockerfiles for all services
+- [x] **P3-09**: Write Dockerfiles for all current backend services
   - Multi-stage build: `python:3.13-slim`
   - Install `lib/` first, then service
   - Non-root user, health check CMD
@@ -276,7 +289,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Move existing Bicep to `infra/bicep/` for reference
   - Add deprecation note
 
-> Note (2026-02-25): Phase 3 scaffolding started with remote-state bootstrap script (`infra/terraform/scripts/bootstrap-state.ps1`), backend sample config (`infra/terraform/backend.hcl.sample`), and CI terraform validation in `.github/workflows/azd-deploy.yml`.
+> Note (current): Terraform, `azure.yaml`, workflow-governed backend deployment, and per-service Dockerfiles are active. Remaining Phase 3 items focus on import/parity hardening, state operations, and production guardrails.
 
 ---
 
@@ -286,11 +299,11 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
 
 ### Phase 4 Tasks
 
-- [ ] **P4-01**: Upgrade core framework
-  - Next.js 14 → 15 (follow migration guide)
-  - React 18 → 19 (update component patterns)
-  - TypeScript 5.6 → 5.7+
-  - Switch Yarn 1.x → pnpm 9.x
+- [x] **P4-01**: Upgrade core framework baseline
+  - Next.js 15 is active
+  - React 18 remains active pending a separate React 19 migration decision
+  - TypeScript 5.7+ is active
+  - pnpm 9.x is active
 
 - [ ] **P4-02**: Upgrade styling
   - Tailwind CSS 3.x → 4.x
@@ -494,7 +507,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Implement OCR pipeline: extract text from uploaded PDFs/images
   - Handle handwritten essay scanning (prebuilt-read model)
   - Business Need: BN-PED-1 (handwritten essay OCR), BN-PED-2 (material text extraction)
-  > **Phase A (branch `feat/ocr-essay-ingestion`, issue #18):** SDK is added directly to `apps/essays/pyproject.toml` (not `tutor-lib`) to keep the scope small and deliverable independently. Migration to `tutor-lib` occurs when `content-svc` is built in Phase B. The `DOCUMENT_INTELLIGENCE_ENDPOINT` env var gates whether DI or the local `pypdf`/PIL fallback is used — see ADR-010 for the integration flow diagram.
+  > **Phase A (branch `feat/ocr-essay-ingestion`, issue #18):** SDK is added directly to `apps/essays/pyproject.toml` (not `tutor-lib`) to keep the scope small and deliverable independently. Migration to `tutor-lib` occurs when `content-svc` is built in Phase B. The `DOCUMENT_INTELLIGENCE_ENDPOINT` env var gates whether DI or the local `pypdf`/PIL fallback is used — see ADR-006 for the integration flow diagram.
 
 - [ ] **P9-03**: Integrate Azure AI Search for RAG
   - Add `azure-search-documents` SDK to `tutor-lib`
@@ -536,10 +549,10 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
 
 ### Phase 10 Tasks
 
-- [ ] **P10-01**: Create Insights Service (`apps/insights/`)
-  - Scaffold FastAPI app with `tutor-lib`
-  - Define indicator strategy pattern (StandardizedTestStrategy, AttendanceStrategy, TaskCompletionStrategy)
-  - Port 8090
+- [x] **P10-01**: Create Insights Service (`apps/insights/`)
+  - FastAPI app with `tutor-lib` is part of the deployed backend set
+  - Current implementation includes governed school-unit intelligence, causal-study drafts, conformal-risk reports, and lifelong-network payloads
+  - Fabric indicator breadth and narrative synthesis remain ongoing supervision-domain hardening
   - Business Need: BN-SUP-1, BN-SUP-3
 
 - [ ] **P10-02**: Integrate Microsoft Fabric REST API
@@ -555,15 +568,15 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
   - Support scheduled (weekly) and on-demand report generation
   - Business Need: BN-SUP-2
 
-- [ ] **P10-04**: Add supervisor RBAC and school scoping
-  - Supervisor role in Entra ID with school-scoped claims
-  - insights-svc validates school access via Entra groups / Graph API
-  - Data isolation: supervisor can only access assigned schools' data
+- [x] **P10-04**: Add supervisor RBAC and school scoping for governed intelligence
+  - `insights-svc` enforces principal, supervisor, and admin role boundaries for current governed intelligence routes
+  - Leader learner-risk access requires explicit learner membership/scope
+  - Graph-backed school assignment enrichment remains a future hardening path where needed
   - Business Need: BN-SUP-5
 
 - [ ] **P10-05**: Create Supervisor Dashboard UI
-  - `/supervision` page: school selector, indicator trends, recent briefings
-  - `/supervision/[schoolId]` page: full briefing report with charts
+  - Current workspace routes include `/workspace/supervisor/briefings` and `/workspace/principal/school-health` governed intelligence panels
+  - Original `/supervision` and `/supervision/[schoolId]` dashboard routes remain future consolidation work
   - Indicator configuration panel (add/remove indicator types)
   - Business Need: BN-SUP-2, BN-SUP-4
 
@@ -605,7 +618,7 @@ The Foundry-native reset is a prerequisite overlay for Wave 1. It is tracked in 
 | Node.js | 18+ | 22 LTS | Major |
 | Next.js | 14.2.5 | 15.x | Major (App Router changes) |
 | React | 18.3.1 | 19.x | Major (Server Components default) |
-| TypeScript | 5.6.3 | 5.7+ | Minor |
+| TypeScript | 5.7+ | 5.7+ | Current baseline |
 | Tailwind CSS | 3.4.14 | 4.x | Major (config format change) |
 | ESLint | 8.57.0 | 9.x | Major (flat config) |
 | zustand | 4.5.4 | 5.x | Major (API changes) |
@@ -626,14 +639,14 @@ tutor/
 ├── .devcontainer/                  # Dev container config
 ├── .github/
 │   └── workflows/                 # CI/CD pipelines
-├── azure.yaml                     # azd service manifest (10 services + frontend)
+├── azure.yaml                     # azd service manifest (9 backend services + frontend)
 ├── Makefile                       # Root-level task runner
 │
 ├── lib/                           # Shared library (tutor-lib)
 │   ├── src/tutor_lib/
 │   │   ├── config/                # Settings, AppFactory
 │   │   ├── cosmos/                # CosmosClient, CosmosCRUD
-│   │   ├── agents/                # BaseTutorAgent, AgentBuilder, AgentRegistry
+│   │   ├── agents/                # AgentReference, InvocationRequest, InvocationResult, Foundry facade
 │   │   ├── search/                # AI Search client for RAG
 │   │   ├── document/              # Document Intelligence client for OCR
 │   │   ├── fabric/                # Fabric REST client for indicator fetching
@@ -707,7 +720,7 @@ tutor/
 │   └── pnpm-lock.yaml
 │
 ├── infra/                         # Infrastructure
-│   ├── terraform/                 # Terraform + AVM (target)
+│   ├── terraform/                 # Terraform with Azure Verified Modules (target)
 │   │   ├── main.tf
 │   │   ├── modules/
 │   │   └── environments/

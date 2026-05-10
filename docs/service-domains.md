@@ -84,13 +84,13 @@ The target platform uses DDD bounded contexts. Several of these contexts can beg
 | **Catalog and Pathways** | Deterministic core | Program catalog, pathway definitions, milestones, curriculum graph, and offering structure. | Future context; partially implied by configuration data today. |
 | **Enrollment and Lifecycle** | Deterministic core | Affiliations, cohort membership, enrollment state, institution relationships, and alumni transitions. | `config-svc` plus LMS sync today. |
 | **Learner Record** | Deterministic core | Append-only history of learning, assessment, tutoring, advising, credential, and community events with provenance. | Future context; initially projected from current services. |
-| **Content and Knowledge** | Deterministic core | Approved content corpus, rubrics, exemplars, pedagogical rules, and grounding policies. | `content-svc` and `config-svc`. |
+| **Content and Knowledge** | Deterministic core | Approved content corpus, rubrics, exemplars, pedagogical rules, and grounding policies. | `config-svc`, approved-content/rule data, Blob Storage, AI Search integrations; future dedicated `content-svc` when ownership or scale justifies it. |
 | **Assessment and Evidence** | Agentic service | Draft evaluations, rubric-grounded evidence, feedback artifacts, and submission-specific evidence links. | `essays-svc` and `questions-svc`. |
 | **Coaching and Interaction** | Agentic service | Guided tutoring, hinting, session transcripts, and interaction summaries. | `avatar-svc` and `chat-svc`. |
 | **Advising and Success** | Hybrid context | Advising cases, recommended interventions, next-best actions, and success summaries. | `upskilling-svc` today; future advising core later. |
-| **Credentialing and Portfolio** | Deterministic core | Credential definitions, eligibility, awards, verification, revocation, and portfolio artifacts. | Future context. |
-| **Community and Network** | Deterministic core | Groups, mentoring links, alumni/community membership, and moderation state. | Future context. |
-| **Institutional Analytics and Read Models** | Projection context | Learner, cohort, school, and program projections for workspaces and interventions. | `insights-svc` plus future read-model projections. |
+| **Credentialing and Portfolio** | Deterministic core | Credential definitions, eligibility, awards, verification, revocation, and portfolio artifacts. | P3 shared contracts in `tutor_lib.lifelong_network` and lifelong-network projections in `insights-svc`; future dedicated context when needed. |
+| **Community and Network** | Deterministic core | Groups, mentoring links, alumni/community membership, and moderation state. | P3 shared contracts in `tutor_lib.lifelong_network` and alumni/network read models in `insights-svc`; future dedicated context when needed. |
+| **Institutional Analytics and Read Models** | Projection context | Learner, cohort, school, and program projections for workspaces and interventions. | `insights-svc`, including school-unit intelligence, causal-study drafts, conformal-risk reports, and lifelong-network payloads. |
 | **Agent Evaluation and Governance** | Governance context | Evaluation datasets, policy gates, provenance contracts, degraded-mode policy, and release approval for high-impact AI features. | `evaluation-svc` and [agent-evaluation.md](./agent-evaluation.md). |
 
 Foundry-native agent execution is an implementation concern of the agentic services, not a system of record. The only app-facing agent runtime boundary is `tutor_lib.agents`; provider SDK objects, direct thread/run polling, and Agent Framework orchestration do not cross into bounded contexts.
@@ -138,13 +138,13 @@ All external data enters Tutor through the **Integration Hub**. After normalizat
 | ------------------ | ----------------------------------- | -------- | ----- |
 | **config-svc** | Identity and Tenancy (partial), Enrollment and Lifecycle, Content and Knowledge (rules/flags) | Wave 1 | Transitional control-plane service until learner-record-centered contexts are separated further. |
 | **lms-gateway** | Integration Hub | Wave 1 | The existing adapter model becomes the anti-corruption seam for LMS first, then SIS/CRM later. |
-| **content-svc** | Content and Knowledge | Wave 1 / Wave 2 | Owns approved corpora and grounding policy for assessment and tutoring. |
+| **Future content-svc boundary** | Content and Knowledge | Wave 1 / Wave 2 | Dedicated service remains optional; current approved-content behavior is covered by `config-svc`, Blob Storage, AI Search, and assessment/interaction service integrations. |
 | **essays-svc + questions-svc** | Assessment and Evidence | Wave 1 | Continue generating draft evaluations and evidence, then append governed outcomes into the learner record. |
 | **avatar-svc + chat-svc** | Coaching and Interaction | Wave 1 / Wave 2 | Stay in coaching mode and feed transcripts and evidence into governed projections. |
 | **upskilling-svc** | Advising and Success (early), Institutional Analytics and Read Models (partial) | Wave 2 | Evolves from analysis toward advising cases, interventions, and next-best-action workflows. |
-| **insights-svc** | Institutional Analytics and Read Models plus narrative institutional insights | Wave 2 | Narrative briefings sit on top of deterministic projections and scope controls. |
+| **insights-svc** | Institutional Analytics and Read Models plus narrative institutional insights | Wave 2 | Current home for governed school-unit intelligence, causal-study drafts, conformal-risk reports, and lifelong-network projections. |
 | **evaluation-svc** | Agent Evaluation and Governance | Wave 1 | Becomes the release gate for provenance, evaluation, and degraded-mode policy on high-impact AI. |
 | **Future learner-record context** | Learner Record | Wave 1 | Can start as an append-only event and projection layer before a dedicated service is justified. |
-| **Future catalog/pathways, credentials, and community contexts** | Catalog and Pathways, Credentialing and Portfolio, Community and Network | Waves 2-3 | These contexts can begin inside existing services or shared libraries and split later when ownership or scale requires it. |
+| **Future catalog/pathways dedicated contexts** | Catalog and Pathways | Waves 2-3 | These contexts can begin inside existing services or shared libraries and split later when ownership or scale requires it. |
 
 Dedicated services are optional until domain ownership, operational load, or governance pressure makes a split necessary. The bounded contexts above are the architectural contract; the current service mesh is the transitional implementation.

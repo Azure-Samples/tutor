@@ -23,12 +23,12 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 
 | Aspect | Architecture Response |
 |--------|----------------------|
-| **Service** | `insights-svc` — NEW service in the **Supervision Domain** |
+| **Service** | `insights-svc` — implemented service in the **Supervision Domain** |
 | **Data Source** | Microsoft Fabric semantic model (via REST API / XMLA endpoint) — NOT local data |
 | **AI Capability** | Azure OpenAI (gpt-4o) for narrative synthesis from structured indicators |
 | **Data Model** | `supervision_db` in Cosmos DB: `insight_reports`, `indicator_configs`, `school_profiles` |
-| **ADR** | [ADR-009: Supervisor Insights & Fabric Integration](adr/009-supervisor-fabric-integration.md) |
-| **Modernization Task** | Phase 9 — Supervision Domain |
+| **ADR** | [ADR-003: Service Boundaries and Institutional Insights](adr/003-service-boundaries-institutional-insights.md) |
+| **Modernization Task** | Phase 9 — Supervision Domain; P2/P3 governed intelligence surfaces are live in `108dev` |
 
 ### BN-SUP-2: Pre-Visit Briefing Reports
 
@@ -40,7 +40,7 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 | **Output Format** | Structured JSON with narrative sections: `trends`, `alerts`, `focus_points`, `improvements` |
 | **Refresh Cycle** | Weekly, aligned with Fabric data pipeline schedule |
 | **Frontend** | `/supervision` page with narrative cards, trend sparklines, school selector |
-| **ADR** | [ADR-009](adr/009-supervisor-fabric-integration.md) |
+| **ADR** | [ADR-003](adr/003-service-boundaries-institutional-insights.md) |
 
 ### BN-SUP-3: Modular Indicator System
 
@@ -74,7 +74,7 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 | **Scope Filtering** | `insights-svc` reads supervisor's school assignments from Entra ID claims or Graph API |
 | **Data Isolation** | All queries to Fabric and Cosmos are scoped by `supervisorId` → `schoolIds[]` |
 | **RBAC** | Supervisor can read insight reports and school profiles; cannot modify configurations |
-| **ADR** | [ADR-009](adr/009-supervisor-fabric-integration.md), [ADR-008](adr/008-security-layers.md) |
+| **ADR** | [ADR-003](adr/003-service-boundaries-institutional-insights.md), [ADR-004](adr/004-security-zero-trust.md) |
 
 ---
 
@@ -91,7 +91,7 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 | **ENEM Rubrics** | New strategy: `ENEMStrategy` in essays service — evaluates across ENEM's 5 competencies |
 | **Discursive Questions** | `questions-svc` extended with `DiscursiveState` — handles open-ended answers (not just multiple-choice) |
 | **Azure Service** | Azure AI Document Intelligence (cloud) for OCR — no local processing |
-| **ADR** | [ADR-010: Pedagogical Content & OCR](adr/010-pedagogical-content-ocr.md) |
+| **ADR** | [ADR-006: Pedagogical Content, OCR, and RAG](adr/006-pedagogical-content-ocr-rag.md) |
 
 ### BN-PED-2: Curated Pedagogical Material Ingestion
 
@@ -99,12 +99,12 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 
 | Aspect | Architecture Response |
 |--------|----------------------|
-| **Service** | `content-svc` — NEW service in the **Platform Domain** |
+| **Service** | Future `content-svc` boundary; current implementation uses configuration-managed rules, Blob Storage, AI Search, and assessment/interaction service integrations |
 | **Storage** | Azure Blob Storage for documents + Azure AI Search for vector index |
 | **Ingestion Pipeline** | Upload → Document Intelligence (extraction) → AI Search (chunking + embedding) |
 | **RAG Pattern** | Assessment domain services query AI Search for relevant pedagogical context before LLM inference |
 | **Governance** | Only `teacher` and `admin` roles can upload materials; versioned with approval workflow |
-| **ADR** | [ADR-010](adr/010-pedagogical-content-ocr.md) |
+| **ADR** | [ADR-006](adr/006-pedagogical-content-ocr-rag.md) |
 
 ### BN-PED-3: Virtual Tutor/Mentor During Writing
 
@@ -112,9 +112,9 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 
 | Aspect | Architecture Response |
 |--------|----------------------|
-| **Service** | `chat-svc` (planned) — extended with **guided tutoring mode** |
+| **Service** | `chat-svc` — implemented guided tutoring mode |
 | **Behavior** | Proactive intervention based on configurable triggers (idle time, error patterns, confidence thresholds) |
-| **Context** | Chat agent retrieves relevant rubrics and exemplars from `content-svc` via AI Search |
+| **Context** | Chat agent retrieves approved pedagogical context through current configuration and AI Search integrations; a dedicated `content-svc` can own this later |
 | **Integration** | Embedded in essay submission UI — student writes while tutor provides inline guidance |
 | **Avatar** | `avatar-svc` for voice-based tutoring sessions alongside text-based `chat-svc` |
 | **Guardrails** | Configurable limits on response frequency, topic scope, and answer-giving prevention |
@@ -125,9 +125,9 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 
 | Aspect | Architecture Response |
 |--------|----------------------|
-| **Status** | **Already addressed** — Current codebase uses `azure-ai-agents` and `azure-ai-projects` SDKs |
-| **Agent Framework** | Azure AI Foundry Agents (not Semantic Kernel) for all agent orchestration |
-| **ADR** | [ADR-005: Foundry Agent Evaluation](adr/005-foundry-evaluation.md) |
+| **Status** | **Already addressed** — Current codebase uses Microsoft Foundry Agent Service through `tutor_lib.agents` per ADR-008 |
+| **Agent Runtime** | Foundry-managed, named/versioned agents behind the shared facade; Microsoft Agent Framework runtime dependencies are superseded |
+| **ADR** | [ADR-008: Foundry Agent Runtime and Evaluation Governance](adr/008-foundry-agent-runtime-evaluation.md) |
 
 ### BN-PED-5: Configurable Pedagogical Rules
 
@@ -157,6 +157,14 @@ The Tutor operates within a **state education department** ecosystem as an AI-po
 ## 4. Traceability Matrix
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph "Supervisor Insights Agenda"
         SUP1["BN-SUP-1\nInsight Generation"]
@@ -176,11 +184,11 @@ graph TB
     end
 
     subgraph "Architecture Components"
-        INSIGHTS["insights-svc\n(NEW)"]
-        CONTENT["content-svc\n(NEW)"]
+        INSIGHTS["insights-svc\n(IMPLEMENTED)"]
+        CONTENT["content-svc\n(FUTURE BOUNDARY)"]
         ESSAYS["essays-svc\n(UPDATED)"]
         QUESTIONS["questions-svc\n(UPDATED)"]
-        CHAT["chat-svc\n(NEW)"]
+        CHAT["chat-svc\n(IMPLEMENTED)"]
         AVATAR["avatar-svc\n(EXISTING)"]
         CONFIG["config-svc\n(UPDATED)"]
         EVAL["evaluation-svc\n(NEW)"]
@@ -231,10 +239,10 @@ The following cloud services are **additions** to the infrastructure, driven dir
 
 | Azure Service | Business Need | Purpose | ADR |
 |---------------|---------------|---------|-----|
-| **Microsoft Fabric** (external) | BN-SUP-1,2,3 | Read-only access to the department's semantic model for educational indicators | ADR-009 |
-| **Azure AI Document Intelligence** | BN-PED-1 | OCR for handwritten essay scanning | ADR-010 |
-| **Azure AI Search** | BN-PED-2 | Vector index over pedagogical materials for RAG grounding | ADR-010 |
-| **Entra ID** (supervisor role) | BN-SUP-5 | Supervisor-scoped RBAC with school assignments | ADR-008 |
+| **Microsoft Fabric** (external) | BN-SUP-1,2,3 | Read-only access to the department's semantic model for educational indicators | ADR-003 |
+| **Azure AI Document Intelligence** | BN-PED-1 | OCR for handwritten essay scanning | ADR-006 |
+| **Azure AI Search** | BN-PED-2 | Vector index over pedagogical materials for RAG grounding | ADR-006 |
+| **Entra ID** (supervisor role) | BN-SUP-5 | Supervisor-scoped RBAC with school assignments | ADR-004 |
 
 All services are provisioned via Terraform with AVM. No local emulators, no simulated services.
 
@@ -246,7 +254,7 @@ The original 4-domain architecture (Platform, Assessment, Interaction, Analytics
 
 | Domain | Services | Business Agenda |
 |--------|----------|-----------------|
-| **Platform** (Non-Agentic) | config-svc, lms-gateway, content-svc | BN-PED-2, BN-PED-5, BN-SUP-5, BN-PED-6 |
+| **Platform** (Non-Agentic) | config-svc, lms-gateway; future content-svc boundary | BN-PED-2, BN-PED-5, BN-SUP-5, BN-PED-6 |
 | **Assessment** (Agentic) | essays-svc, questions-svc | BN-PED-1, BN-PED-5 |
 | **Interaction** (Agentic) | avatar-svc, chat-svc | BN-PED-3 |
 | **Analytics** (Agentic) | upskilling-svc, evaluation-svc | BN-PED-4, BN-PED-6 |
@@ -266,7 +274,7 @@ The original 4-domain architecture (Platform, Assessment, Interaction, Analytics
 | **AI Document Intelligence** | Dev environment uses real cloud endpoint |
 | **AI Search** | Dev environment uses real Azure AI Search (Basic tier) |
 | **Microsoft Fabric** | Dev environment uses real Fabric workspace with read-only service principal |
-| **Container Runtime** | All services deploy to ACA `dev` environment; local runs use `azd deploy` to dev |
+| **Container Runtime** | All services deploy to ACA through the approved GitHub workflows; local `azd provision` / `azd deploy` is limited to first-time bootstrap or documented break-glass work |
 | **Why** | Emulators diverge from cloud behavior (feature gaps, consistency models, SDK compatibility). Cloud-only ensures parity across all environments |
 
 ---
@@ -278,7 +286,7 @@ The original 4-domain architecture (Platform, Assessment, Interaction, Analytics
 | Solution Overview | [solution-overview.md](solution-overview.md) |
 | Architecture | [architecture.md](architecture.md) |
 | Service Domains | [service-domains.md](service-domains.md) |
-| ADR-009: Supervisor Insights | [adr/009-supervisor-fabric-integration.md](adr/009-supervisor-fabric-integration.md) |
-| ADR-010: Pedagogical Content & OCR | [adr/010-pedagogical-content-ocr.md](adr/010-pedagogical-content-ocr.md) |
+| ADR-003: Service Boundaries and Institutional Insights | [adr/003-service-boundaries-institutional-insights.md](adr/003-service-boundaries-institutional-insights.md) |
+| ADR-006: Pedagogical Content, OCR, and RAG | [adr/006-pedagogical-content-ocr-rag.md](adr/006-pedagogical-content-ocr-rag.md) |
 | Modernization Plan | [modernization-plan.md](modernization-plan.md) |
 | Security | [security.md](security.md) |

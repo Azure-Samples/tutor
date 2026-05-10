@@ -23,10 +23,10 @@ Relevant anchors:
 - [docs/architecture.md](./architecture.md)
 - [docs/service-domains.md](./service-domains.md)
 - [docs/modernization-plan.md](./modernization-plan.md)
-- [docs/adr/001-lms-enhancer-platform.md](./adr/001-lms-enhancer-platform.md)
-- [docs/adr/006-domain-decoupling.md](./adr/006-domain-decoupling.md)
-- [docs/adr/007-frontend-modernization.md](./adr/007-frontend-modernization.md)
-- [docs/adr/011-foundry-first-agent-architecture.md](./adr/011-foundry-first-agent-architecture.md)
+- [docs/adr/007-learner-record-platform-distribution.md](./adr/007-learner-record-platform-distribution.md)
+- [docs/adr/003-service-boundaries-institutional-insights.md](./adr/003-service-boundaries-institutional-insights.md)
+- [docs/adr/005-frontend-modernization-workspace-ux.md](./adr/005-frontend-modernization-workspace-ux.md)
+- [docs/adr/008-foundry-agent-runtime-evaluation.md](./adr/008-foundry-agent-runtime-evaluation.md)
 
 ### External Signals
 

@@ -137,7 +137,7 @@ flowchart TB
 
 | Layer | Primary bounded contexts | Design intent | Current repo anchors |
 | ----- | ------------------------ | ------------- | -------------------- |
-| **Deterministic core** | Identity and Tenancy, Integration Hub, Catalog and Pathways, Enrollment and Lifecycle, Learner Record, Content and Knowledge, Credentialing and Portfolio, Community and Network, Governance and Provenance | Own institutional records, policies, lifecycle state, and provenance | `config-svc`, `lms-gateway`, `content-svc`, shared auth middleware, and future learner-record / credential contexts |
+| **Deterministic core** | Identity and Tenancy, Integration Hub, Catalog and Pathways, Enrollment and Lifecycle, Learner Record, Content and Knowledge, Credentialing and Portfolio, Community and Network, Governance and Provenance | Own institutional records, policies, lifecycle state, and provenance | `config-svc`, `lms-gateway`, shared auth middleware, `tutor_lib.intelligence`, `tutor_lib.lifelong_network`, and future learner-record / credential contexts |
 | **Agentic services** | Assessment and Evidence, Coaching and Interaction, Advising and Success, Institutional Insights, Agent Evaluation | Constrain probabilistic reasoning to high-value educational workflows | `essays-svc`, `questions-svc`, `avatar-svc`, `chat-svc`, `upskilling-svc`, `insights-svc`, `evaluation-svc` |
 | **Read models** | Learner timeline, work queues, cohort and school projections, alumni re-entry views | Project append-only records into role-specific experiences | Existing dashboards plus future role-aware workspace shell |
 
@@ -165,6 +165,14 @@ flowchart TB
 > - Steps 9 (ENEM strategy + Foundry evaluation): ⏳ Phase B
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Student
@@ -202,6 +210,14 @@ sequenceDiagram
 ### 3.2 Question Evaluation Flow (State Machine)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Student
@@ -236,6 +252,14 @@ sequenceDiagram
 ### 3.3 Avatar Interaction Flow
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Student
@@ -272,6 +296,14 @@ sequenceDiagram
 ### 3.4 Upskilling Plan Management Flow
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Professor
@@ -318,6 +350,14 @@ sequenceDiagram
 ### 3.5 Configuration CRUD Flow
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Admin as Professor / Admin
@@ -348,6 +388,14 @@ sequenceDiagram
 ### 3.6 Agent Evaluation Flow (New)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Admin as Platform Admin
@@ -379,6 +427,14 @@ sequenceDiagram
 ### 3.7 LMS Gateway Sync Flow (New)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     participant Scheduler as Cron / Event Trigger
@@ -400,6 +456,14 @@ sequenceDiagram
 ### 3.8 Supervisor Insight Report Flow (New)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Supervisor
@@ -436,15 +500,25 @@ sequenceDiagram
     UI-->>Supervisor: Display Strava-like briefing cards
 ```
 
-### 3.9 Pedagogical Content Ingestion Flow (New)
+### 3.9 Pedagogical Content Ingestion Flow (Future Boundary)
+
+This flow describes the future dedicated `content-svc` split. Current approved-content behavior is handled through configuration-managed rules, Blob Storage, AI Search integrations, and assessment/interaction service code until a separate content service is justified.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Teacher
     participant UI as Tutor UI
     participant APIM as API Gateway
-    participant Content as Content Service
+    participant Content as Future Content Service
     participant Blob as Blob Storage
     participant DocIntel as AI Document Intelligence
     participant AISearch as Azure AI Search
@@ -471,6 +545,14 @@ sequenceDiagram
 ### 3.10 Guided Tutoring Flow (Chat Service)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 sequenceDiagram
     autonumber
     actor Student
@@ -507,6 +589,14 @@ sequenceDiagram
 ## 4. Deployment Topology (Current Runtime Substrate)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph Azure["Azure Subscription"]
         subgraph RG["Resource Group: tutor-rg"]
@@ -517,7 +607,6 @@ graph TB
                     subgraph Platform["Platform Domain"]
                         CONFIG["config-svc"]
                         LMS_GW["lms-gateway"]
-                        CONTENT["content-svc"]
                     end
 
                     subgraph Assessment["Assessment Domain"]
@@ -563,7 +652,7 @@ graph TB
             AI_SEARCH["Azure AI Search"]
         end
         
-        FOUNDRY["Microsoft Foundry Project\n(project endpoint,\nworkflow-managed — ADR-015)"]
+        FOUNDRY["Microsoft Foundry Project\n(project endpoint,\nworkflow-managed — ADR-008)"]
         SWA["Static Web App (Frontend)"]
         ENTRA["Microsoft Entra ID"]
     end
@@ -597,6 +686,14 @@ graph TB
 Following the [holiday-peak-hub](https://github.com/Azure-Samples/holiday-peak-hub) reference, all services consume a shared `lib/` package.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph lib["lib/ (tutor-lib)"]
         CONFIG["config/\nAppFactory, Settings"]
@@ -610,7 +707,7 @@ graph TB
         FABRIC_CLIENT["fabric/\nFabric REST API client"]
     end
     
-    subgraph services["Service Layer (10 Container Apps)"]
+    subgraph services["Service Layer (9 Container Apps)"]
         ESSAYS_SVC["essays-svc"]
         QUESTIONS_SVC["questions-svc"]
         AVATAR_SVC["avatar-svc"]
@@ -619,7 +716,6 @@ graph TB
         CONFIG_SVC["config-svc"]
         EVAL_SVC["evaluation-svc"]
         LMS_GW_SVC["lms-gateway"]
-        CONTENT_SVC["content-svc"]
         INSIGHTS_SVC["insights-svc"]
     end
     
@@ -631,7 +727,6 @@ graph TB
     CONFIG_SVC --> lib
     EVAL_SVC --> lib
     LMS_GW_SVC --> lib
-    CONTENT_SVC --> lib
     INSIGHTS_SVC --> lib
 ```
 
@@ -640,6 +735,14 @@ graph TB
 ## 6. Wave 1 Data Model (Cosmos DB Partitioning)
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 erDiagram
     STUDENT {
         string id PK
@@ -744,6 +847,14 @@ erDiagram
 ## 7. Wave 1 Frontend Component Architecture
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph NextJS["Next.js 15 App Router"]
         LAYOUT["layout.tsx\n(DefaultLayout + Providers)"]
@@ -755,8 +866,9 @@ graph TB
             AVATAR_PAGE["/avatar"]
             CONFIG_PAGE["/configuration"]
             EVAL_PAGE["/evaluation"]
-            SUPERVISION_PAGE["/supervision (new)"]
-            CONTENT_PAGE["/content (new)"]
+            SUPERVISOR_BRIEFINGS["/workspace/supervisor/briefings"]
+            PRINCIPAL_HEALTH["/workspace/principal/school-health"]
+            ALUMNI_RECORD["/workspace/alumni/record"]
         end
         
         subgraph Components["Component Library"]
@@ -782,15 +894,15 @@ graph TB
                 AVATAR_PARAMS["AvatarParameterSelector"]
             end
 
-            subgraph Supervision_UI["Supervision (new)"]
+            subgraph Supervision_UI["Governed Intelligence"]
                 BRIEFING["BriefingReport\n(Strava-like narrative)"]
+                GOVERNED_PANEL["GovernedIntelligencePanel\nschool-unit, causal draft, conformal risk"]
                 SCHOOL_SELECT["SchoolSelector\n(scoped to supervisor)"]
                 INDICATOR_TRENDS["IndicatorTrends\n(sparkline cards)"]
             end
 
-            subgraph Content_UI["Content (new)"]
-                MATERIAL_UPLOAD["MaterialUpload"]
-                MATERIAL_LIST["MaterialLibrary"]
+            subgraph Alumni_UI["Lifelong Network"]
+                NETWORK_PANEL["LifelongNetworkPanel\ncredentials, portfolio, re-entry, research governance"]
             end
         end
         
@@ -800,7 +912,7 @@ graph TB
         end
         
         subgraph API_Layer["API Layer"]
-            API_CLIENTS["Typed axios clients\n(per service, 10 total)"]
+            API_CLIENTS["Typed axios clients\n(per service + workspace APIs)"]
         end
     end
     
@@ -816,13 +928,21 @@ graph TB
 
 This section documents the **as-implemented** internal architecture of each microservice, showing how design patterns, agent orchestration, and Azure service integrations are wired in code.
 
-> **Foundry Agent Service Native Architecture (ADR-015):** Agent definitions, versions, conversations, responses, tool calls, traces, and evaluations are managed through Microsoft Foundry Agent Service. Application services call the `tutor_lib.agents` facade with `AgentReference`, `AgentInvocationRequest`, and `AgentInvocationResult` contracts; new writes use `agent_name` and `agent_version`. Microsoft Agent Framework, `AzureAIAgentClient`, direct thread/run polling, and `agent_id` as the primary app-facing contract are superseded. Cosmos DB still stores owned domain data and migration-era lightweight references, while learner-record and role-workspace projections carry governed provenance.
+> **Foundry Agent Runtime and Evaluation Governance (ADR-008):** Agent definitions, versions, conversations, responses, tool calls, traces, and evaluations are managed through Microsoft Foundry Agent Service. Application services call the `tutor_lib.agents` facade with `AgentReference`, `AgentInvocationRequest`, and `AgentInvocationResult` contracts; new writes use `agent_name` and `agent_version`. Microsoft Agent Framework, `AzureAIAgentClient`, direct thread/run polling, and `agent_id` as the primary app-facing contract are superseded. Cosmos DB still stores owned domain data and migration-era lightweight references, while learner-record and role-workspace projections carry governed provenance.
 
 ### 8.1 Essays Service — Strategy + Orchestrator Pattern
 
 The essays service uses a **Strategy pattern** to select the evaluation approach and an **Orchestrator** to compose OCR, RAG, and Foundry agent execution.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     API["POST /grader/interaction\nPOST /essays/{id}/evaluate\nPATCH /essays/{id}"]
     ORCH["EssayOrchestrator.invoke()"]
@@ -863,10 +983,10 @@ flowchart TD
 
 - **Cosmos DB**: Assemblies (Foundry agent references), essays, resources
 - **Blob Storage**: Original essay documents and resource files
-- **Azure AI Foundry**: Agent execution via `AzureAIAgentClient` + `ChatAgent` (threads, messages, file uploads)
+- **Azure AI Foundry**: Agent execution through `tutor_lib.agents` with named/versioned Foundry Agent Service assets and `AgentInvocationRequest` / `AgentInvocationResult`
 - **AI Document Intelligence**: OCR for handwritten essay scanning (required — no fallback)
 - **AI Search** (target): RAG grounding for rubrics and exemplars
-- **Agent Framework rc3**: `SequentialBuilder` for OCR → strategy → grading → synthesis pipeline
+- **Pipeline composition**: service-owned orchestration composes OCR → strategy → grounding → Foundry invocation → response parsing without Agent Framework runtime dependencies
 - **Partial updates**: `PATCH /essays/{id}` via `EssayPatch` model; `PUT` filters `None` values to prevent destructive overwrites of linked fields like `assembly_id`
 
 ---
@@ -876,6 +996,14 @@ flowchart TD
 The questions service implements a **State Machine** for evaluation lifecycle with parallel agent dimension grading.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 stateDiagram-v2
     [*] --> PendingState: evaluate_question() called
     PendingState --> EvaluatingState: transition()
@@ -885,6 +1013,14 @@ stateDiagram-v2
 ```
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     API["POST /grader/interaction"]
     MACHINE["QuestionStateMachine(assembly_id, question, answer)"]
@@ -897,14 +1033,14 @@ flowchart TD
     end
 
     subgraph Parallel["Parallel Dimension Evaluation"]
-        DIM1["Grader: dimension_1\nagent via AgentRegistry"]
-        DIM2["Grader: dimension_2\nagent via AgentRegistry"]
-        DIM_N["Grader: dimension_N\nagent via AgentRegistry"]
+        DIM1["Grader: dimension_1\nAgentReference(name, version)"]
+        DIM2["Grader: dimension_2\nAgentReference(name, version)"]
+        DIM_N["Grader: dimension_N\nAgentReference(name, version)"]
     end
 
     PROMPT["PromptComposer.render()\ncorrect.jinja + question + answer"]
-    AGENT["AzureAIAgentClient(agent_id)\n→ ChatAgent from Foundry"]
-    RUN["ChatAgent.run(prompt)\n→ AgentRunResponse"]
+    AGENT["tutor_lib.agents.invoke()\nAgentReference(name, version)"]
+    RUN["AgentInvocationResult\ncontent + provenance + trace"]
     CONFIDENCE["_infer_confidence(notes)"]
     COMPLETED["CompletedState(result)\nQuestionEvaluationResult"]
 
@@ -922,7 +1058,7 @@ flowchart TD
 **Key integration points:**
 
 - **Cosmos DB**: Assemblies (Foundry agent references), questions, answers, graders
-- **Azure AI Foundry**: Agent execution via Agent Framework rc3 (`ChatAgent` + `ConcurrentBuilder` for parallel dimensions)
+- **Azure AI Foundry**: Agent execution through `tutor_lib.agents`; the service coordinates parallel dimension prompts and captures Foundry provenance
 - **Jinja2**: Prompt rendering with question/answer context per grading dimension
 
 ---
@@ -932,6 +1068,14 @@ flowchart TD
 The avatar service orchestrates **conversational AI tutoring** backed by case profiles loaded from Cosmos DB.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     API_RESP["POST /response"]
     API_PROF["GET /profile"]
@@ -941,9 +1085,9 @@ flowchart TD
         EVALUATE["_evaluate(case, prompt_data)"]
         HISTORY["_coerce_history()\nparse chat_history JSON"]
         SYSTEM_MSG["SIMULATION_PROMPT\nTemplate substitution:\nname, profile, role, steps, case, previous_chat"]
-        AGENT_SPEC["AgentRef from Assembly\n(Foundry agent_id + deployment)"]
-        REGISTRY["AzureAIAgentClient(agent_id)\n→ ChatAgent"]
-        RUN_CTX["ChatAgent.run(prompt)\n→ AgentRunResponse"]
+        AGENT_SPEC["AgentReference from Assembly\n(agent_name + agent_version)"]
+        REGISTRY["tutor_lib.agents facade\n→ Foundry Agent Service"]
+        RUN_CTX["AgentInvocationResult\ntext + trace metadata"]
         EXTRACT["_extract_text(response)"]
     end
 
@@ -971,7 +1115,7 @@ flowchart TD
 **Key integration points:**
 
 - **Cosmos DB**: Case profiles (steps, patient data) for avatar persona
-- **Azure AI Foundry** (via Agent Framework rc3): Conversation generation with `ChatAgent`
+- **Azure AI Foundry**: Conversation generation via `tutor_lib.agents` and Foundry Agent Service
 - **Azure Speech** (target): TTS/STT + WebRTC for voice interaction
 
 ---
@@ -981,6 +1125,14 @@ flowchart TD
 The upskilling service evaluates professor lesson plans paragraph-by-paragraph using multiple **Visitor agents** and an **async iterator**.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     API["POST /plans/{plan_id}/evaluate"]
     ORCH["PlanEvaluationOrchestrator.evaluate(request)"]
@@ -1000,7 +1152,7 @@ flowchart TD
     end
 
     PROMPT["PromptComposer.render()\nJinja2 template with paragraph + context"]
-    AGENT_RUN["ChatAgent.run(prompt) via AzureAIAgentClient\nFoundry agent loaded by agent_id"]
+    AGENT_RUN["tutor_lib.agents.invoke()\nFoundry agent loaded by name/version"]
     PARSE["_parse_feedback(text)\n→ verdict, strengths, improvements"]
     EVAL["ParagraphEvaluation\n{paragraph_index, title, feedback[]}"]
     RESULT["PlanEvaluationResponse\n{timeframe, topic, evaluations[]}"]
@@ -1019,9 +1171,9 @@ flowchart TD
 
 **Key integration points:**
 
-- **Azure AI Foundry**: Three specialized agents per paragraph evaluation (loaded by Foundry agent_id)
+- **Azure AI Foundry**: Three specialized agents per paragraph evaluation (loaded by Foundry agent name/version)
 - **Jinja2**: Template-driven prompt composition with performance history context
-- **tutor_lib**: Shared `ChatAgent` wrappers, `AzureAIAgentClient`, `Assembly` models
+- **tutor_lib**: Shared agent facade, `AgentReference`, `AgentInvocationRequest`, `AgentInvocationResult`, and `Assembly` models
 
 ---
 
@@ -1030,6 +1182,14 @@ flowchart TD
 The configuration service manages roster data with a **repository pattern** and provides bulk LMS synchronization.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     subgraph CRUD["Entity CRUD Operations"]
         direction TB
@@ -1070,6 +1230,14 @@ flowchart TD
 The LMS gateway implements the **Adapter pattern** for external LMS providers and a **background job queue** for async sync operations.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     subgraph Endpoints
         SYNC["POST /lms/sync\n(immediate)"]
@@ -1129,6 +1297,14 @@ flowchart TD
 The evaluation service manages **golden datasets** and **evaluation runs** for agent quality measurement.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     subgraph DatasetOps["Dataset Management"]
         CREATE_DS["POST /datasets\nDatasetRequest → DatasetRecord"]
@@ -1162,10 +1338,10 @@ flowchart TD
 
 **Integration** (evaluation execution pipeline):
 
-- **Azure AI Foundry**: Execute target agent against golden dataset cases via `AzureAIAgentClient`
+- **Azure AI Foundry**: Execute target agent against golden dataset cases through `tutor_lib.agents`
 - **Foundry Evaluators**: Score with groundedness, relevance, coherence, fluency
 - **Cosmos DB**: Persist run results and quality trend data
-- **Agent Framework rc3**: `SequentialBuilder` for agent run → evaluator run → metric collection
+- **Evaluation orchestration**: service-owned run lifecycle invokes target agent, invokes evaluators, and records metrics without Agent Framework runtime dependencies
 
 ---
 
@@ -1174,6 +1350,14 @@ flowchart TD
 The chat service is scaffolded for **guided writing support** that provides hints without direct answers.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 flowchart TD
     API["POST /guide"]
     REQ["GuidanceRequest\n{student_id, course_id, prompt}"]
@@ -1200,6 +1384,14 @@ flowchart TD
 This diagram shows how all **implemented** services connect through the shared infrastructure.
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph Frontend["Next.js SPA"]
         UI["Tutor UI\n(Static Web App)"]
@@ -1225,10 +1417,16 @@ graph TB
         EVALUATION["evaluation-svc\nFastAPI :8086\nDataset + Run Pipeline"]
     end
 
+    subgraph Supervision["Supervision Domain"]
+        INSIGHTS["insights-svc\nFastAPI\nCQRS Projection + Governance"]
+    end
+
     subgraph SharedLib["tutor-lib"]
         LIB_CONFIG["config/\nSettings, AppFactory"]
         LIB_COSMOS["cosmos/\nCosmosCRUD"]
-        LIB_AGENTS["agents/\nChatAgent, AzureAIAgentClient\nSequentialBuilder, ConcurrentBuilder"]
+        LIB_AGENTS["agents/\nAgentReference, InvocationRequest\nInvocationResult, Foundry facade"]
+        LIB_INTEL["intelligence/\nGovernance metadata contracts"]
+        LIB_NETWORK["lifelong_network/\nCredential, portfolio, alumni contracts"]
     end
 
     subgraph Azure["Azure Services"]
@@ -1241,9 +1439,10 @@ graph TB
 
     subgraph External["External"]
         EXT_LMS["Moodle / Canvas\nLMS APIs"]
+        FABRIC["Microsoft Fabric\nSemantic model"]
     end
 
-    UI --> CONFIG & ESSAYS & QUESTIONS & AVATAR & CHAT & UPSKILLING & EVALUATION
+    UI --> CONFIG & ESSAYS & QUESTIONS & AVATAR & CHAT & UPSKILLING & EVALUATION & INSIGHTS
 
     CONFIG --> LIB_CONFIG & LIB_COSMOS --> COSMOS
     LMS_GW --> LIB_CONFIG
@@ -1264,19 +1463,24 @@ graph TB
 
     EVALUATION --> LIB_COSMOS
     EVALUATION --> COSMOS
+
+    INSIGHTS --> LIB_COSMOS & LIB_INTEL & LIB_NETWORK
+    INSIGHTS --> COSMOS
+    INSIGHTS --> FABRIC
 ```
 
 ---
 
 ### 8.10 Design Pattern Summary
 
-| Service | Pattern | Agent Framework (rc3) | Orchestration | Persistence | External AI |
-| ------- | ------- | --------------------- | ------------- | ----------- | ----------- |
-| **essays-svc** | Strategy + Orchestrator | `ChatAgent` via `AzureAIAgentClient` | `SequentialBuilder` (OCR → strategy → grading → synthesis) | Cosmos DB (assemblies) + Blob | AI Foundry, Doc Intel, AI Search |
-| **questions-svc** | State Machine | `ChatAgent` via `AzureAIAgentClient` | `ConcurrentBuilder` (parallel dimension grading) | Cosmos DB (assemblies) | AI Foundry |
-| **avatar-svc** | Agent + Speech | `ChatAgent` via `AzureAIAgentClient` | Single agent with conversation memory | Cosmos DB (cases) | AI Foundry, Speech |
-| **upskilling-svc** | Visitor + Async Iterator | `ChatAgent` via `AzureAIAgentClient` | `ConcurrentBuilder` (visitors) → `SequentialBuilder` (aggregation) | Cosmos DB | AI Foundry |
+| Service | Pattern | Agent runtime boundary | Orchestration | Persistence | External AI |
+| ------- | ------- | ---------------------- | ------------- | ----------- | ----------- |
+| **essays-svc** | Strategy + Orchestrator | `tutor_lib.agents` Foundry Agent Service facade | OCR → strategy → grounding → agent invocation → synthesis | Cosmos DB (assemblies) + Blob | AI Foundry, Doc Intel, AI Search |
+| **questions-svc** | State Machine | `tutor_lib.agents` Foundry Agent Service facade | Service-owned parallel dimension grading | Cosmos DB (assemblies) | AI Foundry |
+| **avatar-svc** | Agent + Speech | `tutor_lib.agents` Foundry Agent Service facade | Single conversation path with governed case context | Cosmos DB (cases) | AI Foundry, Speech |
+| **upskilling-svc** | Visitor + Async Iterator | `tutor_lib.agents` Foundry Agent Service facade | Visitor prompts plus advisory training-plan projection | Cosmos DB | AI Foundry |
 | **config-svc** | Repository + Bulk Sync | N/A (non-agentic) | N/A | Cosmos DB | None |
 | **lms-gateway** | Adapter + Job Queue | N/A (non-agentic) | N/A | Cosmos DB | External LMS APIs |
-| **evaluation-svc** | Dataset + Run Pipeline | Foundry Evaluators | `SequentialBuilder` (agent run → evaluator → metrics) | Cosmos DB | AI Foundry |
-| **chat-svc** | Guided Tutoring (scaffold) | `ChatAgent` via `AzureAIAgentClient` | Single agent with guardrails | Cosmos DB | AI Foundry, AI Search |
+| **evaluation-svc** | Dataset + Run Pipeline | `tutor_lib.agents` + Foundry Evaluators | Target run → evaluator run → metric collection | Cosmos DB | AI Foundry |
+| **chat-svc** | Guided Tutoring | `tutor_lib.agents` Foundry Agent Service facade | Single guidance path with answer-avoidance guardrails | Cosmos DB | AI Foundry, AI Search |
+| **insights-svc** | CQRS Projection + Governance | Optional synthesis through `tutor_lib.agents`; deterministic projections first | School-unit intelligence, causal-study drafts, conformal-risk reports, lifelong-network payloads | Cosmos DB | Fabric, AI Foundry/OpenAI as governed synthesis |

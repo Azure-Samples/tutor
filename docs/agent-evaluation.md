@@ -26,6 +26,14 @@ Without systematic evaluation, there is no way to:
 ## 2. Evaluation Architecture
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph Evaluation Service
         RUNNER["Foundry Runner"]
@@ -301,7 +309,7 @@ class GuardrailComplianceEvaluator:
 
 ## 6. Evaluation API
 
-ADR-015 changes the release-gate identity model from opaque `agentId` values to Foundry Agent Service `agent_name` and `agent_version` references. Existing `agent_id` fields may remain as read-only migration compatibility, but new evaluation runs should persist an `AgentEvaluationReference` containing dataset lineage, thresholds, evaluation run id, trace or report URI, status, and approval state.
+ADR-008 changes the release-gate identity model from opaque `agentId` values to Foundry Agent Service `agent_name` and `agent_version` references. Existing `agent_id` fields may remain as read-only migration compatibility, but new evaluation runs should persist an `AgentEvaluationReference` containing dataset lineage, thresholds, evaluation run id, trace or report URI, status, and approval state.
 
 High-impact agent versions must pass the ten-evaluator panel and the three adversarial reviews documented in [Foundry Native Implementation Epics](./foundry-native-implementation-epics.md). Safety, groundedness, relevance, rubric alignment, discursive accuracy, privacy, and degraded-state behavior can block release.
 
@@ -324,7 +332,8 @@ GET    /api/evaluation/metrics/trends         # Quality trends over time
 
 ```json
 {
-    "agentId": "essay-evaluator-v2",
+    "agentName": "essay-evaluator",
+    "agentVersion": "2.0.0",
     "datasetId": "essay-golden-v1",
     "evaluators": ["groundedness", "relevance", "coherence", "fluency", "pedagogical_accuracy"],
     "config": {
@@ -341,7 +350,8 @@ GET    /api/evaluation/metrics/trends         # Quality trends over time
 {
     "runId": "eval-run-20260224-001",
     "status": "completed",
-    "agentId": "essay-evaluator-v2",
+    "agentName": "essay-evaluator",
+    "agentVersion": "2.0.0",
     "datasetId": "essay-golden-v1",
     "startedAt": "2026-02-24T10:00:00Z",
     "completedAt": "2026-02-24T10:05:23Z",
@@ -419,6 +429,14 @@ async def start_session(request: SessionRequest):
 ### 7.3 Frontend Selector
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph LR
     subgraph AvatarParameterSelector
         VOICE["Voice Selector\n(dropdown)"]

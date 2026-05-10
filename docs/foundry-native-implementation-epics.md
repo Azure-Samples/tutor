@@ -44,7 +44,7 @@ The reasoning procedure is: evidence fit, adversarial critique, then decision an
 
 ## Wave 0 Epics
 
-### FN-00-01: ADR-015 Foundry Agent Service Native Architecture
+### FN-00-01: ADR-008 Foundry Agent Runtime and Evaluation Governance
 
 | Field | Value |
 | ----- | ----- |
@@ -55,16 +55,16 @@ The reasoning procedure is: evidence fit, adversarial critique, then decision an
 
 **Business context:** Restores architectural clarity before code migration and removes the conflict between learner-record platform goals and Agent Framework runtime coupling.
 
-**Scope:** Add ADR-015 and mark conflicting ADR-011/012 sections as superseded without discarding valid Foundry-managed-agent, Cosmos-domain-data, and workflow-only deployment decisions.
+**Scope:** Use consolidated ADR-008 as the authority for Foundry Agent Service runtime, retained Foundry-managed-agent decisions, Cosmos-domain-data boundaries, evaluation gates, and workflow-only deployment decisions.
 
 **Acceptance criteria:**
 
-- ADR-015 declares Foundry Agent Service as the canonical runtime.
-- ADR-015 prohibits Agent Framework runtime usage in `apps/` and `lib/`.
-- ADR-015 defines app-facing contracts by `agent_name` and `agent_version`.
-- ADR-015 states retention, provenance, safety, degraded mode, and human-review requirements.
+- ADR-008 declares Foundry Agent Service as the canonical runtime.
+- ADR-008 prohibits Agent Framework runtime usage in `apps/` and `lib/`.
+- ADR-008 defines app-facing contracts by `agent_name` and `agent_version`.
+- ADR-008 states retention, provenance, safety, degraded mode, and human-review requirements.
 
-**Quality gates:** Architecture review, CodeReviewer documentation review, `rg "Agent Framework rc3|AzureAIAgentClient" docs` limited to historical/superseded context.
+**Quality gates:** Architecture review, CodeReviewer documentation review, `rg "Agent Framework rc3|AzureAIAgentClient" docs` limited to migration context.
 
 ### FN-00-02: Documentation Alignment
 

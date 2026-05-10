@@ -26,7 +26,7 @@
 # 1.0.0 (2025-03-09)
 
 *Features*
-* **OCR Phase A** — Document Intelligence SDK integration in essays service (`file_processing.py`), with `pypdf`/PIL fallback for local development (ADR-010)
+* **OCR Phase A** — Document Intelligence SDK integration in essays service (`file_processing.py`), with `pypdf`/PIL fallback for local development (ADR-006)
 * **Essay PATCH endpoint** — `PATCH /essays/{essay_id}` for partial updates using `EssayPatch` model with `exclude_unset=True`
 * **Upskilling stateful transformation** — full CRUD plan management with Cosmos DB persistence (`upskilling_plans` container, PK `/professor_id`), multi-agent evaluation, repository pattern (`InMemoryUpskillingRepository`, `CosmosUpskillingRepository`)
 * **Configuration UIs** — admin pages for Agents, Upskilling, Evaluation, and LMS Gateway under `/configuration`

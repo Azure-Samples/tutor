@@ -7,6 +7,14 @@
 ## 1. Threat Model
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph Threats
         T1["Unauthorized API access"]
@@ -108,6 +116,14 @@ This keeps agent execution stateless and prevents cross-request session sharing 
 ### Layer 4: Network Security
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph TB
     subgraph VNet ["VNet 10.0.0.0/22"]
         subgraph ACA_Subnet ["ACA Subnet 10.0.0.0/23"]
@@ -194,12 +210,12 @@ graph TB
 | `GET /evaluation/runs` | ❌ | ✅ (own) | ✅ (all) | ❌ |
 | `POST /lms/sync` | ❌ | ❌ | ✅ | ❌ |
 | `GET /lms/status` | ❌ | ✅ | ✅ | ❌ |
-| `POST /content/upload` | ❌ | ✅ | ✅ | ❌ |
-| `GET /content/materials` | ❌ | ✅ | ✅ | ❌ |
 | `GET /insights/reports` | ❌ | ❌ | ✅ (all) | ✅ (school-scoped) |
 | `POST /insights/generate` | ❌ | ❌ | ✅ | ✅ (school-scoped) |
 | `GET /insights/indicators` | ❌ | ❌ | ✅ (all) | ✅ (school-scoped) |
 | `PUT /insights/indicator-config` | ❌ | ❌ | ✅ | ❌ |
+
+Content-ingestion endpoints are a future service boundary. Until `content-svc` exists as a deployed backend, approved content and pedagogical-rule access is enforced through configuration, assessment, interaction, Blob Storage, and AI Search integration policies.
 
 ### Supervisor Data Scoping (BN-SUP-5)
 
@@ -225,6 +241,14 @@ async def get_report(school_id: str, user: AuthenticatedUser):
 ## 4. Managed Identity Assignments
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {
+  'primaryColor':'#FFB3BA',
+  'primaryTextColor':'#000',
+  'primaryBorderColor':'#FF8B94',
+  'lineColor':'#BAE1FF',
+  'secondaryColor':'#BAE1FF',
+  'tertiaryColor':'#FFFFFF'
+}}}%%
 graph LR
     subgraph Identities
         MI_CONFIG["MI: config-svc"]
@@ -235,7 +259,6 @@ graph LR
         MI_EVAL["MI: evaluation-svc"]
         MI_LMS["MI: lms-gateway"]
         MI_CHAT["MI: chat-svc"]
-        MI_CONTENT["MI: content-svc"]
         MI_INSIGHTS["MI: insights-svc"]
     end
 
@@ -282,14 +305,6 @@ graph LR
     MI_EVAL -->|AI Developer| FOUNDRY
     MI_EVAL -->|Secrets User| KV
     MI_EVAL -->|AcrPull| ACR
-
-    MI_CONTENT -->|Data Contributor| COSMOS
-    MI_CONTENT -->|Blob Contributor| BLOB
-    MI_CONTENT -->|CogSv User| DOCINTEL
-    MI_CONTENT -->|Search Index Contributor| SEARCH
-    MI_CONTENT -->|OpenAI User| OPENAI
-    MI_CONTENT -->|Secrets User| KV
-    MI_CONTENT -->|AcrPull| ACR
 
     MI_INSIGHTS -->|Data Contributor| COSMOS
     MI_INSIGHTS -->|OpenAI User| OPENAI

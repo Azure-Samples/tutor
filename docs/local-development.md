@@ -242,12 +242,13 @@ Open a separate terminal per service (each terminal must have the `.env` loaded)
 | **chat** | `cd apps/chat/src && uvicorn app.main:app --reload --port 8086` | 8086 |
 | **evaluation** | `cd apps/evaluation/src && uvicorn app.main:app --reload --port 8087` | 8087 |
 | **lms-gateway** | `cd apps/lms-gateway/src && uvicorn app.main:app --reload --port 8088` | 8088 |
+| **insights** | `cd apps/insights/src && uvicorn app.main:app --reload --port 8089` | 8089 |
 
 > **Tip:** Each service exposes a **`GET /health`** endpoint. After starting, verify with `curl http://localhost:<port>/health`.
 
 ### 5.3 — Minimal Set: Pick Only What You Need
 
-You rarely need all 8 services running. For common sampling scenarios:
+You rarely need all 9 backend services running. For common sampling scenarios:
 
 | Scenario | Services to Run |
 |----------|----------------|
@@ -258,7 +259,8 @@ You rarely need all 8 services running. For common sampling scenarios:
 | **Admin/roster management** | `configuration` |
 | **Agent quality checks** | `evaluation` (set `EVALUATION_REPOSITORY=memory` for no-DB mode) |
 | **LMS sync testing** | `lms-gateway` (set `LMS_JOB_STORE=memory` for no-DB mode) |
-| **Full end-to-end** | All 8 services + frontend |
+| **Governed intelligence / lifelong network** | `insights` |
+| **Full end-to-end** | All 9 backend services + frontend |
 
 ---
 
@@ -295,17 +297,18 @@ The frontend client in `frontend/utils/api.ts` routes service calls through APIM
 | `chatApi` | `/api/chat` | chat |
 | `evaluationApi` | `/api/evaluation` | evaluation |
 | `lmsGatewayApi` | `/api/lms-gateway` | lms-gateway |
+| Workspace governed intelligence APIs | `/api/insights` | insights |
 
 In all builds, `NEXT_PUBLIC_APIM_BASE_URL` is required and the frontend fails fast if missing.
 
 ### Production deployment sequence
 
-Deploy APIM before frontend publication:
+Deploy APIM before frontend publication through the approved GitHub workflows:
 
-1. `azd provision`
-2. Deploy backend Container Apps
+1. Run `.github/workflows/azd-deploy.yml` from `main` or `workflow_dispatch`.
+2. Deploy backend Container Apps through that workflow.
 3. Validate APIM health/readiness routes
-4. Redeploy Static Web App with `NEXT_PUBLIC_APIM_BASE_URL` set
+4. Redeploy Static Web App with `.github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml`; the workflow resolves `NEXT_PUBLIC_APIM_BASE_URL` from Azure outputs
 
 See [azd Deployment Runbook](./runbooks/azd-deployment.md) for exact commands.
 
@@ -354,6 +357,7 @@ Reference map for when running all services locally:
 │ chat               │ 8086 │ http://localhost:8086/docs         │
 │ evaluation         │ 8087 │ http://localhost:8087/docs         │
 │ lms-gateway        │ 8088 │ http://localhost:8088/docs         │
+│ insights           │ 8089 │ http://localhost:8089/docs         │
 ├────────────────────┼──────┼───────────────────────────────────┤
 │ frontend           │ 3000 │ http://localhost:3000              │
 └────────────────────┴──────┴───────────────────────────────────┘
@@ -375,6 +379,7 @@ Use this table to understand which Azure resources each service needs when runni
 | **upskilling** | ✅ | ✅ | — | — | — | — | Cosmos + AI |
 | **evaluation** | ⚪ | — | — | — | — | — | None (`memory` mode) |
 | **lms-gateway** | ⚪ | — | — | — | — | ⚪ | None (`memory` mode) |
+| **insights** | ✅ | — | — | — | — | ⚪ | Cosmos + optional Fabric connector config |
 
 ✅ = required &nbsp; ⚪ = optional (has in-memory fallback)
 
@@ -506,11 +511,11 @@ taskkill /PID <pid> /F
 
 ### Frontend can't reach backends
 
-Ensure the relevant `NEXT_PUBLIC_*_APP_BASE_URL` variable points to the correct local service port. The frontend now reads only `NEXT_PUBLIC_*` keys.
+Ensure `NEXT_PUBLIC_APIM_BASE_URL` points to the APIM gateway for browser traffic. The frontend is APIM-only in production-style builds and no longer relies on per-service `NEXT_PUBLIC_*_APP_BASE_URL` values.
 
 ### Frontend production build fails with APIM env error
 
-If you see `NEXT_PUBLIC_APIM_BASE_URL is required in production deployments`, configure APIM first and set `NEXT_PUBLIC_APIM_BASE_URL` in your SWA deployment workflow secrets.
+If you see `NEXT_PUBLIC_APIM_BASE_URL is required in production deployments`, configure APIM first and rerun the Static Web Apps workflow so it can resolve the APIM gateway URL from Azure outputs. Use an explicit workflow override only for exceptional environment-specific routing.
 
 ### Essays service: `COSMOS_KEY` required
 
