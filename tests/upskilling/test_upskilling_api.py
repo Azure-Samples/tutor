@@ -79,15 +79,15 @@ def fixture_api_client(monkeypatch):
     main_module = importlib.import_module("app.main")
     importlib.reload(main_module)
 
-    main_module._repository.cache_clear()
+    main_module.reset_repository()
 
     return TestClient(main_module.app)
 
 
-def _auth_headers() -> dict[str, str]:
+def _auth_headers(user_id: str = "prof-1", roles: str = "professor") -> dict[str, str]:
     return {
-        "X-User-Id": "prof-1",
-        "X-User-Roles": "professor",
+        "X-User-Id": user_id,
+        "X-User-Roles": roles,
     }
 
 
@@ -128,6 +128,42 @@ def test_get_missing_plan_returns_404(api_client):
     assert r.status_code == 404
 
 
+@pytest.mark.parametrize(
+    ("method", "path_suffix", "json_payload"),
+    [
+        ("get", "", None),
+        ("put", "", {"title": "Unauthorized Update"}),
+        ("delete", "", None),
+        ("post", "/evaluate", None),
+        ("post", "/advisory-training-plan", None),
+    ],
+)
+def test_plan_id_routes_reject_other_professor(api_client, method, path_suffix, json_payload):
+    created = _content(api_client.post("/plans", json=_PLAN_PAYLOAD, headers=_auth_headers()))
+    plan_id = created["id"]
+    request = getattr(api_client, method)
+    kwargs = {"headers": _auth_headers(user_id="prof-2")}
+    if json_payload is not None:
+        kwargs["json"] = json_payload
+
+    response = request(f"/plans/{plan_id}{path_suffix}", **kwargs)
+
+    assert response.status_code == 403
+    owner_response = api_client.get(f"/plans/{plan_id}", headers=_auth_headers())
+    assert owner_response.status_code == 200
+
+
+def test_admin_can_read_other_professors_plan(api_client):
+    created = _content(api_client.post("/plans", json=_PLAN_PAYLOAD, headers=_auth_headers()))
+
+    response = api_client.get(
+        f"/plans/{created['id']}",
+        headers=_auth_headers(user_id="admin-1", roles="admin"),
+    )
+
+    assert response.status_code == 200
+
+
 def test_update_plan(api_client):
     created = _content(api_client.post("/plans", json=_PLAN_PAYLOAD, headers=_auth_headers()))
     plan_id = created["id"]
@@ -166,6 +202,28 @@ def test_evaluate_persisted_plan(api_client):
     assert plan["status"] == "evaluated"
     assert isinstance(plan["evaluations"], list)
     assert len(plan["evaluations"]) > 0
+
+
+def test_advisory_training_plan_is_draft_reviewable_and_persisted(api_client):
+    created = _content(api_client.post("/plans", json=_PLAN_PAYLOAD, headers=_auth_headers()))
+    plan_id = created["id"]
+
+    r = api_client.post(f"/plans/{plan_id}/advisory-training-plan", headers=_auth_headers())
+
+    assert r.status_code == 200
+    plan = _content(r)
+    advisory = plan["advisory_training_plan"]
+    assert plan["status"] == "draft"
+    assert advisory["status"] == "draft"
+    assert advisory["human_review_required"] is True
+    assert advisory["governance"]["review"]["status"] == "required"
+    assert advisory["governance"]["appeal"]["available"] is True
+    assert advisory["governance"]["uncertainty"]["wide"] is True
+    assert advisory["governance"]["advisory_only"] is True
+    assert advisory["governance"]["final_decision"] is False
+
+    persisted = _content(api_client.get(f"/plans/{plan_id}", headers=_auth_headers()))
+    assert persisted["advisory_training_plan"]["plan_id"] == plan_id
 
 
 def test_create_plan_without_auth_returns_401(api_client):

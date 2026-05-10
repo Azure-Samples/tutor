@@ -42,10 +42,19 @@ from app.indicators import (
     TaskCompletionStrategy,
 )
 from app.orchestrator import build_briefing
+from app.p2p3_projections import (
+    build_causal_study_report,
+    build_conformal_risk_report,
+    build_lifelong_network_payload,
+    build_school_unit_intelligence,
+    causal_command_validation_errors,
+    missing_causal_command_fields,
+)
 from app.projections import WorkspaceProjectionBuilder
 from app.schemas import (
     BodyMessage,
     BriefingRequest,
+    CausalStudyCommand,
     ConnectorHealthItem,
     ConnectorHealthPayload,
     CourseProgressItem,
@@ -183,6 +192,8 @@ def _projection_builder() -> WorkspaceProjectionBuilder:
 
 require_supervisor = require_roles("supervisor", "admin")
 require_supervisor_dep = Depends(require_supervisor)
+require_school_intelligence_reader = require_roles("principal", "supervisor", "admin")
+require_school_intelligence_reader_dep = Depends(require_school_intelligence_reader)
 _WORKSPACE_ROLES: set[str] = {"student", "professor", "principal", "supervisor", "admin", "alumni"}
 
 
@@ -323,6 +334,12 @@ def _enforce_learner_record_scope(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requested learner is outside the caller scope")
 
 
+def _enforce_explicit_learner_membership(*, learner_id: str, context: AccessContext) -> None:
+    if learner_id in set(context.scope.learner_ids):
+        return
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requested learner is outside the caller scope")
+
+
 def _resolve_school_scope(
     user: AuthenticatedUser,
     request: Request,
@@ -457,6 +474,42 @@ def _enforce_tenant_scope(user: AuthenticatedUser, tenant_id: str) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Requested tenant is outside the caller scope",
         )
+
+
+def _enforce_optional_tenant_scope(user: AuthenticatedUser, tenant_id: str | None) -> None:
+    if tenant_id is not None:
+        _enforce_tenant_scope(user, tenant_id)
+
+
+def _enforce_school_intelligence_reader_scope(
+    *,
+    user: AuthenticatedUser,
+    request: Request,
+    school_id: str,
+    tenant_id: str | None,
+) -> None:
+    _enforce_pilot_school_scope(school_id)
+    _enforce_school_scope(user, request, school_id)
+    _enforce_optional_tenant_scope(user, tenant_id)
+
+
+def _resolve_governed_learner_context(
+    *,
+    learner_id: str,
+    context_id: str,
+    user: AuthenticatedUser,
+) -> AccessContext:
+    role = _role_from_context_id(context_id)
+    if role not in {"student", "alumni", "principal", "supervisor", "admin"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Role cannot access governed learner intelligence")
+
+    context = _resolve_workspace_context(user, role=role, context_id=context_id)
+    _enforce_workspace_pilot_scope(role=role, context=context, user=user)
+    if role in {"student", "alumni"}:
+        _enforce_learner_record_scope(learner_id=learner_id, role=role, context=context, user=user)
+    elif role in {"principal", "supervisor"}:
+        _enforce_explicit_learner_membership(learner_id=learner_id, context=context)
+    return context
 
 
 @app.get("/workspace-snapshots/{role}")
@@ -808,3 +861,112 @@ async def get_connector_health(
     )
 
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(payload))
+
+
+# ===== P2/P3: Governed Intelligence And Lifelong Network Projections =====
+
+
+@app.get("/school-unit-intelligence")
+async def get_school_unit_intelligence(
+    request: Request,
+    school_id: str = Query(..., min_length=1),
+    unit_id: str | None = Query(default=None),
+    tenant_id: str | None = Query(default=None),
+    user: AuthenticatedUser = require_school_intelligence_reader_dep,
+) -> JSONResponse:
+    _enforce_school_intelligence_reader_scope(
+        user=user,
+        request=request,
+        school_id=school_id,
+        tenant_id=tenant_id,
+    )
+
+    payload = build_school_unit_intelligence(
+        school_id=school_id,
+        unit_id=unit_id,
+        tenant_id=tenant_id,
+    )
+    return _success("School Unit Intelligence Retrieved", "School-unit intelligence fetched.", payload.model_dump())
+
+
+@app.post("/causal-studies")
+async def create_causal_study_report(
+    payload: CausalStudyCommand,
+    request: Request,
+    user: AuthenticatedUser = require_supervisor_dep,
+) -> JSONResponse:
+    _enforce_pilot_supervisor_scope(user)
+    _enforce_pilot_school_scope(payload.school_id)
+    _enforce_school_scope(user, request, payload.school_id)
+    _enforce_optional_tenant_scope(user, payload.tenant_id)
+
+    missing_fields = missing_causal_command_fields(payload)
+    if missing_fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"missing_fields": missing_fields},
+        )
+
+    validation_errors = causal_command_validation_errors(payload)
+    if validation_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"invalid_fields": validation_errors},
+        )
+
+    report = build_causal_study_report(payload)
+    return _success("Causal Study Report Created", "Causal study report generated.", report.model_dump())
+
+
+@app.get("/conformal-risk/{learner_id}")
+async def get_conformal_risk_report(
+    learner_id: str,
+    request: Request,
+    user: AuthenticatedUserDependency,
+    context_id: str = Query(..., min_length=1),
+    tenant_id: str | None = Query(default=None),
+    school_id: str | None = Query(default=None),
+    sample_count: int = Query(default=48, ge=0),
+    interval_width: float = Query(default=0.22, ge=0, le=1),
+) -> JSONResponse:
+    context = _resolve_governed_learner_context(
+        learner_id=learner_id,
+        context_id=context_id,
+        user=user,
+    )
+    _enforce_optional_tenant_scope(user, tenant_id)
+    if school_id is not None:
+        _enforce_school_scope(user, request, school_id)
+
+    payload = build_conformal_risk_report(
+        learner_id=learner_id,
+        context_id=context.context_id,
+        tenant_id=tenant_id,
+        sample_count=sample_count,
+        interval_width=interval_width,
+    )
+    return _success("Conformal Risk Retrieved", "Conformal risk report fetched.", payload.model_dump())
+
+
+@app.get("/lifelong-network/{learner_id}")
+async def get_lifelong_network(
+    learner_id: str,
+    user: AuthenticatedUserDependency,
+    context_id: str = Query(..., min_length=1),
+    tenant_id: str | None = Query(default=None),
+) -> JSONResponse:
+    role = _role_from_context_id(context_id)
+    if role not in {"student", "alumni"}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Learner network views require learner or alumni scope")
+
+    context = _resolve_workspace_context(user, role=role, context_id=context_id)
+    _enforce_workspace_pilot_scope(role=role, context=context, user=user)
+    _enforce_learner_record_scope(learner_id=learner_id, role=role, context=context, user=user)
+    _enforce_optional_tenant_scope(user, tenant_id)
+
+    payload = build_lifelong_network_payload(
+        learner_id=learner_id,
+        context_id=context.context_id,
+        tenant_id=tenant_id,
+    )
+    return _success("Lifelong Network Retrieved", "Lifelong learner network fetched.", payload.model_dump())

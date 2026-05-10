@@ -146,6 +146,361 @@ export interface LearnerRecordTimelinePayload {
   deep_links: DeepLink[];
 }
 
+export interface GovernanceAssumption {
+  assumption_id: string;
+  statement: string;
+  category: "data_quality" | "causal" | "model" | "policy" | "access";
+  evidence_refs: string[];
+  required_for_use: boolean;
+}
+
+export interface IntelligenceProvenance {
+  source_type: string;
+  source_ids: string[];
+  generator: string;
+  workflow_version: string;
+  model: string | null;
+  prompt_version?: string | null;
+}
+
+export interface UncertaintyMetadata {
+  point_estimate: number | null;
+  lower_bound: number | null;
+  upper_bound: number | null;
+  confidence_level: number;
+  interval_width: number | null;
+  method: string;
+  wide: boolean;
+  rationale: string;
+}
+
+export interface CalibrationMetadata {
+  calibration_set_id: string;
+  calibrated_at: string;
+  method: string;
+  sample_count: number;
+  expected_coverage: number;
+  observed_coverage: number;
+}
+
+export interface CoverageMetadata {
+  population: string;
+  eligible_count: number;
+  covered_count: number;
+  coverage_rate: number;
+  minimum_required: number;
+}
+
+export interface DriftMetadata {
+  metric_name: string;
+  status: "stable" | "watch" | "drifted" | "unknown";
+  score: number | null;
+  threshold: number | null;
+  measured_at: string;
+  reference_window: string;
+  current_window: string;
+}
+
+export interface SuppressionMetadata {
+  suppressed: boolean;
+  reason:
+    | "none"
+    | "small_cell"
+    | "wide_uncertainty"
+    | "low_sample"
+    | "low_coverage"
+    | "policy"
+    | "manual_review";
+  minimum_count: number | null;
+  observed_count: number | null;
+  suppressed_fields: string[];
+  rationale: string;
+}
+
+export interface IntelligenceReviewState {
+  status: "required" | "recommended" | "not_required" | "completed";
+  required: boolean;
+  summary: string;
+  reviewer_id?: string | null;
+  reviewed_at?: string | null;
+}
+
+export interface AppealState {
+  status: "unavailable" | "available" | "requested" | "in_review" | "resolved";
+  available: boolean;
+  appeal_id?: string | null;
+  submitted_at?: string | null;
+  resolution_summary?: string | null;
+}
+
+export interface AbstentionMetadata {
+  abstained: boolean;
+  degraded: boolean;
+  reason: string | null;
+  fallback_behavior: "deterministic_only" | "human_review" | "show_advisory" | "suppress_prediction";
+}
+
+export interface IntelligenceGovernanceMetadata {
+  provenance: IntelligenceProvenance;
+  assumptions: GovernanceAssumption[];
+  uncertainty: UncertaintyMetadata;
+  calibration: CalibrationMetadata;
+  coverage: CoverageMetadata;
+  drift: DriftMetadata[];
+  suppression: SuppressionMetadata;
+  review: IntelligenceReviewState;
+  appeal: AppealState;
+  abstention: AbstentionMetadata;
+  advisory_only: boolean;
+  final_decision: boolean;
+}
+
+export interface SchoolUnitMetric {
+  metric_id: string;
+  label: string | null;
+  value: number | null;
+  sample_count: number;
+  status: "visible" | "suppressed";
+  suppression: SuppressionMetadata;
+}
+
+export interface SchoolUnitIntelligencePayload {
+  school_id: string;
+  unit_id: string;
+  tenant_id: string | null;
+  generated_at: string;
+  metrics: SchoolUnitMetric[];
+  governance: IntelligenceGovernanceMetadata;
+}
+
+export interface CausalDagEdge {
+  source: string;
+  target: string;
+}
+
+export interface CausalStudyCommand {
+  school_id: string;
+  tenant_id?: string | null;
+  dag?: string | null;
+  dag_edges?: CausalDagEdge[] | null;
+  treatment?: string | null;
+  outcome?: string | null;
+  estimand?: string | null;
+  population?: string | null;
+  confounders?: string[] | null;
+  refutation_checks?: string[] | null;
+}
+
+export interface CausalSensitivityCheck {
+  check_id: string;
+  method: string;
+  target: string;
+  status: "planned" | "passed" | "needs_review";
+  summary: string;
+}
+
+export interface CausalRefutationResult {
+  check: string;
+  status: "passed" | "needs_review";
+  result: string;
+}
+
+export interface CausalStudyReport {
+  study_id: string;
+  school_id: string;
+  tenant_id: string | null;
+  generated_at: string;
+  dag: string;
+  dag_edges: CausalDagEdge[];
+  treatment: string;
+  outcome: string;
+  estimand: string;
+  population: string;
+  adjustment_set: string[];
+  refutation_checks: string[];
+  sensitivity_checks: CausalSensitivityCheck[];
+  refutation_results: CausalRefutationResult[];
+  effect_estimate: number;
+  uncertainty: UncertaintyMetadata;
+  governance: IntelligenceGovernanceMetadata;
+}
+
+export interface ConformalRiskItem {
+  risk_id: string;
+  risk_type: "attendance" | "performance" | "engagement" | "completion";
+  risk_label: string | null;
+  score: number | null;
+  sample_count: number;
+  uncertainty: UncertaintyMetadata;
+  suppression: SuppressionMetadata;
+}
+
+export interface ConformalRiskReport {
+  learner_id: string;
+  context_id: string;
+  tenant_id: string | null;
+  generated_at: string;
+  calibration: CalibrationMetadata;
+  coverage: CoverageMetadata;
+  drift: DriftMetadata;
+  abstention: AbstentionMetadata;
+  risks: ConformalRiskItem[];
+  governance: IntelligenceGovernanceMetadata;
+}
+
+export interface CredentialDefinition {
+  credential_id: string;
+  title: string;
+  issuer_id: string;
+  level: string;
+  criteria_refs: string[];
+  status: "draft" | "active" | "retired";
+  version: string;
+}
+
+export interface CredentialAward {
+  award_id: string;
+  credential_id: string;
+  learner_id: string;
+  awarded_at: string | null;
+  status: "pending_review" | "active" | "expired" | "revoked";
+  evidence_refs: string[];
+  expires_at?: string | null;
+}
+
+export interface PortfolioArtifact {
+  artifact_id: string;
+  learner_id: string;
+  title: string;
+  artifact_type: string;
+  evidence_refs: string[];
+  visibility: "private" | "institution" | "public";
+  created_at: string;
+}
+
+export interface VerificationRequest {
+  request_id: string;
+  credential_award_id: string;
+  requester_type: string;
+  requested_at: string;
+  status: "requested" | "verified" | "rejected" | "expired";
+  purpose: string;
+}
+
+export interface AlumniAffiliation {
+  affiliation_id: string;
+  learner_id: string;
+  institution_id: string;
+  program_id: string | null;
+  status: "active" | "inactive" | "opted_out";
+  started_at: string;
+}
+
+export interface ReEntryPathway {
+  pathway_id: string;
+  learner_id: string;
+  title: string;
+  target_program_id: string;
+  readiness: "eligible" | "needs_review" | "not_ready";
+  status: "open" | "waitlist" | "closed";
+  recommended_steps: string[];
+}
+
+export interface MentorRelationship {
+  relationship_id: string;
+  learner_id: string;
+  mentor_id: string;
+  status: "proposed" | "active" | "paused" | "ended";
+  started_at?: string | null;
+  focus_areas: string[];
+}
+
+export interface CommunityEvent {
+  event_id: string;
+  title: string;
+  host_id: string;
+  starts_at: string;
+  status: "scheduled" | "completed" | "cancelled";
+  audience: "learners" | "alumni" | "mentors" | "research_participants";
+}
+
+export interface ResearchDataset {
+  dataset_id: string;
+  title: string;
+  steward_id: string;
+  data_categories: string[];
+  de_identified: boolean;
+  consent_basis: string;
+  retention_until: string;
+}
+
+export interface DataUseAgreement {
+  agreement_id: string;
+  dataset_id: string;
+  status: "draft" | "active" | "expired" | "revoked";
+  allowed_uses: string[];
+  prohibited_uses: string[];
+  expires_at: string;
+}
+
+export interface DeIdentificationRun {
+  run_id: string;
+  dataset_id: string;
+  method: string;
+  completed_at: string;
+  residual_risk: "low" | "medium" | "high";
+  reviewer_id?: string | null;
+}
+
+export interface PublicationApproval {
+  approval_id: string;
+  dataset_id: string;
+  status: "draft" | "review_required" | "approved" | "rejected" | "revoked";
+  submitted_at: string;
+  reviewer_id?: string | null;
+  conditions: string[];
+}
+
+export interface LifelongLearnerNetworkPayload {
+  learner_id: string;
+  context_id: string;
+  tenant_id: string | null;
+  generated_at: string;
+  credential_definitions: CredentialDefinition[];
+  credentials: CredentialAward[];
+  portfolio_artifacts: PortfolioArtifact[];
+  verification_requests: VerificationRequest[];
+  alumni_affiliations: AlumniAffiliation[];
+  re_entry_pathways: ReEntryPathway[];
+  mentor_relationships: MentorRelationship[];
+  community_events: CommunityEvent[];
+  research_datasets: ResearchDataset[];
+  data_use_agreements: DataUseAgreement[];
+  de_identification_runs: DeIdentificationRun[];
+  publication_approvals: PublicationApproval[];
+  data_minimization: Record<string, string>;
+  governance: IntelligenceGovernanceMetadata;
+}
+
+export interface SchoolUnitIntelligenceOptions {
+  schoolId: string;
+  unitId?: string | null;
+  tenantId?: string | null;
+}
+
+export interface GovernedLearnerReportOptions {
+  contextId: string;
+  tenantId?: string | null;
+  schoolId?: string | null;
+  sampleCount?: number;
+  intervalWidth?: number;
+}
+
+export interface LifelongNetworkOptions {
+  contextId: string;
+  tenantId?: string | null;
+}
+
 const SCOPE_LABELS = [
   ["institution_ids", "Institution"],
   ["school_ids", "School"],
@@ -195,6 +550,62 @@ export async function getLearnerRecordTimeline(
         context_id: options.contextId,
         limit: options.limit,
         cursor: options.cursor ?? undefined,
+      },
+    },
+  );
+  return response.data;
+}
+
+// Facade pattern: route components call these typed helpers instead of raw service paths.
+export async function getSchoolUnitIntelligence(
+  options: SchoolUnitIntelligenceOptions,
+): Promise<SchoolUnitIntelligencePayload> {
+  const response = await insightsApi.get<SchoolUnitIntelligencePayload>("/school-unit-intelligence", {
+    params: {
+      school_id: options.schoolId,
+      unit_id: options.unitId ?? undefined,
+      tenant_id: options.tenantId ?? undefined,
+    },
+  });
+  return response.data;
+}
+
+export async function createCausalStudy(
+  command: CausalStudyCommand,
+): Promise<CausalStudyReport> {
+  const response = await insightsApi.post<CausalStudyReport>("/causal-studies", command);
+  return response.data;
+}
+
+export async function getConformalRisk(
+  learnerId: string,
+  options: GovernedLearnerReportOptions,
+): Promise<ConformalRiskReport> {
+  const response = await insightsApi.get<ConformalRiskReport>(
+    `/conformal-risk/${encodeURIComponent(learnerId)}`,
+    {
+      params: {
+        context_id: options.contextId,
+        tenant_id: options.tenantId ?? undefined,
+        school_id: options.schoolId ?? undefined,
+        sample_count: options.sampleCount ?? undefined,
+        interval_width: options.intervalWidth ?? undefined,
+      },
+    },
+  );
+  return response.data;
+}
+
+export async function getLifelongNetwork(
+  learnerId: string,
+  options: LifelongNetworkOptions,
+): Promise<LifelongLearnerNetworkPayload> {
+  const response = await insightsApi.get<LifelongLearnerNetworkPayload>(
+    `/lifelong-network/${encodeURIComponent(learnerId)}`,
+    {
+      params: {
+        context_id: options.contextId,
+        tenant_id: options.tenantId ?? undefined,
       },
     },
   );

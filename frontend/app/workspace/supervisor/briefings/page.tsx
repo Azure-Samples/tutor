@@ -1,4 +1,5 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import WorkspaceGovernedIntelligencePanel from "@/components/Workspace/WorkspaceGovernedIntelligencePanel";
 import WorkspaceModulePage from "@/components/Workspace/WorkspaceModulePage";
 
 const SupervisorBriefingsPage = () => {
@@ -33,6 +34,9 @@ const SupervisorBriefingsPage = () => {
           "Trust, freshness, and deep-link metadata now travel with the underlying report payloads as well.",
         ]}
       />
+      <div className="mt-8">
+        <WorkspaceGovernedIntelligencePanel workspaceRole="supervisor" />
+      </div>
     </DefaultLayout>
   );
 };

@@ -1,4 +1,5 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import WorkspaceGovernedIntelligencePanel from "@/components/Workspace/WorkspaceGovernedIntelligencePanel";
 import WorkspaceModulePage from "@/components/Workspace/WorkspaceModulePage";
 
 const PrincipalSchoolHealthPage = () => {
@@ -34,6 +35,9 @@ const PrincipalSchoolHealthPage = () => {
           "The goal is to anchor leadership work in school context, not to create a new detached reporting tool.",
         ]}
       />
+      <div className="mt-8">
+        <WorkspaceGovernedIntelligencePanel workspaceRole="principal" />
+      </div>
     </DefaultLayout>
   );
 };

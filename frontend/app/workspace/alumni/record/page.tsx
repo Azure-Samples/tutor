@@ -1,4 +1,5 @@
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
+import WorkspaceLifelongNetworkPanel from "@/components/Workspace/WorkspaceLifelongNetworkPanel";
 import WorkspaceModulePage from "@/components/Workspace/WorkspaceModulePage";
 
 const AlumniRecordPage = () => {
@@ -34,6 +35,9 @@ const AlumniRecordPage = () => {
           "Learner-record previews on the alumni home route come from the backend timeline contract rather than frontend fixtures.",
         ]}
       />
+      <div className="mt-8">
+        <WorkspaceLifelongNetworkPanel />
+      </div>
     </DefaultLayout>
   );
 };

@@ -235,8 +235,10 @@ export const ROUTE_METADATA = [
     path: "/workspace/principal/school-health",
     href: "/workspace/principal/school-health",
     label: "School health",
-    capability: "Principal route for school indicators and briefing inputs.",
+    capability:
+      "Principal route for school-unit intelligence, briefing inputs, and conformal-risk governance.",
     audience: "Principals",
+    apimPath: "/api/insights/school-unit-intelligence",
   },
   {
     status: "implemented",
@@ -244,8 +246,10 @@ export const ROUTE_METADATA = [
     path: "/workspace/supervisor/briefings",
     href: "/workspace/supervisor/briefings",
     label: "Supervisor briefings",
-    capability: "Network-level briefing review with trust framing.",
+    capability:
+      "Network-level briefing review with school-unit intelligence, causal-study drafts, and conformal-risk governance.",
     audience: "Supervisors",
+    apimPath: "/api/insights/school-unit-intelligence",
   },
   {
     status: "implemented",
@@ -262,8 +266,10 @@ export const ROUTE_METADATA = [
     path: "/workspace/alumni/record",
     href: "/workspace/alumni/record",
     label: "Alumni record",
-    capability: "Learner record preview for re-entry and lifelong learning continuity.",
+    capability:
+      "Learner record preview with lifelong-network credentials, portfolio, re-entry, and research governance.",
     audience: "Alumni",
+    apimPath: "/api/insights/lifelong-network/{learner_id}",
   },
   {
     status: "implemented",
@@ -359,7 +365,8 @@ export const ROUTE_METADATA = [
     path: "/configuration/upskilling",
     href: "/configuration/upskilling",
     label: "Upskilling utility",
-    capability: "Configuration-facing utility for teaching-plan analysis workflows.",
+    capability:
+      "Configuration-facing utility for teaching-plan analysis and review-required advisory training drafts.",
     audience: "Admins and faculty operators",
     apimPath: "/api/upskilling",
   },

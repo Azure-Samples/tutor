@@ -21,6 +21,7 @@ class PlanRecord:
     paragraphs: list[dict[str, str]] = field(default_factory=list)
     evaluations: list[dict] = field(default_factory=list)
     performance_history: list[dict] = field(default_factory=list)
+    advisory_training_plan: dict | None = None
     created_at: str = ""
     updated_at: str = ""
 
@@ -133,6 +134,7 @@ def _plan_to_payload(plan: PlanRecord) -> dict:
         "paragraphs": plan.paragraphs,
         "evaluations": plan.evaluations,
         "performance_history": plan.performance_history,
+        "advisory_training_plan": plan.advisory_training_plan,
         "created_at": plan.created_at,
         "updated_at": plan.updated_at,
     }
@@ -150,6 +152,7 @@ def _row_to_plan(item: dict) -> PlanRecord:
         paragraphs=item.get("paragraphs", []),
         evaluations=item.get("evaluations", []),
         performance_history=item.get("performance_history", []),
+        advisory_training_plan=item.get("advisory_training_plan"),
         created_at=item.get("created_at", ""),
         updated_at=item.get("updated_at", ""),
     )

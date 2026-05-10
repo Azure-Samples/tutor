@@ -1,7 +1,7 @@
 """Pydantic models for the upskilling service."""
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from starlette.status import (
@@ -15,8 +15,9 @@ from starlette.status import (
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
     HTTP_418_IM_A_TEAPOT,
-    HTTP_422_UNPROCESSABLE_ENTITY,
+    HTTP_422_UNPROCESSABLE_CONTENT,
 )
+from tutor_lib.intelligence import IntelligenceGovernanceMetadata
 
 
 class BodyMessage(BaseModel):
@@ -122,6 +123,27 @@ class UpdatePlanRequest(BaseModel):
     performance_history: list[PerformanceSnapshot] | None = None
 
 
+class AdvisoryTrainingStep(BaseModel):
+    """Single draft advisory training-plan step."""
+
+    sequence: int = Field(..., ge=1)
+    title: str
+    rationale: str
+    evidence_refs: list[str] = Field(default_factory=list)
+
+
+class AdvisoryTrainingPlan(BaseModel):
+    """Draft-first advisory training plan for professor review."""
+
+    plan_id: str
+    professor_id: str
+    status: Literal["draft"] = "draft"
+    generated_at: str
+    human_review_required: bool = True
+    steps: list[AdvisoryTrainingStep] = Field(default_factory=list)
+    governance: IntelligenceGovernanceMetadata
+
+
 RESPONSES: dict[int, dict[str, Any]] = {
     HTTP_200_OK: {"model": BodyMessage},
     HTTP_201_CREATED: {"model": BodyMessage},
@@ -133,5 +155,5 @@ RESPONSES: dict[int, dict[str, Any]] = {
     HTTP_401_UNAUTHORIZED: {"model": BodyMessage},
     HTTP_403_FORBIDDEN: {"model": BodyMessage},
     HTTP_418_IM_A_TEAPOT: {"model": BodyMessage},
-    HTTP_422_UNPROCESSABLE_ENTITY: {"model": BodyMessage},
+    HTTP_422_UNPROCESSABLE_CONTENT: {"model": BodyMessage},
 }

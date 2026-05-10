@@ -19,6 +19,29 @@ from starlette.status import (
     HTTP_418_IM_A_TEAPOT,
     HTTP_422_UNPROCESSABLE_CONTENT,
 )
+from tutor_lib.intelligence import (
+    AbstentionMetadata,
+    CalibrationMetadata,
+    CoverageMetadata,
+    DriftMetadata,
+    IntelligenceGovernanceMetadata,
+    SuppressionMetadata,
+    UncertaintyMetadata,
+)
+from tutor_lib.lifelong_network import (
+    AlumniAffiliation,
+    CommunityEvent,
+    CredentialAward,
+    CredentialDefinition,
+    DataUseAgreement,
+    DeIdentificationRun,
+    MentorRelationship,
+    PortfolioArtifact,
+    PublicationApproval,
+    ReEntryPathway,
+    ResearchDataset,
+    VerificationRequest,
+)
 
 
 class BodyMessage(BaseModel):
@@ -280,6 +303,143 @@ class ConnectorHealthPayload(BaseModel):
     total_events_24h: int = 0
     total_errors_24h: int = 0
     freshness: FreshnessMetadata
+
+
+# ===== P2/P3: Governed Intelligence And Lifelong Network Read Models =====
+
+
+class SchoolUnitMetric(BaseModel):
+    """Suppression-aware school-unit intelligence metric."""
+
+    metric_id: str
+    label: str | None = None
+    value: float | None = Field(default=None, ge=0, le=1)
+    sample_count: int = Field(..., ge=0)
+    status: Literal["visible", "suppressed"]
+    suppression: SuppressionMetadata
+
+
+class SchoolUnitIntelligencePayload(BaseModel):
+    """Supervisor-facing school-unit intelligence read model."""
+
+    school_id: str
+    unit_id: str
+    tenant_id: str | None = None
+    generated_at: str
+    metrics: list[SchoolUnitMetric] = Field(default_factory=list)
+    governance: IntelligenceGovernanceMetadata
+
+
+class CausalDagEdge(BaseModel):
+    """Directed DAG edge supplied by the research command."""
+
+    source: str = Field(..., min_length=1)
+    target: str = Field(..., min_length=1)
+
+
+class CausalSensitivityCheck(BaseModel):
+    """Structured sensitivity check attached to a causal report."""
+
+    check_id: str
+    method: str
+    target: str
+    status: Literal["planned", "passed", "needs_review"]
+    summary: str
+
+
+class CausalRefutationResult(BaseModel):
+    """Structured refutation result attached to a causal report."""
+
+    check: str
+    status: Literal["passed", "needs_review"]
+    result: str
+
+
+class CausalStudyCommand(BaseModel):
+    """Command payload for deterministic causal-study report generation."""
+
+    school_id: str = Field(..., min_length=1)
+    tenant_id: str | None = None
+    dag: str | None = None
+    dag_edges: list[CausalDagEdge] | None = None
+    treatment: str | None = None
+    outcome: str | None = None
+    estimand: str | None = None
+    population: str | None = None
+    confounders: list[str] | None = None
+    refutation_checks: list[str] | None = None
+
+
+class CausalStudyReport(BaseModel):
+    """Deterministic causal-study report with validation and governance state."""
+
+    study_id: str
+    school_id: str
+    tenant_id: str | None = None
+    generated_at: str
+    dag: str
+    dag_edges: list[CausalDagEdge]
+    treatment: str
+    outcome: str
+    estimand: str
+    population: str
+    adjustment_set: list[str]
+    refutation_checks: list[str]
+    sensitivity_checks: list[CausalSensitivityCheck]
+    refutation_results: list[CausalRefutationResult]
+    effect_estimate: float
+    uncertainty: UncertaintyMetadata
+    governance: IntelligenceGovernanceMetadata
+
+
+class ConformalRiskItem(BaseModel):
+    """Conformal risk item with label suppression."""
+
+    risk_id: str
+    risk_type: Literal["attendance", "performance", "engagement", "completion"]
+    risk_label: str | None = None
+    score: float | None = Field(default=None, ge=0, le=1)
+    sample_count: int = Field(..., ge=0)
+    uncertainty: UncertaintyMetadata
+    suppression: SuppressionMetadata
+
+
+class ConformalRiskReport(BaseModel):
+    """Conformal risk report with abstention and drift state."""
+
+    learner_id: str
+    context_id: str
+    tenant_id: str | None = None
+    generated_at: str
+    calibration: CalibrationMetadata
+    coverage: CoverageMetadata
+    drift: DriftMetadata
+    abstention: AbstentionMetadata
+    risks: list[ConformalRiskItem] = Field(default_factory=list)
+    governance: IntelligenceGovernanceMetadata
+
+
+class LifelongLearnerNetworkPayload(BaseModel):
+    """Learner-centered P3 lifelong network payload."""
+
+    learner_id: str
+    context_id: str
+    tenant_id: str | None = None
+    generated_at: str
+    credential_definitions: list[CredentialDefinition] = Field(default_factory=list)
+    credentials: list[CredentialAward] = Field(default_factory=list)
+    portfolio_artifacts: list[PortfolioArtifact] = Field(default_factory=list)
+    verification_requests: list[VerificationRequest] = Field(default_factory=list)
+    alumni_affiliations: list[AlumniAffiliation] = Field(default_factory=list)
+    re_entry_pathways: list[ReEntryPathway] = Field(default_factory=list)
+    mentor_relationships: list[MentorRelationship] = Field(default_factory=list)
+    community_events: list[CommunityEvent] = Field(default_factory=list)
+    research_datasets: list[ResearchDataset] = Field(default_factory=list)
+    data_use_agreements: list[DataUseAgreement] = Field(default_factory=list)
+    de_identification_runs: list[DeIdentificationRun] = Field(default_factory=list)
+    publication_approvals: list[PublicationApproval] = Field(default_factory=list)
+    data_minimization: dict[str, str] = Field(default_factory=dict)
+    governance: IntelligenceGovernanceMetadata
 
 
 RESPONSES: dict[int, dict[str, Any]] = {

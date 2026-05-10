@@ -6,6 +6,7 @@ import Breadcrumb from "@/components/Breadcrumbs/Breadcrumb";
 import DefaultLayout from "@/components/Layouts/DefaultLayout";
 import { unwrapContent } from "@/types/api";
 import { upskillingApi } from "@/utils/api";
+import type { IntelligenceGovernanceMetadata } from "@/utils/workspace-api";
 
 // ---------------------------------------------------------------------------
 // Domain types
@@ -33,6 +34,23 @@ interface Evaluation {
   feedback: EvaluationFeedback[];
 }
 
+interface AdvisoryTrainingStep {
+  sequence: number;
+  title: string;
+  rationale: string;
+  evidence_refs: string[];
+}
+
+interface AdvisoryTrainingPlan {
+  plan_id: string;
+  professor_id: string;
+  status: "draft";
+  generated_at: string;
+  human_review_required: boolean;
+  steps: AdvisoryTrainingStep[];
+  governance: IntelligenceGovernanceMetadata;
+}
+
 interface Plan {
   id: string;
   professor_id: string;
@@ -44,6 +62,7 @@ interface Plan {
   paragraphs: Paragraph[];
   evaluations: Evaluation[];
   performance_history: unknown[];
+  advisory_training_plan: AdvisoryTrainingPlan | null;
   created_at: string;
   updated_at: string;
 }
@@ -99,6 +118,31 @@ const feedbackKey = (evaluation: Evaluation, feedback: EvaluationFeedback) =>
     feedback.improvements.join("|"),
   ].join(":");
 
+const formatLabel = (value: string) =>
+  value
+    .replace(/[_:-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+
+const formatReviewLabel = (value: string) => {
+  const normalizedValue = value.toLowerCase().replace(/[\s:-]+/g, "_");
+
+  if (normalizedValue === "not_final" || normalizedValue === "non_final") {
+    return "Review draft";
+  }
+
+  if (normalizedValue.includes("final")) {
+    return "Review recorded";
+  }
+
+  if (normalizedValue.includes("operational")) {
+    return "Review required";
+  }
+
+  return formatLabel(value);
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -112,6 +156,7 @@ const UpskillingConfigPage = () => {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState("");
+  const [listSuccess, setListSuccess] = useState("");
 
   // Detail / form state
   const [formTitle, setFormTitle] = useState("");
@@ -120,9 +165,12 @@ const UpskillingConfigPage = () => {
   const [formClassId, setFormClassId] = useState("");
   const [formParagraphs, setFormParagraphs] = useState<ParagraphDraft[]>([createParagraphDraft()]);
   const [formEvaluations, setFormEvaluations] = useState<Evaluation[]>([]);
+  const [formAdvisoryTrainingPlan, setFormAdvisoryTrainingPlan] =
+    useState<AdvisoryTrainingPlan | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
+  const [advisoryLoadingPlanId, setAdvisoryLoadingPlanId] = useState<string | null>(null);
 
   // Evaluation expand/collapse per paragraph index
   const [expandedEvals, setExpandedEvals] = useState<Set<number>>(new Set());
@@ -156,8 +204,10 @@ const UpskillingConfigPage = () => {
     setFormClassId("");
     setFormParagraphs([createParagraphDraft()]);
     setFormEvaluations([]);
+    setFormAdvisoryTrainingPlan(null);
     setFormError("");
     setFormSuccess("");
+    setListSuccess("");
     setExpandedEvals(new Set());
     setView("detail");
   };
@@ -181,6 +231,7 @@ const UpskillingConfigPage = () => {
           : [createParagraphDraft()],
       );
       setFormEvaluations(plan.evaluations ?? []);
+      setFormAdvisoryTrainingPlan(plan.advisory_training_plan ?? null);
       setView("detail");
     } catch (err: unknown) {
       setListError(err instanceof Error ? err.message : "Failed to load plan details.");
@@ -211,12 +262,17 @@ const UpskillingConfigPage = () => {
       };
 
       if (editingPlanId) {
-        await upskillingApi.put(`/plans/${editingPlanId}`, body, { headers: AUTH_HEADERS });
+        const res = await upskillingApi.put(`/plans/${editingPlanId}`, body, {
+          headers: AUTH_HEADERS,
+        });
+        const updated = unwrapContent<Plan>(res.data);
+        setFormAdvisoryTrainingPlan(updated.advisory_training_plan ?? null);
         setFormSuccess("Plan updated successfully.");
       } else {
         const res = await upskillingApi.post("/plans", body, { headers: AUTH_HEADERS });
         const created = unwrapContent<Plan>(res.data);
         setEditingPlanId(created.id);
+        setFormAdvisoryTrainingPlan(created.advisory_training_plan ?? null);
         setFormSuccess("Plan created successfully.");
       }
     } catch (err: unknown) {
@@ -242,6 +298,7 @@ const UpskillingConfigPage = () => {
   const evaluatePlan = async (planId: string) => {
     setListLoading(true);
     setListError("");
+    setListSuccess("");
     try {
       await upskillingApi.post(`/plans/${planId}/evaluate`, {}, { headers: AUTH_HEADERS });
       await fetchPlans();
@@ -249,6 +306,49 @@ const UpskillingConfigPage = () => {
       setListError(err instanceof Error ? err.message : "Failed to evaluate plan.");
     } finally {
       setListLoading(false);
+    }
+  };
+
+  const draftAdvisoryTrainingPlan = async (planId: string, surface: "list" | "detail") => {
+    setAdvisoryLoadingPlanId(planId);
+
+    if (surface === "list") {
+      setListError("");
+      setListSuccess("");
+    } else {
+      setFormError("");
+      setFormSuccess("");
+    }
+
+    try {
+      const res = await upskillingApi.post(
+        `/plans/${planId}/advisory-training-plan`,
+        {},
+        { headers: AUTH_HEADERS },
+      );
+      const updated = unwrapContent<Plan>(res.data);
+      setPlans((previous) =>
+        previous.map((plan) => (plan.id === updated.id ? { ...plan, ...updated } : plan)),
+      );
+
+      if (editingPlanId === updated.id || surface === "detail") {
+        setFormAdvisoryTrainingPlan(updated.advisory_training_plan ?? null);
+      }
+
+      if (surface === "list") {
+        setListSuccess("Draft advisory training plan generated for review.");
+      } else {
+        setFormSuccess("Draft advisory training plan generated for review.");
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to draft advisory training plan.";
+      if (surface === "list") {
+        setListError(message);
+      } else {
+        setFormError(message);
+      }
+    } finally {
+      setAdvisoryLoadingPlanId(null);
     }
   };
 
@@ -298,7 +398,7 @@ const UpskillingConfigPage = () => {
         <button
           type="button"
           onClick={openCreate}
-          className="rounded bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
+          className="rounded bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-800"
         >
           + Create New Plan
         </button>
@@ -307,6 +407,11 @@ const UpskillingConfigPage = () => {
       {listError && (
         <p className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">
           {listError}
+        </p>
+      )}
+      {listSuccess && (
+        <p className="mb-4 rounded bg-emerald-50 p-3 text-sm text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+          {listSuccess}
         </p>
       )}
 
@@ -327,6 +432,7 @@ const UpskillingConfigPage = () => {
                 <th className="px-4 py-3 font-medium text-black dark:text-white">Topic</th>
                 <th className="px-4 py-3 font-medium text-black dark:text-white">Timeframe</th>
                 <th className="px-4 py-3 font-medium text-black dark:text-white">Status</th>
+                <th className="px-4 py-3 font-medium text-black dark:text-white">Advisory draft</th>
                 <th className="px-4 py-3 font-medium text-black dark:text-white">Updated</th>
                 <th className="px-4 py-3 font-medium text-black dark:text-white">Actions</th>
               </tr>
@@ -341,6 +447,17 @@ const UpskillingConfigPage = () => {
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{plan.topic}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{plan.timeframe}</td>
                   <td className="px-4 py-3">{renderStatusBadge(plan.status)}</td>
+                  <td className="px-4 py-3">
+                    {plan.advisory_training_plan ? (
+                      <span className="inline-block rounded-full bg-amber-100 px-3 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-100">
+                        Review required
+                      </span>
+                    ) : (
+                      <span className="inline-block rounded-full bg-gray-100 px-3 py-0.5 text-xs font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+                        Not drafted
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                     {new Date(plan.updated_at).toLocaleDateString()}
                   </td>
@@ -348,21 +465,29 @@ const UpskillingConfigPage = () => {
                     <button
                       type="button"
                       onClick={() => openEdit(plan.id)}
-                      className="rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                      className="rounded bg-blue-700 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-800"
                     >
                       View / Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => evaluatePlan(plan.id)}
-                      className="rounded bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                      className="rounded bg-emerald-700 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-800"
                     >
                       Evaluate
                     </button>
                     <button
                       type="button"
+                      onClick={() => draftAdvisoryTrainingPlan(plan.id, "list")}
+                      disabled={advisoryLoadingPlanId === plan.id}
+                      className="rounded bg-amber-800 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-900 disabled:opacity-50"
+                    >
+                      {advisoryLoadingPlanId === plan.id ? "Drafting" : "Draft advisory"}
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => deletePlan(plan.id)}
-                      className="rounded bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                      className="rounded bg-red-700 px-3 py-1 text-xs font-semibold text-white hover:bg-red-800"
                     >
                       Delete
                     </button>
@@ -375,6 +500,79 @@ const UpskillingConfigPage = () => {
       )}
     </>
   );
+
+  const renderAdvisoryTrainingPlan = (advisoryTrainingPlan: AdvisoryTrainingPlan | null) => {
+    if (!advisoryTrainingPlan) {
+      return null;
+    }
+
+    const reviewLabel = formatReviewLabel(advisoryTrainingPlan.governance.review.status);
+    const reviewDecisionLabel = advisoryTrainingPlan.governance.final_decision
+      ? "Review recorded"
+      : "Review draft";
+
+    return (
+      <section className="mt-8 rounded border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
+              Advisory training plan
+            </p>
+            <h4 className="mt-2 text-base font-semibold text-black dark:text-white">
+              Draft plan for professor review
+            </h4>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+              {formatLabel(advisoryTrainingPlan.status)}
+            </span>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+              {reviewLabel}
+            </span>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+              {reviewDecisionLabel}
+            </span>
+          </div>
+        </div>
+
+        <dl className="mt-4 grid gap-3 text-sm text-amber-950 md:grid-cols-3 dark:text-amber-100">
+          <div>
+            <dt className="font-semibold">Human review</dt>
+            <dd>{advisoryTrainingPlan.human_review_required ? "Required" : "Not required"}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold">Advisory state</dt>
+            <dd>{advisoryTrainingPlan.governance.advisory_only ? "Advisory only" : "Review required"}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold">Appeal</dt>
+            <dd>{advisoryTrainingPlan.governance.appeal.available ? "Available" : "Unavailable"}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-4 space-y-3">
+          {advisoryTrainingPlan.steps.map((step) => (
+            <article
+              key={`${step.sequence}:${step.title}`}
+              className="rounded border border-amber-200 bg-white/80 p-3 dark:border-amber-900/60 dark:bg-amber-950/30"
+            >
+              <p className="text-sm font-semibold text-black dark:text-white">
+                {step.sequence}. {step.title}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-amber-950 dark:text-amber-100">
+                {step.rationale}
+              </p>
+              {step.evidence_refs.length > 0 && (
+                <p className="mt-2 text-xs font-medium text-amber-800 dark:text-amber-200">
+                  Evidence: {step.evidence_refs.join(", ")}
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  };
 
   const renderDetailView = () => (
     <>
@@ -485,7 +683,7 @@ const UpskillingConfigPage = () => {
             <button
               type="button"
               onClick={addParagraph}
-              className="rounded bg-cyan-600 px-3 py-1 text-xs font-semibold text-white hover:bg-cyan-700"
+              className="rounded bg-cyan-700 px-3 py-1 text-xs font-semibold text-white hover:bg-cyan-800"
             >
               + Add Paragraph
             </button>
@@ -532,42 +730,66 @@ const UpskillingConfigPage = () => {
           </div>
         </div>
 
-        {/* Save */}
-        <button
-          type="button"
-          onClick={savePlan}
-          disabled={formLoading}
-          className="rounded bg-cyan-600 px-6 py-2 font-semibold text-white hover:bg-cyan-700 disabled:opacity-50"
-        >
-          {formLoading ? "Saving…" : editingPlanId ? "Update Plan" : "Create Plan"}
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={savePlan}
+            disabled={formLoading}
+            className="rounded bg-cyan-700 px-6 py-2 font-semibold text-white hover:bg-cyan-800 disabled:opacity-50"
+          >
+            {formLoading ? "Saving…" : editingPlanId ? "Update Plan" : "Create Plan"}
+          </button>
+          {editingPlanId && (
+            <button
+              type="button"
+              onClick={() => draftAdvisoryTrainingPlan(editingPlanId, "detail")}
+              disabled={advisoryLoadingPlanId === editingPlanId}
+              className="rounded bg-amber-800 px-6 py-2 font-semibold text-white hover:bg-amber-900 disabled:opacity-50"
+            >
+              {advisoryLoadingPlanId === editingPlanId
+                ? "Drafting advisory plan"
+                : "Draft advisory training plan"}
+            </button>
+          )}
+        </div>
       </div>
+
+      {renderAdvisoryTrainingPlan(formAdvisoryTrainingPlan)}
 
       {/* Evaluations section */}
       {formEvaluations.length > 0 && (
         <div className="mt-8">
           <h4 className="mb-3 text-base font-semibold text-black dark:text-white">Evaluations</h4>
           <div className="space-y-2">
-            {formEvaluations.map((ev) => (
-              <div
-                key={ev.paragraph_index}
-                className="rounded border border-stroke dark:border-form-strokedark"
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleEval(ev.paragraph_index)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-black hover:bg-gray-50 dark:text-white dark:hover:bg-white/5"
-                >
-                  <span>
-                    §{ev.paragraph_index + 1} — {ev.title}
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {expandedEvals.has(ev.paragraph_index) ? "▲" : "▼"}
-                  </span>
-                </button>
+            {formEvaluations.map((ev) => {
+              const isExpanded = expandedEvals.has(ev.paragraph_index);
+              const feedbackRegionId = `evaluation-feedback-${ev.paragraph_index}`;
 
-                {expandedEvals.has(ev.paragraph_index) && (
-                  <div className="border-t border-stroke px-4 py-3 dark:border-form-strokedark">
+              return (
+                <div
+                  key={ev.paragraph_index}
+                  className="rounded border border-stroke dark:border-form-strokedark"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleEval(ev.paragraph_index)}
+                    aria-expanded={isExpanded}
+                    aria-controls={feedbackRegionId}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-black hover:bg-gray-50 dark:text-white dark:hover:bg-white/5"
+                  >
+                    <span>
+                      §{ev.paragraph_index + 1} — {ev.title}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {isExpanded ? "▲" : "▼"}
+                    </span>
+                  </button>
+
+                  <div
+                    id={feedbackRegionId}
+                    hidden={!isExpanded}
+                    className="border-t border-stroke px-4 py-3 dark:border-form-strokedark"
+                  >
                     {ev.feedback.map((fb) => (
                       <div key={feedbackKey(ev, fb)} className="mb-3 last:mb-0">
                         <div className="mb-1 flex items-center gap-2">
@@ -599,9 +821,9 @@ const UpskillingConfigPage = () => {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
