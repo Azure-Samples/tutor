@@ -25,7 +25,7 @@
     ],
     "python.analysis.indexing": false,
     "python.analysis.typeCheckingMode": "basic",
-    "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python",
+    "python.defaultInterpreterPath": "python",
     "python.analysis.packageIndexDepths": [
         {
           "name": "promptflow",
@@ -34,7 +34,7 @@
         {
           "name": "fastapi",
           "depth": 2
-        },
+        }
       ],
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.variableTypes": true,

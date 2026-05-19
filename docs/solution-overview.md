@@ -98,7 +98,7 @@ All services share a single **Azure Cosmos DB** account with multiple containers
 | Azure Cosmos SDK | ≥4.9.0 | Data access |
 | Azure AI Agents SDK | ≥1.0.0b2 | Agent orchestration |
 | Azure AI Projects SDK | ≥1.0.0b10 | Foundry integration |
-| Jinja2 | ≥3.1.6 | Prompt templating |
+| Python stdlib `string.Template` | 3.13 | Lightweight prompt slot substitution |
 | structlog | ≥24.3.0 | Structured logging |
 | tenacity | ≥9.0.0 | Retry logic |
 

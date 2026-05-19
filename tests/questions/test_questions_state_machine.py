@@ -1,5 +1,8 @@
+from pathlib import Path
+
 import pytest
 from questions.app.questions import (
+    PromptComposer,
     QuestionEvaluationStatus,
     QuestionStateMachine,
     evaluate_question,
@@ -77,6 +80,34 @@ async def test_evaluate_question_returns_completed(monkeypatch):
     assert request.context["question_id"] == "q1"
     assert request.context["answer_id"] == "a1"
     assert request.store is False
+
+
+def test_prompt_composer_renders_question_answer_and_dimension():
+    composer = PromptComposer(Path(__file__).resolve().parents[2] / "apps" / "questions" / "app" / "prompts")
+
+    prompt = composer.render(
+        "correct.md",
+        question=Question(
+            id="q-render",
+            topic="Math",
+            question="What is 2+2?",
+            explanation=None,
+        ),
+        answer=Answer(
+            id="a-render",
+            text="4",
+            question_id="q-render",
+            respondent="Student",
+        ),
+        dimension="accuracy",
+    )
+
+    assert "topic: Math" in prompt
+    assert "question: What is 2+2?" in prompt
+    assert "explanation: None" in prompt
+    assert "answer: 4" in prompt
+    assert '"accuracy" dimension' in prompt
+    assert "{{" not in prompt
 
 
 class _LowConfidenceFoundryAgentFacade(_StubFoundryAgentFacade):

@@ -674,6 +674,49 @@ def test_prepare_resources_falls_back_to_pdf_extraction(monkeypatch, essays_app_
     assert prepared[0].content == "fallback text"
 
 
+def test_prompt_composer_renders_essay_and_resource_details(essays_app_module_fixture):
+    module = essays_app_module_fixture
+    composer = module.PromptComposer(Path(module.__file__).parent / "prompts")
+    essay = module.Essay(
+        id="essay-render",
+        topic="Citizenship",
+        content="",
+        theme="ENEM",
+        file_url="https://example.test/essay.png",
+    )
+    resources = [
+        module.Resource(
+            id="rubric-1",
+            essay_id="essay-render",
+            objective=["Competência 1", "Competência 2"],
+            content="Use formal register.",
+            url="https://example.test/rubric",
+            file_name="rubric.md",
+            content_type="text/markdown",
+            metadata={"source": "unit"},
+        ),
+        module.Resource(
+            id="scan-1",
+            essay_id="essay-render",
+            objective=["Handwriting extraction"],
+            file_name="essay.png",
+            content_type="image/png",
+        ),
+    ]
+
+    prompt = composer.render("correct.md", essay, resources)
+
+    assert "Tema: ENEM" in prompt
+    assert "URL do arquivo: https://example.test/essay.png" in prompt
+    assert "Conteúdo: não fornecido em texto" in prompt
+    assert "Objetivos: Competência 1, Competência 2" in prompt
+    assert "Metadados: {'source': 'unit'}" in prompt
+    assert "Detalhes: Use formal register." in prompt
+    assert "arquivo essay.png" in prompt
+    assert "{{" not in prompt
+    assert "{%" not in prompt
+
+
 @pytest.mark.asyncio
 async def test_grader_interaction_accepts_essay_id(monkeypatch, essays_main_module_fixture):
     module = essays_main_module_fixture

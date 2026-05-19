@@ -204,6 +204,40 @@ def test_evaluate_persisted_plan(api_client):
     assert len(plan["evaluations"]) > 0
 
 
+def test_prompt_composer_renders_plan_context_and_performance_history(api_client):
+    from app.orchestrator import PlanContext, PromptComposer
+    from app.schemas import PerformanceSnapshot, PlanParagraph
+
+    composer = PromptComposer(UPSKILLING_APP / "app" / "prompts")
+    context = PlanContext(
+        timeframe="week",
+        topic="Physics",
+        class_id="class-1",
+        performance_history=[
+            PerformanceSnapshot(
+                period="April",
+                topic="Forces",
+                proficiency=0.76,
+                highlights=["Free-body diagrams"],
+                gaps=["Vector decomposition"],
+            )
+        ],
+    )
+    paragraph = PlanParagraph(title="Intro", content="Start with the basics.")
+
+    prompt = composer.render("performance.md", paragraph=paragraph, context=context)
+
+    assert "Timeframe: week" in prompt
+    assert "Topic: Physics" in prompt
+    assert "Class ID: class-1" in prompt
+    assert "Proficiency: 76%" in prompt
+    assert "Strengths: Free-body diagrams" in prompt
+    assert "Gaps: Vector decomposition" in prompt
+    assert "Title: Intro" in prompt
+    assert "Start with the basics." in prompt
+    assert "{{" not in prompt
+
+
 def test_advisory_training_plan_is_draft_reviewable_and_persisted(api_client):
     created = _content(api_client.post("/plans", json=_PLAN_PAYLOAD, headers=_auth_headers()))
     plan_id = created["id"]

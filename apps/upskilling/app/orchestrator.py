@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
+from string import Template
 
-import jinja2
 from tutor_lib.agents import AgentInvocationRequest, AgentReference, FoundryAgentFacade
 from tutor_lib.config import get_settings
 
-from .schemas import AgentFeedback, ParagraphEvaluation, PlanParagraph, PlanRequest
+from .schemas import AgentFeedback, ParagraphEvaluation, PerformanceSnapshot, PlanParagraph, PlanRequest
 
 
 @dataclass(slots=True)
@@ -21,7 +21,7 @@ class PlanContext:
     timeframe: str
     topic: str
     class_id: str
-    performance_history: list[dict]
+    performance_history: list[PerformanceSnapshot]
 
 
 @dataclass(slots=True)
@@ -66,13 +66,8 @@ class PlanAgentVisitor:
     async def visit(self, element: PlanParagraphElement) -> AgentFeedback:
         prompt = self._composer.render(
             self.template_name,
-            paragraph=element.paragraph.model_dump(),
-            context={
-                "timeframe": element.context.timeframe,
-                "topic": element.context.topic,
-                "class_id": element.context.class_id,
-            },
-            performance_history=element.context.performance_history,
+            paragraph=element.paragraph,
+            context=element.context,
         )
         request = AgentInvocationRequest(
             agent=self._agent_reference,
@@ -101,28 +96,59 @@ class PlanAgentVisitor:
 
 class PerformanceInsightVisitor(PlanAgentVisitor):
     agent_name = "performance-analyst"
-    template_name = "performance.jinja"
+    template_name = "performance.md"
 
 
 class ContentComplexityVisitor(PlanAgentVisitor):
     agent_name = "content-curator"
-    template_name = "content_complexity.jinja"
+    template_name = "content_complexity.md"
 
 
 class GuidanceCoachVisitor(PlanAgentVisitor):
     agent_name = "guidance-coach"
-    template_name = "guidance.jinja"
+    template_name = "guidance.md"
 
 
 class PromptComposer:
-    """Simple Jinja template wrapper for prompt rendering."""
+    """Compose upskilling prompts from Markdown slots and typed builders."""
 
     def __init__(self, template_dir: Path) -> None:
-        loader = jinja2.FileSystemLoader(str(template_dir))
-        self._env = jinja2.Environment(loader=loader, autoescape=False, trim_blocks=True, lstrip_blocks=True)
+        self._template_dir = template_dir
 
-    def render(self, template_name: str, **context) -> str:
-        return self._env.get_template(template_name).render(**context)
+    def render(self, template_name: str, *, paragraph: PlanParagraph, context: PlanContext) -> str:
+        template_text = (self._template_dir / template_name).read_text(encoding="utf-8")
+        # PEP 292 Template keeps prompt files to strict $slot substitution.
+        return Template(template_text).substitute(
+            {
+                "timeframe": context.timeframe,
+                "topic": context.topic,
+                "class_id": context.class_id,
+                "performance_history": _format_performance_history(context.performance_history),
+                "paragraph_title": paragraph.title,
+                "paragraph_content": paragraph.content,
+            }
+        )
+
+
+def _format_performance_history(snapshots: Sequence[PerformanceSnapshot]) -> str:
+    if not snapshots:
+        return "No historical performance data provided."
+    return "\n".join(_format_performance_snapshot(snapshot) for snapshot in snapshots)
+
+
+def _format_performance_snapshot(snapshot: PerformanceSnapshot) -> str:
+    proficiency = f"{snapshot.proficiency * 100:.0f}%"
+    return (
+        f"- Period: {snapshot.period} | Topic: {snapshot.topic} | Proficiency: {proficiency}\n"
+        f"  Strengths: {_format_history_items(snapshot.highlights)}\n"
+        f"  Gaps: {_format_history_items(snapshot.gaps)}"
+    )
+
+
+def _format_history_items(items: Sequence[str] | None) -> str:
+    if not items:
+        return "None captured"
+    return "; ".join(items)
 
 
 class PlanEvaluationIterator:
@@ -179,7 +205,7 @@ class PlanEvaluationOrchestrator:
             timeframe=request.timeframe,
             topic=request.topic,
             class_id=request.class_id,
-            performance_history=[snapshot.model_dump() for snapshot in request.performance_history],
+            performance_history=list(request.performance_history),
         )
         iterable = PlanEvaluationIterable(request, self._visitors, context)
         evaluations: list[ParagraphEvaluation] = []

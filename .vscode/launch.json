@@ -2,77 +2,223 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Avatar",
+      "name": "Service: avatar",
       "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
       "cwd": "${workspaceFolder}\\apps\\avatar\\src",
-      "request": "launch",
-      "module": "uvicorn",
-      "python": "${workspaceFolder}\\apps\\avatar\\.venv\\Scripts\\python.exe",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\apps\\avatar"
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\avatar\\src"
       },
-      "args": ["app.main:app", "--reload", "--port", "8084"],
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8081"],
+      "console": "integratedTerminal",
       "jinja": true,
-      "justMyCode": false
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
     },
     {
-      "name": "Essay",
+      "name": "Service: configuration",
       "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "cwd": "${workspaceFolder}\\apps\\configuration\\src",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\configuration\\src"
+      },
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8082"],
+      "console": "integratedTerminal",
+      "jinja": true,
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
+    },
+    {
+      "name": "Service: essays",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
       "cwd": "${workspaceFolder}\\apps\\essays\\src",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\essays\\src"
+      },
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8083"],
+      "console": "integratedTerminal",
+      "jinja": true,
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
+    },
+    {
+      "name": "Service: questions",
+      "type": "debugpy",
       "request": "launch",
       "module": "uvicorn",
-      "python": "${workspaceFolder}\\apps\\essays\\.venv\\Scripts\\python.exe",
+      "cwd": "${workspaceFolder}\\apps\\questions",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\apps\\essays"
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\questions"
       },
-      "args": ["app.main:app", "--reload", "--port", "8083"],
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8084"],
+      "console": "integratedTerminal",
       "jinja": true,
-      "justMyCode": false
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
     },
     {
-      "name": "Questions",
+      "name": "Service: upskilling",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\questions",
       "request": "launch",
       "module": "uvicorn",
-      "python": "${workspaceFolder}\\apps\\questions\\.venv\\Scripts\\python.exe",
+      "cwd": "${workspaceFolder}\\apps\\upskilling",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\src"
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\upskilling"
       },
-      "args": ["app.main:app", "--reload", "--port", "8082"],
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8085"],
+      "console": "integratedTerminal",
       "jinja": true,
-      "justMyCode": false
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
     },
     {
-      "name": "Configuration",
+      "name": "Service: chat",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\configuration",
       "request": "launch",
       "module": "uvicorn",
-      "python": "${workspaceFolder}\\apps\\configuration\\.venv\\Scripts\\python.exe",
+      "cwd": "${workspaceFolder}\\apps\\chat\\src",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
       "env": {
-        "Path": "${env:Path};${workspaceFolder}\\src"
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\chat\\src"
       },
-      "args": ["app.main:app", "--reload", "--port", "8081"],
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8086"],
+      "console": "integratedTerminal",
       "jinja": true,
-      "justMyCode": false
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
     },
     {
-      "name": "Frontend",
-      "type": "node",
-      "request": "launch",
-      "cwd": "${workspaceFolder}\\frontend",
-      "runtimeExecutable": "yarn",
-      "runtimeArgs": ["dev"],
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Essay Demo Debugger",
+      "name": "Service: evaluation",
       "type": "debugpy",
-      "cwd": "${workspaceFolder}\\src\\essays",
       "request": "launch",
-      "program": "${file}",
-      "python": "${workspaceFolder}\\apps\\essays\\.venv\\Scripts\\python.exe"
+      "module": "uvicorn",
+      "cwd": "${workspaceFolder}\\apps\\evaluation\\src",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\evaluation\\src"
+      },
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8087"],
+      "console": "integratedTerminal",
+      "jinja": true,
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
+    },
+    {
+      "name": "Service: lms-gateway",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "cwd": "${workspaceFolder}\\apps\\lms-gateway\\src",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\lms-gateway\\src"
+      },
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8088"],
+      "console": "integratedTerminal",
+      "jinja": true,
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
+    },
+    {
+      "name": "Service: insights",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "cwd": "${workspaceFolder}\\apps\\insights\\src",
+      "python": "python",
+      "envFile": "${workspaceFolder}\\.env",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}\\lib\\src;${workspaceFolder}\\apps\\insights\\src"
+      },
+      "args": ["app.main:app", "--host", "127.0.0.1", "--port", "8089"],
+      "console": "integratedTerminal",
+      "jinja": true,
+      "justMyCode": false,
+      "preLaunchTask": "env: verify"
+    },
+    {
+      "name": "Frontend: Next dev",
+      "type": "node-terminal",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "command": "pnpm --dir frontend dev",
+      "preLaunchTask": "env: verify"
+    },
+    {
+      "name": "Attach: backend by port",
+      "type": "debugpy",
+      "request": "attach",
+      "connect": { "host": "127.0.0.1", "port": "${input:debugpyPort}" },
+      "pathMappings": [{ "localRoot": "${workspaceFolder}", "remoteRoot": "${workspaceFolder}" }],
+      "justMyCode": false
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug: all backends",
+      "configurations": [
+        "Service: avatar",
+        "Service: configuration",
+        "Service: essays",
+        "Service: questions",
+        "Service: upskilling",
+        "Service: chat",
+        "Service: evaluation",
+        "Service: lms-gateway",
+        "Service: insights"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Debug: full stack",
+      "configurations": [
+        "Service: avatar",
+        "Service: configuration",
+        "Service: essays",
+        "Service: questions",
+        "Service: upskilling",
+        "Service: chat",
+        "Service: evaluation",
+        "Service: lms-gateway",
+        "Service: insights",
+        "Frontend: Next dev"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Debug: frontend + chat",
+      "configurations": ["Service: chat", "Frontend: Next dev"]
+    },
+    {
+      "name": "Debug: frontend + evaluation",
+      "configurations": ["Service: evaluation", "Frontend: Next dev"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "debugpyPort",
+      "type": "pickString",
+      "description": "Backend debugpy port: avatar 5681, configuration 5682, essays 5683, questions 5684, upskilling 5685, chat 5686, evaluation 5687, lms-gateway 5688, insights 5689",
+      "options": ["5681", "5682", "5683", "5684", "5685", "5686", "5687", "5688", "5689"],
+      "default": "5686"
     }
   ]
 }

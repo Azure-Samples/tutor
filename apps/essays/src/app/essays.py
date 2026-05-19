@@ -8,9 +8,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from string import Template
 from typing import Any
 
-import jinja2
 from azure.core.exceptions import AzureError
 from azure.cosmos import exceptions
 from pydantic import ValidationError
@@ -67,21 +67,73 @@ class EssayEvaluationResult:
 
 
 class PromptComposer:
-    """Render Jinja prompts using the essay and its supporting resources."""
+    """Compose editable prompt artifacts with service-owned Markdown builders."""
 
     def __init__(self, template_dir: Path) -> None:
-        loader = jinja2.FileSystemLoader(str(template_dir))
-        self._env = jinja2.Environment(loader=loader, autoescape=False)
+        self._template_dir = template_dir
 
     def render(self, template_name: str, essay: Essay, resources: Iterable[Resource]) -> str:
-        template = self._env.get_template(template_name)
-        return template.render(essay=essay.model_dump(), resources=[r.model_dump() for r in resources])
+        template_text = (self._template_dir / template_name).read_text(encoding="utf-8")
+        template_values = _build_essay_prompt_values(essay, list(resources))
+        # PEP 292 Template keeps prompt files to strict $slot substitution.
+        return Template(template_text).substitute(template_values)
+
+
+def _build_essay_prompt_values(essay: Essay, resources: Sequence[Resource]) -> dict[str, str]:
+    return {
+        "essay_theme": essay.theme or "N/A",
+        "essay_topic": essay.topic,
+        "essay_file_url": essay.file_url or "nenhum",
+        "essay_content": _format_essay_content(essay),
+        "resources": _format_resources(resources),
+    }
+
+
+def _format_essay_content(essay: Essay) -> str:
+    if essay.content:
+        return f"Conteúdo:\n{essay.content}"
+    return (
+        "Conteúdo: não fornecido em texto. Leia integralmente os recursos anexados "
+        "(incluindo imagens) para extrair o texto do ensaio antes de avaliá-lo."
+    )
+
+
+def _format_resources(resources: Sequence[Resource]) -> str:
+    return "\n".join(_format_resource(resource) for resource in resources)
+
+
+def _format_resource(resource: Resource) -> str:
+    detail = _format_resource_detail(resource)
+    objectives = ", ".join(resource.objective)
+    metadata = resource.metadata or "nenhum"
+    return (
+        f"- ID do critério: {resource.id}\n"
+        f"  Objetivos: {objectives}\n"
+        f"  URL de referência: {resource.url or 'nenhum'}\n"
+        f"  Nome do arquivo: {resource.file_name or 'nenhum'}\n"
+        f"  Tipo de conteúdo: {resource.content_type or 'texto'}\n"
+        f"  Metadados: {metadata}\n"
+        f"  {detail}"
+    )
+
+
+def _format_resource_detail(resource: Resource) -> str:
+    if resource.content:
+        return f"Detalhes: {resource.content}"
+    if resource.content_type and resource.content_type.startswith("image/"):
+        file_label = resource.file_name or resource.id
+        return (
+            "Detalhes: A redação está fornecida como imagem "
+            f"(arquivo {file_label}). Extraia todo o texto dessa imagem usando "
+            "visão antes de avaliar; não solicite conteúdo adicional ao usuário."
+        )
+    return "Detalhes: n/a"
 
 
 class EssayEvaluationStrategy:
     """Base class for strategy implementations."""
 
-    template_name = "correct.jinja"
+    template_name = "correct.md"
 
     def __init__(self, agent_facade: FoundryAgentFacade, composer: PromptComposer) -> None:
         self._agent_facade = agent_facade

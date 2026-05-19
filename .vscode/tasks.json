@@ -1,0 +1,335 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "env: verify",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\test-env.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "local: start all",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "start"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "local: start all debug",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "start",
+        "-DebugBackend"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "local: start chat debug",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "start",
+        "-Services",
+        "chat",
+        "-NoFrontend",
+        "-DebugBackend"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "local: stop all",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "stop"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "local: restart all",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "restart"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "local: status",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "status"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "local: health",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "health"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "local: check",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\.vscode\\scripts\\local-dev.ps1",
+        "-Action",
+        "check"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "dev: frontend",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--dir", "frontend", "dev"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "dev: avatar",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "avatar"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: configuration",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "configuration"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: essays",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "essays"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: questions",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "questions"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: upskilling",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "upskilling"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: chat",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "chat"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: evaluation",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "evaluation"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: lms-gateway",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "lms-gateway"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: insights",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\start-service.ps1", "-Service", "insights"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "panel": "dedicated" }
+    },
+    {
+      "label": "dev: all backends",
+      "dependsOrder": "parallel",
+      "dependsOn": [
+        "dev: avatar",
+        "dev: configuration",
+        "dev: essays",
+        "dev: questions",
+        "dev: upskilling",
+        "dev: chat",
+        "dev: evaluation",
+        "dev: lms-gateway",
+        "dev: insights"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "dev: full stack",
+      "dependsOrder": "parallel",
+      "dependsOn": ["dev: all backends", "dev: frontend"],
+      "problemMatcher": []
+    },
+    {
+      "label": "health: local services",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\.vscode\\scripts\\check-health.ps1"],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: backend tests",
+      "type": "shell",
+      "command": "python",
+      "args": ["-m", "pytest", "tests", "-q"],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: frontend lint",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--dir", "frontend", "lint"],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: frontend typecheck",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--dir", "frontend", "typecheck"],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: e2e list",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--dir", "frontend", "e2e:list"],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: e2e",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--dir", "frontend", "e2e"],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: all fast",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "env: verify",
+        "check: frontend lint",
+        "check: frontend typecheck",
+        "check: e2e list",
+        "check: backend tests"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "check: all full",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "env: verify",
+        "check: frontend lint",
+        "check: frontend typecheck",
+        "check: e2e",
+        "check: backend tests"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable
 from pathlib import Path
+from string import Template
 from typing import Protocol
 
-import jinja2
 from azure.core.exceptions import AzureError
 from azure.cosmos import exceptions
 from pydantic import ValidationError
@@ -65,7 +65,7 @@ class EvaluatingState:
 
     async def _run_dimension(self, context: QuestionStateMachine, grader: Grader) -> DimensionEvaluation:
         prompt = context.prompt_composer.render(
-            "correct.jinja",
+            "correct.md",
             question=context.question,
             answer=context.answer,
             dimension=grader.dimension,
@@ -111,16 +111,29 @@ class CompletedState:
 
 
 class PromptComposer:
+    """Compose question prompts from plain text slots and typed inputs."""
+
     def __init__(self, template_dir: Path) -> None:
-        self._env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(template_dir)))
+        self._template_dir = template_dir
 
     def render(self, template: str, *, question: Question, answer: Answer, dimension: str) -> str:
-        template_obj = self._env.get_template(template)
-        return template_obj.render(
-            question=question.model_dump(),
-            answer=answer.model_dump(),
-            dimension=dimension,
+        template_text = (self._template_dir / template).read_text(encoding="utf-8")
+        # PEP 292 Template keeps prompt files to strict $slot substitution.
+        return Template(template_text).substitute(
+            {
+                "question_topic": question.topic,
+                "question_text": question.question,
+                "question_explanation": _format_question_explanation(question),
+                "answer_text": answer.text,
+                "dimension": dimension,
+            }
         )
+
+
+def _format_question_explanation(question: Question) -> str:
+    if question.explanation is None:
+        return "None"
+    return question.explanation
 
 
 class QuestionStateMachine:

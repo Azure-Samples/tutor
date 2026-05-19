@@ -955,7 +955,7 @@ flowchart TD
         DEFAULT["DefaultEssayStrategy"]
     end
 
-    COMPOSE["PromptComposer.render()\nJinja2 template"]
+    COMPOSE["PromptComposer.render()\nstdlib Template + Markdown builders"]
     ATTACHMENTS["_build_image_attachments()\nBase64 → binary for vision"]
     FOUNDRY["FoundryAgentFacade.invoke()\nMicrosoft Foundry Agent Service"]
     THREAD["Conversation/response adapter\nstore policy + tool calls + trace id"]
@@ -1038,7 +1038,7 @@ flowchart TD
         DIM_N["Grader: dimension_N\nAgentReference(name, version)"]
     end
 
-    PROMPT["PromptComposer.render()\ncorrect.jinja + question + answer"]
+    PROMPT["PromptComposer.render()\ncorrect.md + question + answer"]
     AGENT["tutor_lib.agents.invoke()\nAgentReference(name, version)"]
     RUN["AgentInvocationResult\ncontent + provenance + trace"]
     CONFIDENCE["_infer_confidence(notes)"]
@@ -1059,7 +1059,7 @@ flowchart TD
 
 - **Cosmos DB**: Assemblies (Foundry agent references), questions, answers, graders
 - **Azure AI Foundry**: Agent execution through `tutor_lib.agents`; the service coordinates parallel dimension prompts and captures Foundry provenance
-- **Jinja2**: Prompt rendering with question/answer context per grading dimension
+- **Prompt composition**: Editable Markdown prompt files with stdlib `$slot` substitution and service-owned helpers for question/answer context per grading dimension
 
 ---
 
@@ -1143,15 +1143,15 @@ flowchart TD
         ELEMENT["PlanParagraphElement(index, paragraph, context)"]
         
         subgraph Visitors["Visitor Agents (sequential per paragraph)"]
-            PERF["PerformanceInsightVisitor\nagent: performance-analyst\ntemplate: performance.jinja"]
-            CONTENT["ContentComplexityVisitor\nagent: content-curator\ntemplate: content_complexity.jinja"]
-            GUIDANCE["GuidanceCoachVisitor\nagent: guidance-coach\ntemplate: guidance.jinja"]
+            PERF["PerformanceInsightVisitor\nagent: performance-analyst\ntemplate: performance.md"]
+            CONTENT["ContentComplexityVisitor\nagent: content-curator\ntemplate: content_complexity.md"]
+            GUIDANCE["GuidanceCoachVisitor\nagent: guidance-coach\ntemplate: guidance.md"]
         end
 
         ACCEPT["element.accept(visitor)\n→ AgentFeedback"]
     end
 
-    PROMPT["PromptComposer.render()\nJinja2 template with paragraph + context"]
+    PROMPT["PromptComposer.render()\nstdlib Template with paragraph + context"]
     AGENT_RUN["tutor_lib.agents.invoke()\nFoundry agent loaded by name/version"]
     PARSE["_parse_feedback(text)\n→ verdict, strengths, improvements"]
     EVAL["ParagraphEvaluation\n{paragraph_index, title, feedback[]}"]
@@ -1172,7 +1172,7 @@ flowchart TD
 **Key integration points:**
 
 - **Azure AI Foundry**: Three specialized agents per paragraph evaluation (loaded by Foundry agent name/version)
-- **Jinja2**: Template-driven prompt composition with performance history context
+- **Prompt composition**: Editable Markdown prompt files with stdlib `$slot` substitution; Python helpers build performance history and paragraph context blocks
 - **tutor_lib**: Shared agent facade, `AgentReference`, `AgentInvocationRequest`, `AgentInvocationResult`, and `Assembly` models
 
 ---
