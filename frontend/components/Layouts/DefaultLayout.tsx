@@ -6,7 +6,7 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 
 const WORKSPACE_SHELL_METRICS_CLASS =
-  "[--workspace-header-offset:9.75rem] [--workspace-sidebar-width:15.5rem] sm:[--workspace-header-offset:8.75rem] lg:[--workspace-header-offset:4.5rem]";
+  "[--workspace-header-offset:9.75rem] [--workspace-sidebar-width:15.5rem]";
 const PUBLIC_SHELL_METRICS_CLASS = "[--workspace-header-offset:5rem]";
 const DESKTOP_SIDEBAR_QUERY = "(min-width: 1024px)";
 
@@ -22,6 +22,8 @@ export default function DefaultLayout({
   // No GoF pattern applies; this layout tracks simple responsive disclosure state.
   const [sidebarState, setSidebarState] = useState<SidebarDisclosureState>("responsive");
   const [isDesktopSidebarViewport, setIsDesktopSidebarViewport] = useState(false);
+  const shellRef = useRef<HTMLElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const sidebarSwitcherRef = useRef<HTMLButtonElement>(null);
   const isWorkspaceShell = variant === "workspace";
   const sidebarOpen =
@@ -38,14 +40,48 @@ export default function DefaultLayout({
     return () => desktopQuery.removeEventListener("change", syncDesktopViewport);
   }, []);
 
+  useEffect(() => {
+    const shell = shellRef.current;
+    const header = headerRef.current;
+
+    if (!shell || !header) {
+      return;
+    }
+
+    // No GoF pattern applies; mirror the measured fixed header height into shell CSS.
+    const updateHeaderOffset = () => {
+      const measuredHeight = Math.ceil(header.getBoundingClientRect().height);
+
+      if (measuredHeight > 0) {
+        shell.style.setProperty("--workspace-header-offset", `${measuredHeight}px`);
+      }
+    };
+
+    updateHeaderOffset();
+
+    const ResizeObserverConstructor = window.ResizeObserver as typeof ResizeObserver | undefined;
+
+    if (!ResizeObserverConstructor) {
+      window.addEventListener("resize", updateHeaderOffset);
+
+      return () => window.removeEventListener("resize", updateHeaderOffset);
+    }
+
+    const resizeObserver = new ResizeObserverConstructor(updateHeaderOffset);
+    resizeObserver.observe(header);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
   return (
     <main
+      ref={shellRef}
       id="main-content"
       className={`min-h-screen overflow-x-hidden text-slate-900 dark:text-slate-100 ${
         isWorkspaceShell ? WORKSPACE_SHELL_METRICS_CLASS : PUBLIC_SHELL_METRICS_CLASS
       }`}
     >
-      <div className="fixed left-0 top-0 z-50 w-full">
+      <div ref={headerRef} id="workspace-header" className="fixed left-0 top-0 z-50 w-full">
         <Header
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
@@ -62,6 +98,7 @@ export default function DefaultLayout({
           />
         )}
         <div
+          data-workspace-main-panel="true"
           className={`min-h-[calc(100vh_-_var(--workspace-header-offset))] min-w-0 transition-[margin] duration-200 ${
             isWorkspaceShell && sidebarState !== "closed" ? "lg:ml-[var(--workspace-sidebar-width)]" : ""
           }`}

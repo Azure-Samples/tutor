@@ -334,7 +334,7 @@ const WorkspaceHome = () => {
             </h1>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-300">
               {snapshot
-                ? `Current context: ${snapshot.context_label}. Deterministic highlights, advisory items, and attention states below are coming from the backend snapshot contract.`
+                ? `Current context: ${snapshot.context_label}. Highlights, advisory items, and attention states below come from the Insights workspace snapshot for this context.`
                 : `Tutor is preparing the latest ${roleConfig.label.toLowerCase()} snapshot for this context.`}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
