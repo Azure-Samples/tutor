@@ -49,7 +49,7 @@ const CountCard = ({
   value: string | number;
   detail: string;
 }) => (
-  <div className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
+  <div className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/60">
     <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
       {label}
     </dt>
@@ -59,7 +59,7 @@ const CountCard = ({
 );
 
 const StatusPill = ({ label }: { label: string }) => (
-  <span className="inline-flex rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+  <span className="inline-flex max-w-full break-words rounded-full border border-stone-200 bg-white px-3 py-1 text-left text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
     {label}
   </span>
 );
@@ -141,13 +141,13 @@ const WorkspaceLifelongNetworkPanel = () => {
   const publicationStatus = network?.publication_approvals[0]?.status ?? "review_required";
 
   return (
-    <section className="rounded-[1.75rem] border border-stone-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+    <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm md:p-5 dark:border-slate-700 dark:bg-slate-900/75">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-700 dark:text-teal-300">
             P3 lifelong network
           </p>
-          <h2 className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <h2 className="mt-3 break-words text-xl font-semibold text-slate-900 dark:text-slate-50">
             Credentials, portfolio, re-entry, and research governance
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
@@ -166,12 +166,12 @@ const WorkspaceLifelongNetworkPanel = () => {
       </div>
 
       {(loadError || isMockMode) && (
-        <div className="mt-5 rounded-[1.25rem] border border-amber-200 bg-amber-50/80 p-4 text-sm leading-7 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
           {loadError || "Workspace access context is unavailable. Local pilot defaults are shown."}
         </div>
       )}
 
-      <dl className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <CountCard
           label="Credentials"
           value={network?.credentials.length ?? 0}
@@ -194,8 +194,8 @@ const WorkspaceLifelongNetworkPanel = () => {
         />
       </dl>
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <article className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/60">
+      <div className="mt-4 grid gap-3 xl:grid-cols-3">
+        <article className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <FiAward aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
@@ -209,7 +209,7 @@ const WorkspaceLifelongNetworkPanel = () => {
           </div>
         </article>
 
-        <article className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/60">
+        <article className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <FiBriefcase aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
@@ -223,7 +223,7 @@ const WorkspaceLifelongNetworkPanel = () => {
           </div>
         </article>
 
-        <article className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/60">
+        <article className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
           <div className="flex items-center gap-3">
             <FiShield aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-50">
@@ -238,7 +238,7 @@ const WorkspaceLifelongNetworkPanel = () => {
         </article>
       </div>
 
-      <div className="mt-5 rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
+      <div className="mt-4 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
         <div className="flex items-center gap-3">
           <FiDatabase aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
           <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">

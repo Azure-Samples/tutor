@@ -35,7 +35,7 @@ const PrincipalSchoolHealthPage = () => {
           "The goal is to anchor leadership work in school context, not to create a new detached reporting tool.",
         ]}
       />
-      <div className="mt-8">
+      <div className="mt-6">
         <WorkspaceGovernedIntelligencePanel workspaceRole="principal" />
       </div>
     </DefaultLayout>

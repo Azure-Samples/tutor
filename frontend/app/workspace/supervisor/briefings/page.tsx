@@ -34,7 +34,7 @@ const SupervisorBriefingsPage = () => {
           "Trust, freshness, and deep-link metadata now travel with the underlying report payloads as well.",
         ]}
       />
-      <div className="mt-8">
+      <div className="mt-6">
         <WorkspaceGovernedIntelligencePanel workspaceRole="supervisor" />
       </div>
     </DefaultLayout>

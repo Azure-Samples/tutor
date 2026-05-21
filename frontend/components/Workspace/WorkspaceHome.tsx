@@ -88,31 +88,31 @@ function SnapshotSection({
   title: string;
 }) {
   return (
-    <article className="rounded-[1.75rem] border border-stone-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
-      <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-50">{title}</h2>
+    <article className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm md:p-5 dark:border-slate-700 dark:bg-slate-900/75">
+      <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">{title}</h2>
       <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">{description}</p>
 
       {loading && (
-        <div className="mt-5 rounded-[1.25rem] border border-dashed border-stone-200 bg-stone-50/80 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+        <div className="mt-4 rounded-md border border-dashed border-stone-200 bg-stone-50/80 p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
           Loading the latest section projection...
         </div>
       )}
 
       {!loading && items.length === 0 && (
-        <div className="mt-5 rounded-[1.25rem] border border-dashed border-stone-200 bg-stone-50/80 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
+        <div className="mt-4 rounded-md border border-dashed border-stone-200 bg-stone-50/80 p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
           {emptyText}
         </div>
       )}
 
       {items.length > 0 && (
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-3">
           {items.map((item) => (
             <Link
               key={item.item_id}
               href={item.deep_link.href}
-              className="block rounded-[1.25rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
+              className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
             >
-              <div className={`rounded-[1.25rem] border p-4 ${toneStyles[item.tone]}`}>
+              <div className={`rounded-md border p-3 ${toneStyles[item.tone]}`}>
                 <div className="flex flex-wrap items-center gap-3">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.22em] opacity-75">
                     {item.deep_link.label}
@@ -121,8 +121,8 @@ function SnapshotSection({
                     <span className="text-sm font-semibold opacity-90">{item.metric}</span>
                   )}
                 </div>
-                <p className="mt-2 text-lg font-semibold">{item.title}</p>
-                <p className="mt-2 text-sm leading-7 opacity-90">{item.summary}</p>
+                <p className="mt-2 text-base font-semibold">{item.title}</p>
+                <p className="mt-2 text-sm leading-6 opacity-90">{item.summary}</p>
               </div>
             </Link>
           ))}
@@ -261,11 +261,11 @@ const WorkspaceHome = () => {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <section className="rounded-[2rem] border border-stone-200 bg-white/90 p-6 shadow-sm md:p-8">
+        <section className="rounded-lg border border-stone-200 bg-white/90 p-5 shadow-sm md:p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-teal-700">
             {roleConfig.workspaceTitle}
           </p>
-          <h1 className="mt-4 text-4xl font-semibold text-slate-900 md:text-5xl dark:text-slate-50">
+          <h1 className="mt-4 break-words text-3xl font-semibold text-slate-900 md:text-4xl dark:text-slate-50">
             Resolving your workspace access
           </h1>
           <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-300">
@@ -279,12 +279,12 @@ const WorkspaceHome = () => {
 
   if (isMockMode) {
     return (
-      <div className="space-y-8">
-        <section className="rounded-[2rem] border border-amber-200 bg-amber-50/80 p-6 shadow-sm md:p-8 dark:border-amber-900/60 dark:bg-amber-950/20">
+      <div className="space-y-6">
+        <section className="rounded-lg border border-amber-200 bg-amber-50/80 p-5 shadow-sm md:p-6 dark:border-amber-900/60 dark:bg-amber-950/20">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-900 dark:text-amber-200">
             Fallback workspace shell
           </p>
-          <h1 className="mt-4 text-4xl font-semibold leading-tight text-slate-900 md:text-5xl dark:text-slate-50">
+          <h1 className="mt-4 break-words text-3xl font-semibold leading-tight text-slate-900 md:text-4xl dark:text-slate-50">
             Backend access context is unavailable right now.
           </h1>
           <p className="mt-4 text-lg leading-8 text-slate-700 dark:text-slate-200">
@@ -292,18 +292,18 @@ const WorkspaceHome = () => {
             temporarily using the local fallback configuration.
           </p>
           {error && (
-            <p className="mt-4 rounded-[1.25rem] border border-amber-300 bg-white/80 p-4 text-sm leading-7 text-amber-950 dark:border-amber-900/60 dark:bg-slate-950/70 dark:text-amber-100">
+            <p className="mt-4 rounded-md border border-amber-300 bg-white/80 p-3 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-slate-950/70 dark:text-amber-100">
               {error}
             </p>
           )}
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
+        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {recommendedLinks.map((item) => (
             <Link
               key={item.key}
               href={item.route}
-              className="rounded-[1.5rem] border border-stone-200 bg-white/90 p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900/75"
+              className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900/75"
             >
               <p className="text-lg font-semibold text-slate-900 dark:text-slate-50">
                 {item.label}
@@ -322,14 +322,14 @@ const WorkspaceHome = () => {
   const timeline = timelineState.data;
 
   return (
-    <div className="space-y-8">
-      <section className="rounded-[2rem] border border-stone-200 bg-white/90 p-6 shadow-sm md:p-8">
+    <div className="space-y-6">
+      <section className="rounded-lg border border-stone-200 bg-white/90 p-5 shadow-sm md:p-6">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-3xl">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-teal-700">
               {roleConfig.workspaceTitle}
             </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-tight text-slate-900 md:text-5xl dark:text-slate-50">
+            <h1 className="mt-4 break-words text-3xl font-semibold leading-tight text-slate-900 md:text-4xl dark:text-slate-50">
               {snapshot?.summary || roleConfig.publicPitch}
             </h1>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-300">
@@ -350,11 +350,11 @@ const WorkspaceHome = () => {
             </div>
           </div>
 
-          <aside className="w-full max-w-md rounded-[1.5rem] border border-stone-200 bg-stone-50/90 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+          <aside className="w-full min-w-0 rounded-lg border border-stone-200 bg-stone-50/90 p-4 shadow-sm lg:w-80 lg:flex-none dark:border-slate-700 dark:bg-slate-900/70">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
               Current context
             </p>
-            <h2 className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+            <h2 className="mt-3 text-xl font-semibold text-slate-900 dark:text-slate-50">
               {snapshot?.context_label || currentContext.label}
             </h2>
             <p className="mt-1 text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -364,7 +364,7 @@ const WorkspaceHome = () => {
               {currentContext.note}
             </p>
             {actor && (
-              <div className="mt-4 rounded-[1.25rem] border border-stone-200 bg-white/90 p-4 dark:border-slate-700 dark:bg-slate-950/70">
+              <div className="mt-4 rounded-md border border-stone-200 bg-white/90 p-3 dark:border-slate-700 dark:bg-slate-950/70">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
                   Active actor
                 </p>
@@ -380,14 +380,14 @@ const WorkspaceHome = () => {
         </div>
 
         {snapshotState.error && (
-          <div className="mt-6 rounded-[1.25rem] border border-rose-200 bg-rose-50/80 p-4 text-sm leading-7 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100">
+          <div className="mt-5 rounded-md border border-rose-200 bg-rose-50/80 p-3 text-sm leading-6 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100">
             {snapshotState.error}
           </div>
         )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <article className="rounded-lg border border-stone-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Freshness</p>
           {snapshot?.freshness ? (
             <>
@@ -418,7 +418,7 @@ const WorkspaceHome = () => {
           )}
         </article>
 
-        <article className="rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+        <article className="rounded-lg border border-stone-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Human review</p>
           {snapshot?.trust ? (
             <>
@@ -436,7 +436,7 @@ const WorkspaceHome = () => {
           )}
         </article>
 
-        <article className="rounded-[1.5rem] border border-stone-200 bg-white/85 p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+        <article className="rounded-lg border border-stone-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
           <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Provenance</p>
           {snapshot?.trust ? (
             <>
@@ -461,8 +461,8 @@ const WorkspaceHome = () => {
         </article>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,22rem)]">
-        <div className="space-y-6">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]">
+        <div className="min-w-0 space-y-5">
           <SnapshotSection
             title="Deterministic highlights"
             description="These items come directly from the backend workspace snapshot and should remain inspectable even when advisory layers change."
@@ -486,8 +486,8 @@ const WorkspaceHome = () => {
           />
         </div>
 
-        <aside className="space-y-4">
-          <section className="rounded-[1.75rem] border border-stone-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
               Trust and governance
             </p>
@@ -519,7 +519,7 @@ const WorkspaceHome = () => {
                   </p>
                 </div>
                 {snapshot.trust.degraded && (
-                  <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50/80 p-4 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
+                  <div className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
                     This snapshot includes degraded output. Tutor is surfacing the condition
                     explicitly instead of masking it.
                   </div>
@@ -533,7 +533,7 @@ const WorkspaceHome = () => {
           </section>
 
           {timelineLearnerId && (
-            <section className="rounded-[1.75rem] border border-stone-200 bg-stone-50/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
+            <section className="rounded-lg border border-stone-200 bg-stone-50/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
                 Learner record preview
               </p>
@@ -549,7 +549,7 @@ const WorkspaceHome = () => {
               )}
 
               {timelineState.error && (
-                <p className="mt-4 rounded-[1.25rem] border border-rose-200 bg-rose-50/80 p-4 text-sm leading-7 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100">
+                <p className="mt-4 rounded-md border border-rose-200 bg-rose-50/80 p-3 text-sm leading-6 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/20 dark:text-rose-100">
                   {timelineState.error}
                 </p>
               )}
@@ -566,10 +566,10 @@ const WorkspaceHome = () => {
                     <Link
                       key={entry.record_id}
                       href={entry.deep_link.href}
-                      className="block rounded-[1.25rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
+                      className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2"
                     >
                       <div
-                        className={`rounded-[1.25rem] border p-4 ${timelineStatusStyles[entry.status]}`}
+                        className={`rounded-md border p-3 ${timelineStatusStyles[entry.status]}`}
                       >
                         <div className="flex flex-wrap items-center gap-3">
                           <p className="text-sm font-semibold">{entry.title}</p>
@@ -590,7 +590,7 @@ const WorkspaceHome = () => {
             </section>
           )}
 
-          <section className="rounded-[1.75rem] border border-stone-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+          <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
               Continue exploring
             </p>
@@ -599,14 +599,14 @@ const WorkspaceHome = () => {
                 <Link
                   key={item.key}
                   href={item.route}
-                  className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
+                  className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
                 >
                   {item.label}
                 </Link>
               ))}
               <Link
                 href="/evidence-trust"
-                className="rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
+                className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
               >
                 Evidence and Trust
               </Link>

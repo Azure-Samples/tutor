@@ -1,4 +1,3 @@
-import "@/css/satoshi.css";
 import "@/css/style.css";
 import "jsvectormap/dist/jsvectormap.css";
 import "flatpickr/dist/flatpickr.min.css";
@@ -26,7 +25,7 @@ export default function RootLayout({
         <TranscriptionProvider>
           <HumanEvaluationProvider>
             <WorkspaceProvider>
-              <div id="root" className="min-h-screen dark:text-bodydark">
+              <div id="root" className="min-h-screen text-slate-900 dark:text-slate-100">
                 {children}
               </div>
             </WorkspaceProvider>

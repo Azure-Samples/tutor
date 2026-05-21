@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { startTransition, useId } from "react";
 
 const inputClassName =
-  "mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+  "mt-1 min-h-9 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
 
 const RoleSwitcher = () => {
   const id = useId();
@@ -14,7 +14,7 @@ const RoleSwitcher = () => {
   const { availableRoles, currentRole, isLoading, setRole } = useWorkspace();
 
   return (
-    <div className="min-w-[12rem]">
+    <div className="min-w-[10rem]">
       <label
         htmlFor={id}
         className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500"

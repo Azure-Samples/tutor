@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --shell-background: #f4efe7;
+  --shell-background: #f8fafc;
   --shell-surface: rgba(255, 255, 255, 0.9);
   --shell-panel: #ffffff;
-  --shell-muted: #f8f4ed;
-  --shell-border: #d8cfc1;
-  --shell-ink: #16212b;
-  --shell-subtle: #5d6873;
-  --shell-accent: #0f5e5b;
-  --shell-accent-soft: #dce9e8;
-  --shell-warm: #8a6249;
+  --shell-muted: #eef2f7;
+  --shell-border: #d7dde5;
+  --shell-ink: #0f172a;
+  --shell-subtle: #475569;
+  --shell-accent: #0f766e;
+  --shell-accent-soft: #ccfbf1;
+  --shell-warm: #92400e;
 }
 
 html.dark,
@@ -38,9 +38,7 @@ html {
 body {
   min-height: 100vh;
   color: var(--shell-ink);
-  background: radial-gradient(circle at top left, rgba(15, 94, 91, 0.08), transparent 32%),
-    radial-gradient(circle at top right, rgba(138, 98, 73, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.42), transparent 22%), var(--shell-background);
+  background: var(--shell-background);
 }
 
 body,
@@ -48,7 +46,7 @@ input,
 textarea,
 button,
 select {
-  font-family: "Satoshi", "Avenir Next", "Segoe UI", sans-serif;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
   font-feature-settings: "ss01" on, "ss02" on;
 }
 
@@ -58,8 +56,8 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: -0.03em;
+  font-family: inherit;
+  letter-spacing: 0;
 }
 
 ::selection {

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 interface RouteSmokeCase {
   heading: RegExp;
@@ -53,6 +53,69 @@ const ROUTE_SMOKE_CASES = [
   },
 ] as const satisfies readonly RouteSmokeCase[];
 
+const ADMIN_NAV_ACTIVE_CASES = [
+  {
+    activeLabel: "Configuration",
+    path: "/configuration",
+  },
+  {
+    activeLabel: "Avatar cases",
+    path: "/configuration/cases",
+  },
+  {
+    activeLabel: "Policies",
+    path: "/configuration/questions",
+  },
+  {
+    activeLabel: "Integrations",
+    path: "/lms-gateway",
+  },
+  {
+    activeLabel: "AI governance",
+    path: "/workspace/admin/ai-governance",
+  },
+] as const;
+
+const WORKSPACE_REFLOW_CASES = [
+  {
+    path: "/configuration/cases",
+    role: "admin",
+  },
+  {
+    path: "/workspace/supervisor/briefings",
+  },
+  {
+    path: "/workspace/alumni/record",
+  },
+] as const;
+
+const WORKSPACE_REFLOW_VIEWPORTS = [
+  {
+    height: 844,
+    name: "mobile",
+    width: 390,
+  },
+  {
+    height: 1024,
+    name: "tablet",
+    width: 768,
+  },
+] as const;
+
+const expectNoHorizontalOverflow = async (page: Page) => {
+  await expect
+    .poll(async () =>
+      page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+    )
+    .toBeLessThanOrEqual(1);
+};
+
+const setWorkspaceRole = async (page: Page, role: string) => {
+  await page.addInitScript((workspaceRole) => {
+    window.localStorage.setItem("tutor.workspace.role", JSON.stringify(workspaceRole));
+  }, role);
+};
+
 test.describe("modern route shells", () => {
   for (const smokeCase of ROUTE_SMOKE_CASES) {
     test(`${smokeCase.path} renders without live backend services`, async ({ page }) => {
@@ -64,5 +127,41 @@ test.describe("modern route shells", () => {
         await expect(page.getByText(smokeCase.visibleText).first()).toBeVisible();
       }
     });
+  }
+});
+
+test.describe("admin sidebar navigation", () => {
+  test.beforeEach(async ({ page }) => {
+    await setWorkspaceRole(page, "admin");
+  });
+
+  for (const navCase of ADMIN_NAV_ACTIVE_CASES) {
+    test(`${navCase.path} marks exactly one admin sidebar item active`, async ({ page }) => {
+      await page.goto(navCase.path);
+
+      await expect(page.locator("#main-content")).toBeVisible();
+
+      const activeSidebarLinks = page.locator('#sidebar nav a[aria-current="page"]');
+      await expect(activeSidebarLinks).toHaveCount(1);
+      await expect(activeSidebarLinks).toContainText(navCase.activeLabel);
+    });
+  }
+});
+
+test.describe("workspace shell reflow", () => {
+  for (const viewport of WORKSPACE_REFLOW_VIEWPORTS) {
+    for (const reflowCase of WORKSPACE_REFLOW_CASES) {
+      test(`${reflowCase.path} has no horizontal overflow on ${viewport.name}`, async ({ page }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        if ("role" in reflowCase) {
+          await setWorkspaceRole(page, reflowCase.role);
+        }
+
+        await page.goto(reflowCase.path);
+
+        await expect(page.locator("#main-content")).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+      });
+    }
   }
 });

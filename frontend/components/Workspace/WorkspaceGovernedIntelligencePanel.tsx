@@ -112,7 +112,7 @@ const metricToneClass = (status: "visible" | "suppressed") =>
     : "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-100";
 
 const StatusPill = ({ label }: { label: string }) => (
-  <span className="inline-flex rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+  <span className="inline-flex max-w-full break-words rounded-full border border-stone-200 bg-white px-3 py-1 text-left text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
     {label}
   </span>
 );
@@ -219,13 +219,13 @@ const WorkspaceGovernedIntelligencePanel = ({
     : "Learner scope required for risk";
 
   return (
-    <section className="rounded-[1.75rem] border border-stone-200 bg-white/90 p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
+    <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm md:p-5 dark:border-slate-700 dark:bg-slate-900/75">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-teal-700 dark:text-teal-300">
             P2/P3 governed status
           </p>
-          <h2 className="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+          <h2 className="mt-3 break-words text-xl font-semibold text-slate-900 dark:text-slate-50">
             School-unit intelligence and risk governance
           </h2>
           <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
@@ -244,13 +244,13 @@ const WorkspaceGovernedIntelligencePanel = ({
       </div>
 
       {(loadError || isMockMode) && (
-        <div className="mt-5 rounded-[1.25rem] border border-amber-200 bg-amber-50/80 p-4 text-sm leading-7 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
           {loadError || "Workspace access context is unavailable. Local pilot defaults are shown."}
         </div>
       )}
 
-      <div className={`mt-5 grid gap-4 ${canDraftCausalStudy ? "xl:grid-cols-3" : "xl:grid-cols-2"}`}>
-        <article className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/60">
+      <div className={`mt-4 grid gap-3 ${canDraftCausalStudy ? "xl:grid-cols-3" : "lg:grid-cols-2"}`}>
+        <article className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <FiActivity aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
@@ -284,7 +284,7 @@ const WorkspaceGovernedIntelligencePanel = ({
             {(schoolUnit?.metrics ?? []).slice(0, 3).map((metric) => (
               <div
                 key={metric.metric_id}
-                className={`rounded-[1rem] border px-3 py-2 text-xs font-medium ${metricToneClass(metric.status)}`}
+                className={`rounded-md border px-3 py-2 text-xs font-medium ${metricToneClass(metric.status)}`}
               >
                 {metric.label ?? humanizeIdentifier(metric.metric_id)} · {formatPercent(metric.value)} · n=
                 {metric.sample_count}
@@ -294,7 +294,7 @@ const WorkspaceGovernedIntelligencePanel = ({
         </article>
 
         {canDraftCausalStudy && (
-          <article className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/60">
+          <article className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <FiZap aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
@@ -334,14 +334,14 @@ const WorkspaceGovernedIntelligencePanel = ({
               {isCausalLoading ? "Drafting study" : "Draft causal study"}
             </button>
             {causalError && (
-              <p className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+              <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
                 {causalError}
               </p>
             )}
           </article>
         )}
 
-        <article className="rounded-[1.25rem] border border-stone-200 bg-stone-50/80 p-5 dark:border-slate-700 dark:bg-slate-950/60">
+        <article className="min-w-0 rounded-md border border-stone-200 bg-stone-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/60">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <FiShield aria-hidden="true" className="text-xl text-teal-700 dark:text-teal-300" />
@@ -352,7 +352,7 @@ const WorkspaceGovernedIntelligencePanel = ({
             <StatusPill label={scopedContext.learnerId ? governanceLabel(conformalRisk) : "Learner scope required"} />
           </div>
           {!scopedContext.learnerId && (
-            <p className="mt-4 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
+            <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
               Conformal risk was not requested because this leader context has no explicit learner membership.
             </p>
           )}
