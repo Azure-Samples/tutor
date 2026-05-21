@@ -4,14 +4,14 @@ import { useWorkspace } from "@/components/Workspace/WorkspaceProvider";
 import { useId } from "react";
 
 const inputClassName =
-  "mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
+  "mt-1 min-h-9 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100";
 
 const ContextSwitcher = () => {
   const id = useId();
   const { currentContext, contextOptions, isLoading, setContext } = useWorkspace();
 
   return (
-    <div className="min-w-[15rem]">
+    <div className="min-w-0 flex-1 sm:min-w-[14rem] lg:min-w-[15rem]">
       <label
         htmlFor={id}
         className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500"
@@ -31,7 +31,9 @@ const ContextSwitcher = () => {
           </option>
         ))}
       </select>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{currentContext.note}</p>
+      <p className="mt-1 max-w-full truncate text-xs text-slate-500 dark:text-slate-400">
+        {currentContext.note}
+      </p>
     </div>
   );
 };

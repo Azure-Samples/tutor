@@ -35,7 +35,7 @@ const AlumniRecordPage = () => {
           "Learner-record previews on the alumni home route come from the backend timeline contract rather than frontend fixtures.",
         ]}
       />
-      <div className="mt-8">
+      <div className="mt-6">
         <WorkspaceLifelongNetworkPanel />
       </div>
     </DefaultLayout>

@@ -32,6 +32,13 @@ export const WORKSPACE_ROLES = [
 
 export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
 
+export type WorkspaceNavMatchStrategy = "exact" | "prefix" | "none";
+
+export interface WorkspaceNavRouteMatch {
+  route: string;
+  strategy: Exclude<WorkspaceNavMatchStrategy, "none">;
+}
+
 export interface WorkspaceContextOption {
   id: string;
   label: string;
@@ -51,8 +58,8 @@ export interface WorkspaceNavItem {
   description: string;
   icon: IconType;
   badge?: string;
-  exactMatch?: boolean;
-  matchRoutes?: string[];
+  matchStrategy?: WorkspaceNavMatchStrategy;
+  matchRoutes?: WorkspaceNavRouteMatch[];
 }
 
 export interface WorkspaceStat {
@@ -162,27 +169,34 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/student",
         description: "Current priorities, evidence, and next actions.",
         icon: FiHome,
-        exactMatch: true,
+        matchStrategy: "exact",
       },
       {
         label: "Learning",
         route: "/workspace/student/learning",
         description: "Guided coaching, live practice, and supported study.",
         icon: FiBookOpen,
-        matchRoutes: ["/avatar", "/chat"],
+        matchRoutes: [
+          { route: "/avatar", strategy: "prefix" },
+          { route: "/chat", strategy: "prefix" },
+        ],
       },
       {
         label: "Assignments",
         route: "/workspace/student/assignments",
         description: "Essay, revision, and question work in one queue.",
         icon: FiClipboard,
-        matchRoutes: ["/essays", "/questions"],
+        matchRoutes: [
+          { route: "/essays", strategy: "prefix" },
+          { route: "/questions", strategy: "prefix" },
+        ],
       },
       {
         label: "Progress",
         route: "/workspace/student",
         description: "Competency movement, evidence, and milestones.",
         icon: FiTrendingUp,
+        matchStrategy: "none",
       },
       {
         label: "Credentials",
@@ -346,24 +360,28 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/professor",
         description: "Section health, review pressure, and next actions.",
         icon: FiHome,
-        exactMatch: true,
+        matchStrategy: "exact",
       },
       {
         label: "Review",
         route: "/workspace/professor/review",
         description: "Essay and question work needing faculty attention.",
         icon: FiFileText,
-        matchRoutes: ["/essays", "/questions"],
+        matchRoutes: [
+          { route: "/essays", strategy: "prefix" },
+          { route: "/questions", strategy: "prefix" },
+        ],
       },
       {
         label: "Content",
         route: "/configuration",
         description: "Program setup, rubric inputs, and content controls.",
         icon: FiLayers,
+        matchStrategy: "exact",
         matchRoutes: [
-          "/configuration/questions",
-          "/configuration/questions/answers",
-          "/configuration/questions/graders",
+          { route: "/configuration/questions", strategy: "exact" },
+          { route: "/configuration/questions/answers", strategy: "exact" },
+          { route: "/configuration/questions/graders", strategy: "exact" },
         ],
       },
       {
@@ -371,19 +389,21 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/professor",
         description: "Progress and risk framing for the active section.",
         icon: FiBarChart2,
+        matchStrategy: "none",
       },
       {
         label: "Interventions",
         route: "/workspace/professor",
         description: "Faculty-owned next steps and learner follow-through.",
         icon: FiFlag,
+        matchStrategy: "none",
       },
       {
         label: "Teaching plans",
         route: "/workspace/professor/teaching-plans",
         description: "Structured teaching-plan analysis and iteration.",
         icon: FiCompass,
-        matchRoutes: ["/upskilling"],
+        matchRoutes: [{ route: "/upskilling", strategy: "prefix" }],
       },
     ],
     hero: {
@@ -535,26 +555,28 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/principal",
         description: "School health, interventions, and briefings.",
         icon: FiHome,
-        exactMatch: true,
+        matchStrategy: "exact",
       },
       {
         label: "School health",
         route: "/workspace/principal/school-health",
         description: "Current school indicators and briefing inputs.",
         icon: FiActivity,
-        matchRoutes: ["/configuration/supervisor"],
+        matchRoutes: [{ route: "/configuration/supervisor", strategy: "prefix" }],
       },
       {
         label: "Programs",
         route: "/workspace/principal",
         description: "Program-level milestones and performance framing.",
         icon: FiLayers,
+        matchStrategy: "none",
       },
       {
         label: "Interventions",
         route: "/workspace/principal",
         description: "Priority watchlist and follow-through.",
         icon: FiFlag,
+        matchStrategy: "none",
       },
       {
         label: "Staff development",
@@ -704,38 +726,41 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/supervisor",
         description: "Network summary, visit prep, and current alerts.",
         icon: FiHome,
-        exactMatch: true,
+        matchStrategy: "exact",
       },
       {
         label: "Schools",
         route: "/configuration/supervisor",
         description: "School-scoped briefings and profiles.",
         icon: FiGlobe,
+        matchStrategy: "prefix",
       },
       {
         label: "Briefings",
         route: "/workspace/supervisor/briefings",
         description: "Narrative briefings layered over read models.",
         icon: FiFileText,
-        matchRoutes: ["/configuration/supervisor"],
       },
       {
         label: "Visits",
         route: "/workspace/supervisor",
         description: "Preparation cues and open visit tasks.",
         icon: FiBriefcase,
+        matchStrategy: "none",
       },
       {
         label: "Trends",
         route: "/workspace/supervisor",
         description: "Network-level movement and watch areas.",
         icon: FiTrendingUp,
+        matchStrategy: "none",
       },
       {
         label: "Alerts",
         route: "/workspace/supervisor",
         description: "Escalations, sync delays, and validation needs.",
         icon: FiFlag,
+        matchStrategy: "none",
       },
     ],
     hero: {
@@ -854,7 +879,7 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
     shortLabel: "Admin",
     workspaceTitle: "Admin workspace",
     publicPitch:
-      "An operations shell for programs, users, integrations, audit posture, and AI governance visibility.",
+      "An operations shell for Configuration, Avatar cases, Integrations, Policies, and AI governance.",
     contextLabel: "Tenant and environment",
     trustLabel:
       "The admin slice surfaces policy, evaluation, and degraded-state signals as operational concerns, not hidden implementation details.",
@@ -880,38 +905,48 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/admin",
         description: "Operational posture, incidents, and pending admin action.",
         icon: FiHome,
-        exactMatch: true,
+        matchStrategy: "exact",
       },
       {
-        label: "Programs",
+        label: "Configuration",
         route: "/configuration",
-        description: "Program and platform configuration surfaces.",
+        description: "Content, policy, integration, and admin utility hub.",
         icon: FiLayers,
+        matchStrategy: "exact",
       },
       {
-        label: "Users",
+        label: "Avatar cases",
         route: "/configuration/cases",
-        description: "Access and workflow-adjacent setup.",
-        icon: FiUsers,
+        description: "Practice scenarios, avatar profiles, and case steps.",
+        icon: FiMessageSquare,
+        matchStrategy: "exact",
       },
       {
         label: "Integrations",
-        route: "/lms-gateway",
+        route: "/configuration/lms-gateway",
         description: "Gateway operations and sync posture.",
         icon: FiDatabase,
+        matchStrategy: "exact",
+        matchRoutes: [{ route: "/lms-gateway", strategy: "exact" }],
       },
       {
         label: "Policies",
         route: "/configuration/questions",
         description: "Question, grading, and rules configuration.",
         icon: FiSettings,
+        matchStrategy: "exact",
+        matchRoutes: [
+          { route: "/configuration/questions/answers", strategy: "exact" },
+          { route: "/configuration/questions/graders", strategy: "exact" },
+        ],
       },
       {
         label: "AI governance",
         route: "/workspace/admin/ai-governance",
         description: "Evaluation coverage and degraded-state visibility.",
         icon: FiShield,
-        matchRoutes: ["/evaluation"],
+        matchStrategy: "exact",
+        matchRoutes: [{ route: "/evaluation", strategy: "prefix" }],
       },
     ],
     hero: {
@@ -1006,7 +1041,7 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
       {
         title: "Platform direction",
         description:
-          "This shell previews how admin work will eventually include program, user, integration, policy, and audit domains.",
+          "This shell keeps admin work aligned to the available surfaces: Configuration, Avatar cases, Integrations, Policies, and AI governance.",
         items: [
           {
             eyebrow: "Deterministic",
@@ -1057,7 +1092,7 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/workspace/alumni",
         description: "Record, pathways, and re-engagement cues.",
         icon: FiHome,
-        exactMatch: true,
+        matchStrategy: "exact",
       },
       {
         label: "Record",
@@ -1076,18 +1111,21 @@ const ROLE_CONFIGS: Record<WorkspaceRole, WorkspaceRoleConfig> = {
         route: "/programs",
         description: "Curated re-entry and continuing-learning offers.",
         icon: FiCompass,
+        matchStrategy: "none",
       },
       {
         label: "Career",
         route: "/workspace/alumni",
         description: "Role of the record in re-skilling and advancement.",
         icon: FiBriefcase,
+        matchStrategy: "none",
       },
       {
         label: "Mentoring",
         route: "/workspace/alumni",
         description: "Community and mentoring positioning for later waves.",
         icon: FiUsers,
+        matchStrategy: "none",
       },
     ],
     hero: {

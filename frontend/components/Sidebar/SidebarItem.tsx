@@ -1,14 +1,20 @@
-import type { WorkspaceNavItem } from "@/utils/workspace";
+import type { WorkspaceNavItem, WorkspaceNavMatchStrategy } from "@/utils/workspace";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
 
-function routeMatches(pathname: string, route: string, exactMatch = false) {
+const DEFAULT_NAV_MATCH_STRATEGY: WorkspaceNavMatchStrategy = "exact";
+
+function routeMatches(pathname: string, route: string, strategy: WorkspaceNavMatchStrategy) {
+  if (strategy === "none") {
+    return false;
+  }
+
   if (route === "/") {
     return pathname === route;
   }
 
-  if (exactMatch) {
+  if (strategy === "exact") {
     return pathname === route;
   }
 
@@ -18,8 +24,10 @@ function routeMatches(pathname: string, route: string, exactMatch = false) {
 const SidebarItem = ({ item }: { item: WorkspaceNavItem }) => {
   const pathname = usePathname();
   const isItemActive =
-    routeMatches(pathname, item.route, item.exactMatch) ||
-    (item.matchRoutes ?? []).some((route) => routeMatches(pathname, route));
+    routeMatches(pathname, item.route, item.matchStrategy ?? DEFAULT_NAV_MATCH_STRATEGY) ||
+    (item.matchRoutes ?? []).some((matchRoute) =>
+      routeMatches(pathname, matchRoute.route, matchRoute.strategy),
+    );
   const Icon = item.icon;
 
   return (
@@ -27,27 +35,27 @@ const SidebarItem = ({ item }: { item: WorkspaceNavItem }) => {
       <Link
         href={item.route}
         aria-current={isItemActive ? "page" : undefined}
-        className={`group flex items-start gap-3 rounded-[1.25rem] border px-3 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 ${
+        className={`group flex min-h-11 items-start gap-2 rounded-lg border px-2.5 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 ${
           isItemActive
             ? "border-teal-700 bg-teal-700 text-white shadow-sm"
             : "border-transparent bg-transparent text-slate-700 hover:border-stone-200 hover:bg-white/80 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:bg-slate-900/70"
         }`}
       >
         <span
-          className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+          className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition ${
             isItemActive
               ? "border-white/20 bg-white/10 text-white"
               : "border-stone-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
           }`}
         >
-          <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className="font-semibold">{item.label}</span>
+            <span className="text-sm font-semibold leading-5">{item.label}</span>
             {item.badge && (
               <span
-                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${
                   isItemActive
                     ? "bg-white/10 text-white"
                     : "bg-stone-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"
@@ -58,7 +66,7 @@ const SidebarItem = ({ item }: { item: WorkspaceNavItem }) => {
             )}
           </span>
           <span
-            className={`mt-1 block text-xs leading-6 ${
+            className={`mt-0.5 block break-words text-[11px] leading-4 ${
               isItemActive ? "text-teal-50" : "text-slate-500 dark:text-slate-400"
             }`}
           >
