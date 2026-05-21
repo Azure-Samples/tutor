@@ -89,7 +89,7 @@ Set `agent_principal_object_ids` with managed identity object IDs for additional
 - `Cosmos DB Built-in Data Contributor` (native Cosmos SQL role assignments at account and database scope)
 - `Storage Blob Data Contributor`
 - `AcrPull`
-- `Cognitive Services User`
+- `Foundry User`
 
 Example:
 
