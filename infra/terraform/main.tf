@@ -50,7 +50,7 @@ locals {
   agent_role_scopes = {
     "Storage Blob Data Contributor" = azurerm_storage_account.uploads.id
     "AcrPull"                       = azurerm_container_registry.main.id
-    "Azure AI User"                 = module.ai_foundry.ai_foundry_id
+    "Foundry User"                  = module.ai_foundry.ai_foundry_id
   }
 
   agent_role_assignments = {
@@ -531,13 +531,13 @@ resource "azurerm_api_management_api_policy" "backend_services_hardening" {
 resource "azurerm_role_assignment" "container_app_cognitive_services" {
   for_each             = toset(local.backend_service_names)
   scope                = module.ai_foundry.ai_foundry_id
-  role_definition_name = "Azure AI User"
+  role_definition_name = "Foundry User"
   principal_id         = azurerm_container_app.backend_services[each.key].identity[0].principal_id
 }
 
 resource "azurerm_role_assignment" "foundry_project_ai_user" {
   scope                = module.ai_foundry.ai_foundry_id
-  role_definition_name = "Azure AI User"
+  role_definition_name = "Foundry User"
   principal_id         = module.ai_foundry.ai_foundry_project_system_identity_principal_id["tutor"]
 }
 
