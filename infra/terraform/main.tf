@@ -71,6 +71,12 @@ resource "random_string" "suffix" {
   special = false
 }
 
+resource "random_string" "ai_foundry_suffix" {
+  length  = 6
+  upper   = false
+  special = false
+}
+
 resource "azurerm_resource_group" "main" {
   name     = "${var.name_prefix}-${var.environment}"
   location = var.location
@@ -390,7 +396,7 @@ module "ai_foundry" {
   resource_group_resource_id = azurerm_resource_group.main.id
 
   ai_foundry = {
-    name                    = "${local.normalized_prefix}${random_string.suffix.result}ai"
+    name                    = "${local.normalized_prefix}${random_string.ai_foundry_suffix.result}ai"
     create_ai_agent_service = true
     disable_local_auth      = false
   }
