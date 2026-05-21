@@ -31,7 +31,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
@@ -250,10 +249,14 @@ jobs:
   provision-foundation:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      id-token: write
+      contents: read
     needs:
       - resolve-release
       - detect-changes
     if: needs.detect-changes.outputs.provision_required == 'true'
+    environment: ${{ needs.resolve-release.outputs.release_tier }}
 
     env:
       RELEASE_TIER: ${{ needs.resolve-release.outputs.release_tier }}
@@ -1123,12 +1126,16 @@ jobs:
 
   provision-service-infra:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs:
       - resolve-release
       - detect-changes
       - provision-foundation
       - deploy-backend-services
     if: always() && needs.detect-changes.outputs.service_infra_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success') && needs.deploy-backend-services.result == 'success'
+    environment: ${{ needs.resolve-release.outputs.release_tier }}
     strategy:
       fail-fast: false
       matrix:
@@ -1410,11 +1417,15 @@ jobs:
 
   deploy-backend-services:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs:
       - resolve-release
       - detect-changes
       - provision-foundation
     if: always() && needs.detect-changes.outputs.service_count != '0' && (needs.detect-changes.outputs.provision_required != 'true' || needs.provision-foundation.result == 'success')
+    environment: ${{ needs.resolve-release.outputs.release_tier }}
     strategy:
       fail-fast: false
       matrix:
@@ -2187,12 +2198,16 @@ jobs:
 
   post-deploy-guardrails:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs:
       - resolve-release
       - detect-changes
       - deploy-backend-services
       - provision-service-infra
     if: always() && needs.detect-changes.outputs.service_count != '0' && needs.deploy-backend-services.result == 'success' && (needs.provision-service-infra.result == 'success' || needs.provision-service-infra.result == 'skipped')
+    environment: ${{ needs.resolve-release.outputs.release_tier }}
     strategy:
       fail-fast: false
       matrix:

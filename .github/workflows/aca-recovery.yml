@@ -22,13 +22,16 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  id-token: write
   contents: read
 
 jobs:
   recover:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    permissions:
+      id-token: write
+      contents: read
+    environment: ${{ github.event.inputs.environment }}
     env:
       AZURE_ENV_NAME: ${{ github.event.inputs.environment }}
       SERVICES_CSV: ${{ github.event.inputs.services }}

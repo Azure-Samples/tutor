@@ -32,9 +32,7 @@ on:
       - ".github/workflows/azure-static-web-apps-polite-wave-029b18f0f.yml"
 
 permissions:
-  id-token: write
   contents: read
-  pull-requests: write
 
 jobs:
   resolve-release:
@@ -129,7 +127,11 @@ jobs:
   resolve-azure-endpoints:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs: resolve-release
+    environment: ${{ needs.resolve-release.outputs.release_tier }}
     outputs:
       apim_base_url: ${{ steps.resolve_apim.outputs.apim_base_url }}
     env:
@@ -188,10 +190,14 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'prod' && startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, 'stable')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'auto' && startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, 'stable'))
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs:
       - resolve-release
       - resolve-azure-endpoints
     name: Build and Deploy Prod
+    environment: prod
     env:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
@@ -236,10 +242,14 @@ jobs:
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'dev') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.release_tier == 'auto' && (!startsWith(github.ref, 'refs/tags/') || !contains(github.ref_name, 'stable')))
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     needs:
       - resolve-release
       - resolve-azure-endpoints
     name: Build and Deploy Dev
+    environment: dev
     env:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
@@ -279,10 +289,15 @@ jobs:
           output_location: ""
 
   close_pull_request:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.base_ref == 'main'
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.base_ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
     needs: resolve-release
     name: Close Pull Request
+    environment: dev
     env:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
