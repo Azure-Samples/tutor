@@ -110,6 +110,28 @@ const expectNoHorizontalOverflow = async (page: Page) => {
     .toBeLessThanOrEqual(1);
 };
 
+const expectSidebarOffCanvas = async (page: Page) => {
+  await expect
+    .poll(async () =>
+      page.locator("#sidebar").evaluate((sidebar) => Math.round(sidebar.getBoundingClientRect().right)),
+    )
+    .toBeLessThanOrEqual(1);
+};
+
+const expectSidebarOnCanvas = async (page: Page) => {
+  await expect
+    .poll(async () =>
+      page.locator("#sidebar").evaluate((sidebar) => Math.round(sidebar.getBoundingClientRect().right)),
+    )
+    .toBeGreaterThan(200);
+};
+
+const expectSidebarFixed = async (page: Page) => {
+  await expect
+    .poll(async () => page.locator("#sidebar").evaluate((sidebar) => window.getComputedStyle(sidebar).position))
+    .toBe("fixed");
+};
+
 const setWorkspaceRole = async (page: Page, role: string) => {
   await page.addInitScript((workspaceRole) => {
     window.localStorage.setItem("tutor.workspace.role", JSON.stringify(workspaceRole));
@@ -164,4 +186,62 @@ test.describe("workspace shell reflow", () => {
       });
     }
   }
+
+  for (const viewport of WORKSPACE_REFLOW_VIEWPORTS) {
+    test(`workspace sidebar starts closed and toggles on ${viewport.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await setWorkspaceRole(page, "admin");
+
+      await page.goto("/configuration/cases");
+
+      await expect(page.locator("#main-content")).toBeVisible();
+      await expect(page.locator('button[aria-label="Close sidebar"]')).toHaveCount(0);
+      await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await expectSidebarOffCanvas(page);
+      await expectNoHorizontalOverflow(page);
+
+      await page.locator('button[aria-controls="sidebar"]').click();
+      await expect(page.locator('button[aria-label="Close sidebar"]')).toBeVisible();
+      await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      await expectSidebarOnCanvas(page);
+
+      await page.mouse.click(viewport.width - 16, Math.min(320, viewport.height - 16));
+      await expect(page.locator('button[aria-label="Close sidebar"]')).toHaveCount(0);
+      await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await expectSidebarOffCanvas(page);
+      await expectNoHorizontalOverflow(page);
+    });
+  }
+
+  test("workspace sidebar is visible by default on desktop and still toggles", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await setWorkspaceRole(page, "admin");
+
+    await page.goto("/configuration/cases");
+
+    await expect(page.locator("#main-content")).toBeVisible();
+    await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute("aria-expanded", "true");
+    await expectSidebarOnCanvas(page);
+    await expectSidebarFixed(page);
+    await expectNoHorizontalOverflow(page);
+
+    await page.locator('button[aria-controls="sidebar"]').click();
+    await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute("aria-expanded", "false");
+    await expectSidebarOffCanvas(page);
+    await expectNoHorizontalOverflow(page);
+
+    await page.locator('button[aria-controls="sidebar"]').click();
+    await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute("aria-expanded", "true");
+    await expectSidebarOnCanvas(page);
+    await expectNoHorizontalOverflow(page);
+  });
 });

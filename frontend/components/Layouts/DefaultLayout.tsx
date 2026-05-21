@@ -1,13 +1,14 @@
 "use client";
 import Header from "@/components/Header";
-import Sidebar from "@/components/Sidebar";
+import Sidebar, { type SidebarDisclosureState } from "@/components/Sidebar";
 import type { Metadata } from "next";
 import type React from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const WORKSPACE_SHELL_METRICS_CLASS =
   "[--workspace-header-offset:9.75rem] [--workspace-sidebar-width:15.5rem] sm:[--workspace-header-offset:8.75rem] lg:[--workspace-header-offset:4.5rem]";
 const PUBLIC_SHELL_METRICS_CLASS = "[--workspace-header-offset:5rem]";
+const DESKTOP_SIDEBAR_QUERY = "(min-width: 1024px)";
 
 export default function DefaultLayout({
   children,
@@ -18,9 +19,24 @@ export default function DefaultLayout({
   metadata?: Metadata;
   variant?: "workspace" | "public";
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // No GoF pattern applies; this layout tracks simple responsive disclosure state.
+  const [sidebarState, setSidebarState] = useState<SidebarDisclosureState>("responsive");
+  const [isDesktopSidebarViewport, setIsDesktopSidebarViewport] = useState(false);
   const sidebarSwitcherRef = useRef<HTMLButtonElement>(null);
   const isWorkspaceShell = variant === "workspace";
+  const sidebarOpen =
+    sidebarState === "open" || (sidebarState === "responsive" && isDesktopSidebarViewport);
+  const setSidebarOpen = (open: boolean) => setSidebarState(open ? "open" : "closed");
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia(DESKTOP_SIDEBAR_QUERY);
+    const syncDesktopViewport = () => setIsDesktopSidebarViewport(desktopQuery.matches);
+
+    syncDesktopViewport();
+    desktopQuery.addEventListener("change", syncDesktopViewport);
+
+    return () => desktopQuery.removeEventListener("change", syncDesktopViewport);
+  }, []);
 
   return (
     <main
@@ -40,14 +56,14 @@ export default function DefaultLayout({
       <div className="pt-[var(--workspace-header-offset)]">
         {isWorkspaceShell && (
           <Sidebar
-            sidebarOpen={sidebarOpen}
+            sidebarState={sidebarState}
             setSidebarOpen={setSidebarOpen}
             exceptionRef={sidebarSwitcherRef}
           />
         )}
         <div
           className={`min-h-[calc(100vh_-_var(--workspace-header-offset))] min-w-0 transition-[margin] duration-200 ${
-            isWorkspaceShell && sidebarOpen ? "lg:ml-[var(--workspace-sidebar-width)]" : ""
+            isWorkspaceShell && sidebarState !== "closed" ? "lg:ml-[var(--workspace-sidebar-width)]" : ""
           }`}
         >
           <div

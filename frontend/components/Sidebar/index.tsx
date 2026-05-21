@@ -6,10 +6,19 @@ import Link from "next/link";
 import type React from "react";
 
 interface SidebarProps {
-  sidebarOpen: boolean;
+  sidebarState: SidebarDisclosureState;
   setSidebarOpen: (arg: boolean) => void;
   exceptionRef?: React.RefObject<HTMLElement>;
 }
+
+export type SidebarDisclosureState = "closed" | "open" | "responsive";
+
+// No GoF pattern applies; this is a finite responsive disclosure state.
+const sidebarTransformClass = {
+  closed: "-translate-x-full",
+  open: "translate-x-0",
+  responsive: "-translate-x-full lg:translate-x-0",
+} as const satisfies Record<SidebarDisclosureState, string>;
 
 interface SidebarHoverCardProps {
   description: string;
@@ -59,11 +68,12 @@ const SidebarHoverCard = ({
   );
 };
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen, exceptionRef }: SidebarProps) => {
+const Sidebar = ({ sidebarState, setSidebarOpen, exceptionRef }: SidebarProps) => {
   const { currentContext, isLoading, roleConfig } = useWorkspace();
   const contextNote = isLoading
     ? "Tutor is resolving the latest context note for this role."
     : currentContext.note;
+  const sidebarOpen = sidebarState === "open";
 
   return (
     <>
@@ -79,7 +89,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, exceptionRef }: SidebarProps) =>
       <aside
         id="sidebar"
         className={`fixed left-0 top-[var(--workspace-header-offset)] z-40 flex h-[calc(100vh_-_var(--workspace-header-offset))] w-[var(--workspace-sidebar-width)] flex-col border-r border-stone-200 bg-stone-50/95 px-3 py-3 shadow-sm transition-transform duration-200 dark:border-slate-800 dark:bg-slate-950/90 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          sidebarTransformClass[sidebarState]
         }`}
       >
         <div className="rounded-lg border border-stone-200 bg-white/90 p-2.5 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
