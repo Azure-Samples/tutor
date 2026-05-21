@@ -815,6 +815,7 @@ jobs:
 
           echo "Pre-seeding first model deployment to serialize Cognitive Services operations..."
           terraform apply -auto-approve -parallelism=4 \
+            -target='module.ai_foundry.azapi_resource.ai_foundry' \
             -target='module.ai_foundry.azapi_resource.ai_model_deployment["gpt-5-nano"]'
 
           echo "Pre-seed complete. Full provision will create the remaining model."
