@@ -23,6 +23,8 @@ const LOCAL_DEVELOPMENT_HEADERS = {
   "X-Feature-Flags": "workspace-shell,workspace-snapshots,learner-record-preview",
 } as const;
 
+const PILOT_AUTH_HEADERS_ENABLED = process.env.NEXT_PUBLIC_PILOT_AUTH_HEADERS_ENABLED === "true";
+
 const LOCAL_HOST_PATTERN = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|::1)$/i;
 
 const normalizeBaseURL = (value: string | undefined): string | undefined => {
@@ -120,7 +122,7 @@ const createClient = (
       }
     }
 
-    if (isLocalLikeUrl(config.baseURL) || isLocalLikeUrl(config.url)) {
+    if (PILOT_AUTH_HEADERS_ENABLED || isLocalLikeUrl(config.baseURL) || isLocalLikeUrl(config.url)) {
       applyLegacyLocalHeaders(config);
     }
 
