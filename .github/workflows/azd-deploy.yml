@@ -192,7 +192,10 @@ jobs:
                   selected_service_infra=("${all_services[@]}")
                   ;;
                 .github/workflows/azd-deploy.yml)
-                  echo "Workflow-only change detected. Skipping full infrastructure reprovision trigger."
+                  echo "Deployment workflow change detected. Triggering full deployment validation."
+                  provision_required=true
+                  selected_services=("${all_services[@]}")
+                  selected_service_infra=("${all_services[@]}")
                   ;;
                 lib/*)
                   selected_services=("${all_services[@]}")
