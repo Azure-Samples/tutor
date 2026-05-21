@@ -132,6 +132,28 @@ const expectSidebarFixed = async (page: Page) => {
     .toBe("fixed");
 };
 
+const expectWorkspaceShellBelowHeader = async (page: Page) => {
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const header = document.querySelector("#workspace-header");
+        const sidebar = document.querySelector("#sidebar");
+        const mainPanel = document.querySelector("[data-workspace-main-panel]");
+
+        if (!header || !sidebar || !mainPanel) {
+          return Number.NEGATIVE_INFINITY;
+        }
+
+        const headerBottom = Math.ceil(header.getBoundingClientRect().bottom);
+        const sidebarTop = Math.floor(sidebar.getBoundingClientRect().top);
+        const mainPanelTop = Math.floor(mainPanel.getBoundingClientRect().top);
+
+        return Math.min(sidebarTop - headerBottom, mainPanelTop - headerBottom);
+      }),
+    )
+    .toBeGreaterThanOrEqual(-1);
+};
+
 const setWorkspaceRole = async (page: Page, role: string) => {
   await page.addInitScript((workspaceRole) => {
     window.localStorage.setItem("tutor.workspace.role", JSON.stringify(workspaceRole));
@@ -182,6 +204,7 @@ test.describe("workspace shell reflow", () => {
         await page.goto(reflowCase.path);
 
         await expect(page.locator("#main-content")).toBeVisible();
+        await expectWorkspaceShellBelowHeader(page);
         await expectNoHorizontalOverflow(page);
       });
     }
@@ -200,6 +223,7 @@ test.describe("workspace shell reflow", () => {
         "aria-expanded",
         "false",
       );
+      await expectWorkspaceShellBelowHeader(page);
       await expectSidebarOffCanvas(page);
       await expectNoHorizontalOverflow(page);
 
@@ -209,6 +233,7 @@ test.describe("workspace shell reflow", () => {
         "aria-expanded",
         "true",
       );
+      await expectWorkspaceShellBelowHeader(page);
       await expectSidebarOnCanvas(page);
 
       await page.mouse.click(viewport.width - 16, Math.min(320, viewport.height - 16));
@@ -217,6 +242,7 @@ test.describe("workspace shell reflow", () => {
         "aria-expanded",
         "false",
       );
+      await expectWorkspaceShellBelowHeader(page);
       await expectSidebarOffCanvas(page);
       await expectNoHorizontalOverflow(page);
     });
@@ -230,17 +256,20 @@ test.describe("workspace shell reflow", () => {
 
     await expect(page.locator("#main-content")).toBeVisible();
     await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute("aria-expanded", "true");
+    await expectWorkspaceShellBelowHeader(page);
     await expectSidebarOnCanvas(page);
     await expectSidebarFixed(page);
     await expectNoHorizontalOverflow(page);
 
     await page.locator('button[aria-controls="sidebar"]').click();
     await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute("aria-expanded", "false");
+    await expectWorkspaceShellBelowHeader(page);
     await expectSidebarOffCanvas(page);
     await expectNoHorizontalOverflow(page);
 
     await page.locator('button[aria-controls="sidebar"]').click();
     await expect(page.locator('button[aria-controls="sidebar"]')).toHaveAttribute("aria-expanded", "true");
+    await expectWorkspaceShellBelowHeader(page);
     await expectSidebarOnCanvas(page);
     await expectNoHorizontalOverflow(page);
   });
