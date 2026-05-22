@@ -1,11 +1,12 @@
 "use client";
 
+import { useI18n } from "@/components/I18n/LocaleProvider";
 import {
   DEFAULT_WORKSPACE_ROLE,
-  ROLE_CONFIG_LIST,
   type WorkspaceContextOption,
   type WorkspaceRole,
   type WorkspaceRoleConfig,
+  getRoleConfigList,
   getRoleConfig,
   getWorkspaceRoleFromPathname,
   isWorkspaceRole,
@@ -87,6 +88,7 @@ function toContextOption(role: WorkspaceRole, context: AccessContextItem): Works
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const { locale } = useI18n();
   const pathname = usePathname();
   const pathnameRole = getWorkspaceRoleFromPathname(pathname);
   const [storedRole, setStoredRole] = useState<WorkspaceRole>(() =>
@@ -143,14 +145,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       accessContext?.roles
         .map((roleContext) => roleContext.role)
         .filter(isWorkspaceRole)
-        .map((role) => getRoleConfig(role)) ?? [];
+        .map((role) => getRoleConfig(role, locale)) ?? [];
 
     if (apiRoles.length === 0) {
-      return ROLE_CONFIG_LIST;
+      return getRoleConfigList(locale);
     }
 
     return Array.from(new Map(apiRoles.map((role) => [role.key, role])).values());
-  }, [accessContext]);
+  }, [accessContext, locale]);
 
   const defaultRole = useMemo<WorkspaceRole>(() => {
     if (
@@ -168,7 +170,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const currentRole = availableRoles.some((role) => role.key === requestedRole)
     ? requestedRole
     : defaultRole;
-  const roleConfig = getRoleConfig(currentRole);
+  const roleConfig = getRoleConfig(currentRole, locale);
   const roleContext = findRoleContext(accessContext, currentRole);
   const contextOptions =
     roleContext?.contexts.length && !isLoading
@@ -241,7 +243,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
           return {
             ...previous,
-            [role]: getRoleConfig(role).contexts[0].id,
+            [role]: getRoleConfig(role, locale).contexts[0].id,
           };
         });
       },
@@ -260,6 +262,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       currentRole,
       error,
       isLoading,
+      locale,
       roleConfig,
     ],
   );

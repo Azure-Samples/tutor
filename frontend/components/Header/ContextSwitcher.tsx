@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/I18n/LocaleProvider";
 import { useWorkspace } from "@/components/Workspace/WorkspaceProvider";
 import { useId } from "react";
 
@@ -8,6 +9,7 @@ const inputClassName =
 
 const ContextSwitcher = () => {
   const id = useId();
+  const { dictionary } = useI18n();
   const { currentContext, contextOptions, isLoading, setContext } = useWorkspace();
 
   return (
@@ -16,7 +18,7 @@ const ContextSwitcher = () => {
         htmlFor={id}
         className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500"
       >
-        Context
+        {dictionary.workspace.contextLabel}
       </label>
       <select
         id={id}

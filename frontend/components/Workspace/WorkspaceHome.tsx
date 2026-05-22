@@ -1,6 +1,8 @@
 "use client";
 
+import { useI18n } from "@/components/I18n/LocaleProvider";
 import { useWorkspace } from "@/components/Workspace/WorkspaceProvider";
+import { formatTemplate } from "@/utils/i18n";
 import {
   type LearnerRecordTimelinePayload,
   type SnapshotItem,
@@ -79,12 +81,14 @@ function SnapshotSection({
   emptyText,
   items,
   loading,
+  loadingText,
   title,
 }: {
   description: string;
   emptyText: string;
   items: SnapshotItem[];
   loading: boolean;
+  loadingText: string;
   title: string;
 }) {
   return (
@@ -94,7 +98,7 @@ function SnapshotSection({
 
       {loading && (
         <div className="mt-4 rounded-md border border-dashed border-stone-200 bg-stone-50/80 p-3 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-400">
-          Loading the latest section projection...
+          {loadingText}
         </div>
       )}
 
@@ -133,6 +137,7 @@ function SnapshotSection({
 }
 
 const WorkspaceHome = () => {
+  const { dictionary, locale } = useI18n();
   const { actor, currentContext, currentRole, error, isLoading, isMockMode, roleConfig } =
     useWorkspace();
   const [snapshotState, setSnapshotState] = useState<AsyncState<WorkspaceSnapshotPayload>>({
@@ -266,11 +271,10 @@ const WorkspaceHome = () => {
             {roleConfig.workspaceTitle}
           </p>
           <h1 className="mt-4 break-words text-3xl font-semibold text-slate-900 md:text-4xl dark:text-slate-50">
-            Resolving your workspace access
+            {dictionary.workspaceHome.loadingAccessTitle}
           </h1>
           <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-300">
-            Tutor is loading the backend access context for this role before it requests the latest
-            snapshot.
+            {dictionary.workspaceHome.loadingAccessDescription}
           </p>
         </section>
       </div>
@@ -282,14 +286,13 @@ const WorkspaceHome = () => {
       <div className="space-y-6">
         <section className="rounded-lg border border-amber-200 bg-amber-50/80 p-5 shadow-sm md:p-6 dark:border-amber-900/60 dark:bg-amber-950/20">
           <p className="text-xs font-semibold uppercase tracking-[0.3em] text-amber-900 dark:text-amber-200">
-            Fallback workspace shell
+            {dictionary.workspaceHome.fallbackShellEyebrow}
           </p>
           <h1 className="mt-4 break-words text-3xl font-semibold leading-tight text-slate-900 md:text-4xl dark:text-slate-50">
-            Backend access context is unavailable right now.
+            {dictionary.workspaceHome.fallbackShellTitle}
           </h1>
           <p className="mt-4 text-lg leading-8 text-slate-700 dark:text-slate-200">
-            The shell is preserving navigation and current routes, but role and context data are
-            temporarily using the local fallback configuration.
+            {dictionary.workspaceHome.fallbackShellDescription}
           </p>
           {error && (
             <p className="mt-4 rounded-md border border-amber-300 bg-white/80 p-3 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-slate-950/70 dark:text-amber-100">
@@ -334,8 +337,12 @@ const WorkspaceHome = () => {
             </h1>
             <p className="mt-4 text-lg leading-8 text-slate-600 dark:text-slate-300">
               {snapshot
-                ? `Current context: ${snapshot.context_label}. Highlights, advisory items, and attention states below come from the Insights workspace snapshot for this context.`
-                : `Tutor is preparing the latest ${roleConfig.label.toLowerCase()} snapshot for this context.`}
+                ? formatTemplate(dictionary.workspaceHome.currentSnapshotTemplate, {
+                    context: snapshot.context_label,
+                  })
+                : formatTemplate(dictionary.workspaceHome.preparingSnapshotTemplate, {
+                    role: roleConfig.label.toLocaleLowerCase(locale),
+                  })}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               {heroLinks.map((link) => (
@@ -352,7 +359,7 @@ const WorkspaceHome = () => {
 
           <aside className="w-full min-w-0 rounded-lg border border-stone-200 bg-stone-50/90 p-4 shadow-sm lg:w-80 lg:flex-none dark:border-slate-700 dark:bg-slate-900/70">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Current context
+              {dictionary.workspaceHome.currentContext}
             </p>
             <h2 className="mt-3 text-xl font-semibold text-slate-900 dark:text-slate-50">
               {snapshot?.context_label || currentContext.label}
@@ -366,7 +373,7 @@ const WorkspaceHome = () => {
             {actor && (
               <div className="mt-4 rounded-md border border-stone-200 bg-white/90 p-3 dark:border-slate-700 dark:bg-slate-950/70">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                  Active actor
+                  {dictionary.workspaceHome.activeActor}
                 </p>
                 <p className="mt-2 text-sm font-semibold text-slate-900 dark:text-slate-50">
                   {actor.display_name || actor.email || humanizeIdentifier(actor.subject)}
@@ -388,7 +395,9 @@ const WorkspaceHome = () => {
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <article className="rounded-lg border border-stone-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Freshness</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {dictionary.workspaceHome.freshness}
+          </p>
           {snapshot?.freshness ? (
             <>
               <span
@@ -400,12 +409,12 @@ const WorkspaceHome = () => {
                 {snapshot.freshness.note}
               </p>
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                Generated{" "}
+                {dictionary.workspaceHome.generated}{" "}
                 {formatDateTime(snapshot.freshness.generated_at) || snapshot.freshness.generated_at}
               </p>
               {snapshot.freshness.source_updated_at && (
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Source updated{" "}
+                  {dictionary.workspaceHome.sourceUpdated}{" "}
                   {formatDateTime(snapshot.freshness.source_updated_at) ||
                     snapshot.freshness.source_updated_at}
                 </p>
@@ -413,13 +422,15 @@ const WorkspaceHome = () => {
             </>
           ) : (
             <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
-              Waiting for freshness metadata.
+              {dictionary.workspaceHome.waitingFreshness}
             </p>
           )}
         </article>
 
         <article className="rounded-lg border border-stone-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Human review</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {dictionary.workspaceHome.humanReview}
+          </p>
           {snapshot?.trust ? (
             <>
               <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-slate-50">
@@ -431,13 +442,15 @@ const WorkspaceHome = () => {
             </>
           ) : (
             <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
-              Waiting for trust metadata.
+              {dictionary.workspaceHome.waitingTrust}
             </p>
           )}
         </article>
 
         <article className="rounded-lg border border-stone-200 bg-white/85 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
-          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Provenance</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+            {dictionary.workspaceHome.provenance}
+          </p>
           {snapshot?.trust ? (
             <>
               <p className="mt-3 text-lg font-semibold text-slate-900 dark:text-slate-50">
@@ -447,15 +460,15 @@ const WorkspaceHome = () => {
                 {snapshot.trust.note}
               </p>
               <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                Workflow {snapshot.trust.provenance.workflow_version}
+                {dictionary.workspaceHome.workflow} {snapshot.trust.provenance.workflow_version}
                 {snapshot.trust.provenance.model
-                  ? ` · Model ${snapshot.trust.provenance.model}`
+                  ? ` · ${dictionary.workspaceHome.model} ${snapshot.trust.provenance.model}`
                   : ""}
               </p>
             </>
           ) : (
             <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-300">
-              Waiting for provenance metadata.
+              {dictionary.workspaceHome.waitingProvenance}
             </p>
           )}
         </article>
@@ -464,43 +477,48 @@ const WorkspaceHome = () => {
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(16rem,20rem)]">
         <div className="min-w-0 space-y-5">
           <SnapshotSection
-            title="Deterministic highlights"
-            description="These items come directly from the backend workspace snapshot and should remain inspectable even when advisory layers change."
+            title={dictionary.workspaceHome.deterministicHighlightsTitle}
+            description={dictionary.workspaceHome.deterministicHighlightsDescription}
             items={snapshot?.deterministic_highlights ?? []}
             loading={snapshotState.loading}
-            emptyText="No deterministic highlights were returned for this context."
+            loadingText={dictionary.workspaceHome.loadingSectionProjection}
+            emptyText={dictionary.workspaceHome.deterministicHighlightsEmpty}
           />
           <SnapshotSection
-            title="Advisory items"
-            description="Advisory content is visible, labelled, and kept separate from deterministic status and evidence."
+            title={dictionary.workspaceHome.advisoryItemsTitle}
+            description={dictionary.workspaceHome.advisoryItemsDescription}
             items={snapshot?.advisory_items ?? []}
             loading={snapshotState.loading}
-            emptyText="No advisory items were returned for this context."
+            loadingText={dictionary.workspaceHome.loadingSectionProjection}
+            emptyText={dictionary.workspaceHome.advisoryItemsEmpty}
           />
           <SnapshotSection
-            title="Attention items"
-            description="These cards surface degraded states, delays, or operational conditions that need review."
+            title={dictionary.workspaceHome.attentionItemsTitle}
+            description={dictionary.workspaceHome.attentionItemsDescription}
             items={snapshot?.attention_items ?? []}
             loading={snapshotState.loading}
-            emptyText="No attention items are active for this context."
+            loadingText={dictionary.workspaceHome.loadingSectionProjection}
+            emptyText={dictionary.workspaceHome.attentionItemsEmpty}
           />
         </div>
 
         <aside className="min-w-0 space-y-4">
           <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Trust and governance
+              {dictionary.workspaceHome.trustGovernance}
             </p>
             {snapshot?.trust ? (
               <div className="mt-4 space-y-4 text-sm leading-7 text-slate-600 dark:text-slate-300">
                 <div>
                   <p className="font-semibold text-slate-900 dark:text-slate-50">
-                    Evaluation state
+                    {dictionary.workspaceHome.evaluationState}
                   </p>
                   <p>{humanizeIdentifier(snapshot.trust.evaluation_state)}</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900 dark:text-slate-50">Source lineage</p>
+                  <p className="font-semibold text-slate-900 dark:text-slate-50">
+                    {dictionary.workspaceHome.sourceLineage}
+                  </p>
                   <p>{snapshot.trust.provenance.source_type}</p>
                   {snapshot.trust.provenance.source_ids.length > 0 && (
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -510,24 +528,23 @@ const WorkspaceHome = () => {
                 </div>
                 <div>
                   <p className="font-semibold text-slate-900 dark:text-slate-50">
-                    Advisory boundary
+                    {dictionary.workspaceHome.advisoryBoundary}
                   </p>
                   <p>
                     {snapshot.trust.advisory_only
-                      ? "The snapshot includes advisory-only guidance that must be reviewed alongside deterministic evidence."
-                      : "The snapshot includes deterministic actions that may be executed directly."}
+                      ? dictionary.workspaceHome.advisoryOnlySnapshot
+                      : dictionary.workspaceHome.deterministicSnapshot}
                   </p>
                 </div>
                 {snapshot.trust.degraded && (
                   <div className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
-                    This snapshot includes degraded output. Tutor is surfacing the condition
-                    explicitly instead of masking it.
+                    {dictionary.workspaceHome.degradedSnapshot}
                   </div>
                 )}
               </div>
             ) : (
               <p className="mt-4 text-sm leading-7 text-slate-600 dark:text-slate-300">
-                Trust metadata will appear once the snapshot finishes loading.
+                {dictionary.workspaceHome.trustMetadataPending}
               </p>
             )}
           </section>
@@ -535,16 +552,17 @@ const WorkspaceHome = () => {
           {timelineLearnerId && (
             <section className="rounded-lg border border-stone-200 bg-stone-50/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/80">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                Learner record preview
+                {dictionary.workspaceHome.learnerRecordPreview}
               </p>
               <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
-                Previewing {humanizeIdentifier(timelineLearnerId)} through the learner-record
-                timeline contract.
+                {formatTemplate(dictionary.workspaceHome.learnerRecordPreviewTemplate, {
+                  learner: humanizeIdentifier(timelineLearnerId),
+                })}
               </p>
 
               {timelineState.loading && (
                 <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                  Loading learner record entries...
+                  {dictionary.workspaceHome.loadingLearnerRecord}
                 </p>
               )}
 
@@ -556,7 +574,7 @@ const WorkspaceHome = () => {
 
               {!timelineState.loading && !timelineState.error && timeline?.entries.length === 0 && (
                 <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                  No learner-record entries were returned for this context.
+                  {dictionary.workspaceHome.learnerRecordEmpty}
                 </p>
               )}
 
@@ -592,7 +610,7 @@ const WorkspaceHome = () => {
 
           <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/75">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Continue exploring
+              {dictionary.workspaceHome.continueExploring}
             </p>
             <div className="mt-4 flex flex-col gap-3">
               {recommendedLinks.map((item) => (
@@ -608,7 +626,7 @@ const WorkspaceHome = () => {
                 href="/evidence-trust"
                 className="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
               >
-                Evidence and Trust
+                {dictionary.header.helpAndTrust}
               </Link>
             </div>
           </section>

@@ -1,6 +1,8 @@
 "use client";
 
+import { useI18n } from "@/components/I18n/LocaleProvider";
 import { useWorkspace } from "@/components/Workspace/WorkspaceProvider";
+import { formatTemplate } from "@/utils/i18n";
 import { type WorkspaceRole, getRoleConfig } from "@/utils/workspace";
 import Link from "next/link";
 
@@ -28,9 +30,10 @@ const WorkspaceModulePage = ({
   title,
   workspaceRole,
 }: WorkspaceModulePageProps) => {
+  const { dictionary, locale } = useI18n();
   const { currentContext, isLoading, isMockMode, roleConfig } = useWorkspace();
   const activeRoleConfig =
-    roleConfig.key === workspaceRole ? roleConfig : getRoleConfig(workspaceRole);
+    roleConfig.key === workspaceRole ? roleConfig : getRoleConfig(workspaceRole, locale);
 
   return (
     <div className="space-y-6">
@@ -50,7 +53,7 @@ const WorkspaceModulePage = ({
 
           <aside className="w-full min-w-0 rounded-lg border border-stone-200 bg-stone-50/90 p-4 shadow-sm lg:w-80 lg:flex-none dark:border-slate-700 dark:bg-slate-900/70">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-              Current context
+              {dictionary.workspace.currentContext}
             </p>
             <h2 className="mt-3 text-xl font-semibold text-slate-900 dark:text-slate-50">
               {currentContext.label}
@@ -63,7 +66,7 @@ const WorkspaceModulePage = ({
             </p>
             <div className="mt-4 rounded-md border border-stone-200 bg-white/90 p-3 dark:border-slate-700 dark:bg-slate-950/70">
               <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">
-                Trust note
+                {dictionary.workspace.trustNote}
               </p>
               <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-300">
                 {activeRoleConfig.trustLabel}
@@ -75,8 +78,7 @@ const WorkspaceModulePage = ({
 
       {!isLoading && isMockMode && (
         <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-100">
-          This route is still available while the backend access context is unavailable. Links below
-          continue to target the existing working pages.
+          {dictionary.workspaceModule.mockFallback}
         </div>
       )}
 
@@ -103,7 +105,7 @@ const WorkspaceModulePage = ({
 
       <section className="rounded-lg border border-stone-200 bg-white/90 p-4 shadow-sm md:p-5 dark:border-slate-700 dark:bg-slate-900/75">
         <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-50">
-          How this route works
+          {dictionary.workspaceModule.howRouteWorks}
         </h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {notes.map((note) => (
@@ -119,7 +121,9 @@ const WorkspaceModulePage = ({
           href={`/workspace/${workspaceRole}`}
           className="mt-5 inline-flex rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
         >
-          Back to {activeRoleConfig.label} home
+          {formatTemplate(dictionary.workspaceModule.backToRoleHomeTemplate, {
+            role: activeRoleConfig.label,
+          })}
         </Link>
       </section>
     </div>

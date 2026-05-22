@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/I18n/LocaleProvider";
 import { useWorkspace } from "@/components/Workspace/WorkspaceProvider";
 import type { WorkspaceRole } from "@/utils/workspace";
 import { useRouter } from "next/navigation";
@@ -11,6 +12,7 @@ const inputClassName =
 const RoleSwitcher = () => {
   const id = useId();
   const router = useRouter();
+  const { dictionary } = useI18n();
   const { availableRoles, currentRole, isLoading, setRole } = useWorkspace();
 
   return (
@@ -19,7 +21,7 @@ const RoleSwitcher = () => {
         htmlFor={id}
         className="block text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500"
       >
-        Role
+        {dictionary.workspace.roleLabel}
       </label>
       <select
         id={id}

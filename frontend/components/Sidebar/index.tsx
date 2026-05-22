@@ -1,7 +1,9 @@
 "use client";
 
 import SidebarItem from "@/components/Sidebar/SidebarItem";
+import { useI18n } from "@/components/I18n/LocaleProvider";
 import { useWorkspace } from "@/components/Workspace/WorkspaceProvider";
+import { formatTemplate } from "@/utils/i18n";
 import Link from "next/link";
 import type React from "react";
 
@@ -69,10 +71,9 @@ const SidebarHoverCard = ({
 };
 
 const Sidebar = ({ sidebarState, setSidebarOpen, exceptionRef }: SidebarProps) => {
+  const { dictionary } = useI18n();
   const { currentContext, isLoading, roleConfig } = useWorkspace();
-  const contextNote = isLoading
-    ? "Tutor is resolving the latest context note for this role."
-    : currentContext.note;
+  const contextNote = isLoading ? dictionary.workspace.loadingContextNote : currentContext.note;
   const sidebarOpen = sidebarState === "open";
 
   return (
@@ -80,7 +81,7 @@ const Sidebar = ({ sidebarState, setSidebarOpen, exceptionRef }: SidebarProps) =
       {sidebarOpen && (
         <button
           type="button"
-          aria-label="Close sidebar"
+          aria-label={dictionary.workspace.closeSidebar}
           className="fixed inset-0 z-30 bg-slate-950/20 backdrop-blur-[1px] lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
@@ -109,14 +110,14 @@ const Sidebar = ({ sidebarState, setSidebarOpen, exceptionRef }: SidebarProps) =
               eyebrow={roleConfig.workspaceTitle}
               position="side-start"
               title={roleConfig.label}
-              triggerLabel="About"
+              triggerLabel={dictionary.workspace.about}
             />
             <SidebarHoverCard
               description={contextNote}
-              eyebrow="Current context"
+              eyebrow={dictionary.workspace.currentContext}
               position="side-start"
               title={currentContext.label}
-              triggerLabel="Context"
+              triggerLabel={dictionary.workspace.contextLabel}
             >
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                 {currentContext.scope}
@@ -124,22 +125,29 @@ const Sidebar = ({ sidebarState, setSidebarOpen, exceptionRef }: SidebarProps) =
             </SidebarHoverCard>
             <SidebarHoverCard
               description={roleConfig.trustLabel}
-              eyebrow="Trust note"
+              eyebrow={dictionary.workspace.trustNote}
               position="side-start"
-              title={`${roleConfig.label} guidance`}
-              triggerLabel="Trust"
+              title={formatTemplate(dictionary.workspace.roleGuidanceTemplate, {
+                role: roleConfig.label,
+              })}
+              triggerLabel={dictionary.workspace.trust}
             >
               <Link
                 href="/evidence-trust"
                 className="inline-flex rounded-full border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50"
               >
-                Review trust posture
+                {dictionary.workspace.reviewTrustPosture}
               </Link>
             </SidebarHoverCard>
           </div>
         </div>
 
-        <nav aria-label={`${roleConfig.label} navigation`} className="mt-3 flex-1 overflow-y-auto">
+        <nav
+          aria-label={formatTemplate(dictionary.workspace.roleNavigationTemplate, {
+            role: roleConfig.label,
+          })}
+          className="mt-3 flex-1 overflow-y-auto"
+        >
           <ul className="space-y-1.5">
             {roleConfig.navigation.map((item) => (
               <SidebarItem key={`${roleConfig.key}-${item.label}`} item={item} />
