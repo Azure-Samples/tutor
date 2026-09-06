@@ -139,7 +139,7 @@ jobs:
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -162,12 +162,12 @@ jobs:
     runs-on: ubuntu-latest
     name: Frontend PR Checks
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           submodules: true
           lfs: false
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: "22"
       - name: Set up pnpm
@@ -202,12 +202,12 @@ jobs:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           submodules: true
           lfs: false
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -225,7 +225,7 @@ jobs:
           echo "api_token=$token" >> "$GITHUB_OUTPUT"
       - name: Build And Deploy
         id: builddeploy
-        uses: Azure/static-web-apps-deploy@v1
+        uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1
         env:
           NEXT_PUBLIC_APIM_BASE_URL: ${{ needs.resolve-azure-endpoints.outputs.apim_base_url }}
         with:
@@ -254,12 +254,12 @@ jobs:
       SWA_NAME: ${{ needs.resolve-release.outputs.swa_name }}
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           submodules: true
           lfs: false
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -277,7 +277,7 @@ jobs:
           echo "api_token=$token" >> "$GITHUB_OUTPUT"
       - name: Build And Deploy
         id: builddeploy
-        uses: Azure/static-web-apps-deploy@v1
+        uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1
         env:
           NEXT_PUBLIC_APIM_BASE_URL: ${{ needs.resolve-azure-endpoints.outputs.apim_base_url }}
           NEXT_PUBLIC_PILOT_AUTH_HEADERS_ENABLED: "true"
@@ -304,7 +304,7 @@ jobs:
       RESOURCE_GROUP: ${{ needs.resolve-release.outputs.resource_group }}
     steps:
       - name: Azure Login
-        uses: azure/login@v2
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -322,7 +322,7 @@ jobs:
           echo "api_token=$token" >> "$GITHUB_OUTPUT"
       - name: Close Pull Request
         id: closepullrequest
-        uses: Azure/static-web-apps-deploy@v1
+        uses: Azure/static-web-apps-deploy@4d27395796ac319302594769cfe812bd207490b1 # v1
         with:
           azure_static_web_apps_api_token: ${{ steps.swa_token.outputs.api_token }}
           app_location: "/frontend"
